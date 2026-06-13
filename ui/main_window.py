@@ -16,6 +16,7 @@ from ui.settings_dialog import SettingsDialog
 
 class ExportThread(QThread):
     finished = Signal(bool, str)
+    progress = Signal(int, int, str)
     
     def __init__(self, questions, file_path, filter_type):
         super().__init__()
@@ -24,10 +25,13 @@ class ExportThread(QThread):
         self.filter_type = filter_type
         
     def run(self):
+        def report_progress(current, total, message):
+            self.progress.emit(current, total, message)
+            
         try:
             if self.filter_type.startswith("Word"):
                 from modules.exporter import export_to_docx
-                export_to_docx(self.questions, self.file_path)
+                export_to_docx(self.questions, self.file_path, progress_callback=report_progress)
             elif self.filter_type.startswith("Markdown"):
                 from modules.exporter import export_to_markdown
                 export_to_markdown(self.questions, self.file_path)
@@ -427,15 +431,23 @@ class YunKaoExtractorApp(QMainWindow):
     def extract_rich_text(self, element):
         if not element: return ""
         text = ""
+        block_tags = {'p', 'div', 'tr', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'}
+        
         for child in element.contents:
             if isinstance(child, str):
                 text += child
+            elif child.name == 'br':
+                text += "\n"
             elif child.name == 'img':
                 src = child.get('src', '')
                 if src:
                     text += f"![img]({src})"
             elif hasattr(child, 'contents'):
+                if child.name in block_tags and text and not text.endswith("\n"):
+                    text += "\n"
                 text += self.extract_rich_text(child)
+                if child.name in block_tags and not text.endswith("\n"):
+                    text += "\n"
         return text.strip()
 
     def process_html_with_bs4(self, html_content):
@@ -486,20 +498,25 @@ class YunKaoExtractorApp(QMainWindow):
         # 寻找真正的题目容器
         content_div = target if 'practice_slide_content' in target.get('class', []) else target.select_one('.practice_slide_content')
         
-        # 默认始终尝试提取答案，哪怕设置里没勾选
-        # 新逻辑：直接从 DOM 属性获取答案
-        if content_div and content_div.has_attr('data-answer'):
-            answer_text = content_div['data-answer'].strip()
-        
-        # 备用逻辑：从解析区块获取
+        # 优先从页面上显示的正确答案区块提取富文本
+        ans_mark = target.select_one('.right_ans_mark')
+        if ans_mark is not None:
+            # 提取前移除可能的 "正确答案：" 标签 span 以防止重复
+            label_span = ans_mark.select_one('.label, .title')
+            if label_span and "正确答案" in label_span.get_text():
+                label_span.decompose()
+            answer_text = self.extract_rich_text(ans_mark)
+            answer_text = re.sub(r'^正确答案[：:]?\s*', '', answer_text).strip()
+
+        # 备用逻辑：从其他解析区块获取
         if not answer_text:
             ans_node = target.select_one('.answer-text')
             if ans_node is not None:
-                answer_text = ans_node.get_text(strip=True)
-            else:
-                ans_mark = target.select_one('.right_ans_mark')
-                if ans_mark is not None:
-                    answer_text = self.extract_rich_text(ans_mark)
+                answer_text = self.extract_rich_text(ans_node)
+        
+        if not answer_text:
+            if content_div and content_div.has_attr('data-answer'):
+                answer_text = content_div['data-answer'].strip()
                     
         # 尝试精确定位真正的解析文本
         # 必须分步提取，不能用逗号并列，因为带有逗号的 select_one 会返回 DOM 中第一个匹配的元素，从而导致父容器被优先选中！

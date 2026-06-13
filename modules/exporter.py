@@ -36,7 +36,7 @@ def export_to_txt(questions, file_path):
                 
             f.write("\n" + "-"*30 + "\n\n")
 
-def export_to_docx(questions, file_path):
+def export_to_docx(questions, file_path, progress_callback=None):
     try:
         from docx import Document
         from docx.shared import Pt, RGBColor, Inches
@@ -82,12 +82,15 @@ def export_to_docx(questions, file_path):
                         
                     try:
                         # 使用 PyMuPDF 将 SVG 渲染为 PNG
-                        # dpi=100 以匹配常规文字大小，不要过大
                         doc = fitz.open("svg", svg_content.encode('utf-8'))
-                        pix = doc[0].get_pixmap(alpha=True, dpi=100)
+                        # 获取 SVG 原始定义的物理宽度
+                        svg_width_pt = doc[0].rect.width
+                        # 高清渲染 (300dpi)
+                        pix = doc[0].get_pixmap(alpha=True, dpi=300)
                         image_stream = BytesIO(pix.tobytes("png"))
                         run = p.add_run()
-                        run.add_picture(image_stream)
+                        # 在 Word 中以原始物理宽度插入，确保排版完美且高清
+                        run.add_picture(image_stream, width=Pt(svg_width_pt))
                     except Exception as e:
                         print(f"PyMuPDF failed to render SVG: {e}")
                         p.add_run("[图片加载失败]")
@@ -145,7 +148,10 @@ def export_to_docx(questions, file_path):
     heading = doc.add_heading('融智云考题库导出', 0)
     heading.alignment = 1 # 居中
     
+    total = len(questions)
     for i, q in enumerate(questions, 1):
+        if progress_callback:
+            progress_callback(i, total, f"正在处理第 {i}/{total} 题，渲染图片公式中...")
         # 题目
         p = doc.add_paragraph()
         p.add_run(f"{i}. ").bold = True
