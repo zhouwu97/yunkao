@@ -259,9 +259,10 @@ def export_to_docx(questions, file_path, progress_callback=None):
 
 def export_to_pdf(questions, file_path, progress_callback=None):
     import os
-    import tempfile
     
-    temp_docx = os.path.join(tempfile.gettempdir(), f"yunkao_temp_{os.getpid()}.docx")
+    # 强制将临时 Word 放在最终导出的同级目录下，防止存放在 Temp 目录触发 WPS/Office 的“受保护的视图”而导致导出失败
+    file_dir = os.path.dirname(os.path.abspath(file_path))
+    temp_docx = os.path.join(file_dir, f"~yunkao_temp_{os.getpid()}.docx")
     
     try:
         export_to_docx(questions, temp_docx, progress_callback)
