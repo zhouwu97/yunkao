@@ -83,14 +83,37 @@ def export_to_docx(questions, file_path, progress_callback=None):
                     try:
                         # 使用 PyMuPDF 将 SVG 渲染为 PNG
                         doc = fitz.open("svg", svg_content.encode('utf-8'))
-                        # 获取 SVG 原始定义的物理宽度
+                        # 获取 SVG 原始定义的物理宽高
                         svg_width_pt = doc[0].rect.width
+                        svg_height_pt = doc[0].rect.height
+                        
                         # 高清渲染 (300dpi)
                         pix = doc[0].get_pixmap(alpha=True, dpi=300)
                         image_stream = BytesIO(pix.tobytes("png"))
                         run = p.add_run()
                         # 在 Word 中以原始物理宽度插入，确保排版完美且高清
                         run.add_picture(image_stream, width=Pt(svg_width_pt))
+                        
+                        # 尝试解析 SVG 的 vertical-align 以精准对齐 baseline
+                        try:
+                            v_align_match = re.search(r'vertical-align:\s*([-0-9.]+)ex', svg_content)
+                            height_match = re.search(r'height="([0-9.]+)ex"', svg_content)
+                            if v_align_match and height_match:
+                                v_align_ex = float(v_align_match.group(1))
+                                height_ex = float(height_match.group(1))
+                                if height_ex > 0:
+                                    # 计算出需要偏移的 pt 数量
+                                    offset_pt = (v_align_ex / height_ex) * svg_height_pt
+                                    # python-docx 的 position 单位是半点 (half-points)
+                                    from docx.oxml import OxmlElement
+                                    from docx.oxml.ns import qn
+                                    rPr = run._element.get_or_add_rPr()
+                                    position = OxmlElement('w:position')
+                                    position.set(qn('w:val'), str(int(offset_pt * 2)))
+                                    rPr.append(position)
+                        except Exception as e_offset:
+                            print("Failed to apply vertical-align offset:", e_offset)
+                            
                     except Exception as e:
                         print(f"PyMuPDF failed to render SVG: {e}")
                         p.add_run("[图片加载失败]")

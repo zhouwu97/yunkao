@@ -405,14 +405,23 @@ class YunKaoExtractorApp(QMainWindow):
             return
             
         # 显示加载动画进度条
-        self.progress_dialog = QProgressDialog("正在拼命导出并下载高清图片公式...\n这可能需要一小会儿，请稍候...", None, 0, 0, self)
+        self.progress_dialog = QProgressDialog("正在准备导出...", None, 0, len(self.extracted_questions), self)
         self.progress_dialog.setWindowTitle("导出中")
         self.progress_dialog.setWindowModality(Qt.WindowModal)
+        self.progress_dialog.setMinimumDuration(0)
+        self.progress_dialog.setValue(0)
         self.progress_dialog.show()
         
         self.export_thread = ExportThread(self.extracted_questions, file_path, filter)
+        self.export_thread.progress.connect(self._on_export_progress)
         self.export_thread.finished.connect(self._on_export_finished)
         self.export_thread.start()
+
+    def _on_export_progress(self, current, total, message):
+        if hasattr(self, 'progress_dialog'):
+            self.progress_dialog.setLabelText(message)
+            self.progress_dialog.setMaximum(total)
+            self.progress_dialog.setValue(current)
 
     def _on_export_finished(self, success, result):
         if hasattr(self, 'progress_dialog'):
@@ -448,7 +457,7 @@ class YunKaoExtractorApp(QMainWindow):
                 text += self.extract_rich_text(child)
                 if child.name in block_tags and not text.endswith("\n"):
                     text += "\n"
-        return text.strip()
+        return text
 
     def process_html_with_bs4(self, html_content):
         # [DEBUG] Save the raw HTML to disk so we can analyze it
@@ -506,13 +515,13 @@ class YunKaoExtractorApp(QMainWindow):
             if label_span and "正确答案" in label_span.get_text():
                 label_span.decompose()
             answer_text = self.extract_rich_text(ans_mark)
-            answer_text = re.sub(r'^正确答案[：:]?\s*', '', answer_text).strip()
+            answer_text = re.sub(r'^正确答案[：:]?\s*', '', answer_text).strip('\r\n')
 
         # 备用逻辑：从其他解析区块获取
         if not answer_text:
             ans_node = target.select_one('.answer-text')
             if ans_node is not None:
-                answer_text = self.extract_rich_text(ans_node)
+                answer_text = self.extract_rich_text(ans_node).strip('\r\n')
         
         if not answer_text:
             if content_div and content_div.has_attr('data-answer'):
@@ -525,14 +534,14 @@ class YunKaoExtractorApp(QMainWindow):
             analysis_node = target.select_one('.analysis-content .desc')
             
         if analysis_node is not None:
-            raw_analysis = self.extract_rich_text(analysis_node).strip()
+            raw_analysis = self.extract_rich_text(analysis_node).strip('\r\n')
             if raw_analysis:
                 analysis_text = raw_analysis
         for garbage in target.select('.right_ans_mark, .practice_analysis'):
             garbage.decompose()
             
         title_tag = target.select_one('.practice_slide_title .txt, .practice_slide_title')
-        title_text = self.extract_rich_text(title_tag) if title_tag else "未知题目"
+        title_text = self.extract_rich_text(title_tag).strip('\r\n') if title_tag else "未知题目"
 
         options = []
         correct_labels = []
@@ -545,7 +554,7 @@ class YunKaoExtractorApp(QMainWindow):
                 
             txt_tag = li.select_one('.txt')
             opt_elem = txt_tag if txt_tag else li
-            opt_text = self.extract_rich_text(opt_elem)
+            opt_text = self.extract_rich_text(opt_elem).strip('\r\n')
             options.append(f"{auto_label}. {opt_text}")
 
         # 获取题型，用于后续特殊题型的答案提取
@@ -564,19 +573,19 @@ class YunKaoExtractorApp(QMainWindow):
             # 填空题答案提取逻辑
             fill_answers = []
             for elem in target.select('.fill_option li .txt, .answer-input-result'):
-                text = self.extract_rich_text(elem)
+                text = self.extract_rich_text(elem).strip('\r\n')
                 if text: fill_answers.append(text)
             if fill_answers:
                 answer_text = "；".join(fill_answers)
             # 如果上面没找到，再试试其他常见容器
             elif not answer_text or answer_text == 'B':
                 ans_content = target.select_one('.subjective-answer, .answer-content, .answer-detail')
-                if ans_content: answer_text = self.extract_rich_text(ans_content)
+                if ans_content: answer_text = self.extract_rich_text(ans_content).strip('\r\n')
         elif '简答' in question_type or '计算' in question_type or '名词解释' in question_type or '论述' in question_type:
             # 主观题答案提取逻辑
             ans_content = target.select_one('.subjective-answer, .answer-content, .answer-detail')
             if ans_content:
-                answer_text = self.extract_rich_text(ans_content)
+                answer_text = self.extract_rich_text(ans_content).strip('\r\n')
 
         # 过滤掉作为干扰项的默认 B 答案（如果前面没成功提取到，且仍然是 B）
         if answer_text == 'B' and not correct_labels and ('填空' in question_type or '简答' in question_type or '计算' in question_type):
