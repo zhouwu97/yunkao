@@ -451,7 +451,13 @@ class YunKaoExtractorApp(QMainWindow):
             elif child.name == 'img':
                 src = child.get('src', '')
                 if src:
-                    text += f"![img]({src})"
+                    style = child.get('style', '')
+                    v_align_match = re.search(r'vertical-align:\s*([-0-9.]+)(px|ex|em|pt)', style)
+                    if v_align_match:
+                        val, unit = v_align_match.groups()
+                        text += f"![img]({src}|align:{val}{unit})"
+                    else:
+                        text += f"![img]({src})"
             elif hasattr(child, 'contents'):
                 if child.name in block_tags and text and not text.endswith("\n"):
                     text += "\n"

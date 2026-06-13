@@ -57,7 +57,34 @@ def export_to_docx(questions, file_path, progress_callback=None):
                 p.add_run(text_before)
             
             # 尝试下载并嵌入图片
-            url = match.group(1)
+            raw_url = match.group(1)
+            align_val = None
+            align_unit = None
+            url = raw_url
+            if "|align:" in raw_url:
+                parts = raw_url.split("|align:")
+                url = parts[0]
+                align_str = parts[1]
+                v_match = re.match(r'([-0-9.]+)(px|ex|em|pt)', align_str)
+                if v_match:
+                    align_val = float(v_match.group(1))
+                    align_unit = v_match.group(2)
+                    
+            def apply_w_position(run_obj, a_val, a_unit):
+                if a_val is None: return
+                offset_half_pt = 0
+                if a_unit == 'px': offset_half_pt = a_val * 1.5
+                elif a_unit == 'pt': offset_half_pt = a_val * 2
+                elif a_unit == 'ex': offset_half_pt = a_val * 12
+                elif a_unit == 'em': offset_half_pt = a_val * 24
+                
+                if offset_half_pt != 0:
+                    from docx.oxml import OxmlElement
+                    from docx.oxml.ns import qn
+                    rPr = run_obj._element.get_or_add_rPr()
+                    pos = OxmlElement('w:position')
+                    pos.set(qn('w:val'), str(int(offset_half_pt)))
+                    rPr.append(pos)
             try:
                 # 补全相对路径和协议头
                 if url.startswith("//"):
@@ -94,25 +121,27 @@ def export_to_docx(questions, file_path, progress_callback=None):
                         # 在 Word 中以原始物理宽度插入，确保排版完美且高清
                         run.add_picture(image_stream, width=Pt(svg_width_pt))
                         
-                        # 尝试解析 SVG 的 vertical-align 以精准对齐 baseline
-                        try:
-                            v_align_match = re.search(r'vertical-align:\s*([-0-9.]+)ex', svg_content)
-                            height_match = re.search(r'height="([0-9.]+)ex"', svg_content)
-                            if v_align_match and height_match:
-                                v_align_ex = float(v_align_match.group(1))
-                                height_ex = float(height_match.group(1))
-                                if height_ex > 0:
-                                    # 计算出需要偏移的 pt 数量
-                                    offset_pt = (v_align_ex / height_ex) * svg_height_pt
-                                    # python-docx 的 position 单位是半点 (half-points)
-                                    from docx.oxml import OxmlElement
-                                    from docx.oxml.ns import qn
-                                    rPr = run._element.get_or_add_rPr()
-                                    position = OxmlElement('w:position')
-                                    position.set(qn('w:val'), str(int(offset_pt * 2)))
-                                    rPr.append(position)
-                        except Exception as e_offset:
-                            print("Failed to apply vertical-align offset:", e_offset)
+                        # 优先使用 HTML style 提取到的对齐信息
+                        if align_val is not None:
+                            apply_w_position(run, align_val, align_unit)
+                        else:
+                            # 尝试解析 SVG 的 vertical-align 以精准对齐 baseline
+                            try:
+                                v_align_match = re.search(r'vertical-align:\s*([-0-9.]+)ex', svg_content)
+                                height_match = re.search(r'height="([0-9.]+)ex"', svg_content)
+                                if v_align_match and height_match:
+                                    v_align_ex = float(v_align_match.group(1))
+                                    height_ex = float(height_match.group(1))
+                                    if height_ex > 0:
+                                        offset_pt = (v_align_ex / height_ex) * svg_height_pt
+                                        from docx.oxml import OxmlElement
+                                        from docx.oxml.ns import qn
+                                        rPr = run._element.get_or_add_rPr()
+                                        position = OxmlElement('w:position')
+                                        position.set(qn('w:val'), str(int(offset_pt * 2)))
+                                        rPr.append(position)
+                            except Exception as e_offset:
+                                print("Failed to apply vertical-align offset:", e_offset)
                             
                     except Exception as e:
                         print(f"PyMuPDF failed to render SVG: {e}")
@@ -130,6 +159,7 @@ def export_to_docx(questions, file_path, progress_callback=None):
                     image_stream = BytesIO(image_data)
                     run = p.add_run()
                     run.add_picture(image_stream)
+                    if align_val is not None: apply_w_position(run, align_val, align_unit)
                     last_end = match.end()
                     continue
 
@@ -149,9 +179,11 @@ def export_to_docx(questions, file_path, progress_callback=None):
                             run.add_picture(image_stream, width=Inches(5.0))
                         else:
                             run.add_picture(image_stream)
+                        if align_val is not None: apply_w_position(run, align_val, align_unit)
                     except Exception:
                         run = p.add_run()
                         run.add_picture(image_stream)
+                        if align_val is not None: apply_w_position(run, align_val, align_unit)
                 else:
                     p.add_run("[图片加载失败]")
             except Exception as e:
@@ -205,5 +237,19 @@ def export_to_docx(questions, file_path, progress_callback=None):
             add_rich_text_to_paragraph(p_ana, q['analysis'])
             
         doc.add_paragraph("-" * 40)
+        
+    # 添加全页水印
+    from docx.oxml import parse_xml
+    for section in doc.sections:
+        header = section.header
+        p_watermark = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
+        run_watermark = p_watermark.add_run()
+        xml = f'''<w:pict xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml">
+            <v:shape id="WordWaterMark" style="position:absolute;left:0;margin-left:0;margin-top:0;width:500pt;height:200pt;rotation:315;z-index:-251658240;mso-position-horizontal:center;mso-position-horizontal-relative:margin;mso-position-vertical:center;mso-position-vertical-relative:margin" fillcolor="#D0D0D0" stroked="f">
+                <v:fill opacity="0.2"/>
+                <v:textpath style="font-family:'SimHei';font-size:60pt" string="融智云考题库"/>
+            </v:shape>
+        </w:pict>'''
+        run_watermark._element.append(parse_xml(xml))
         
     doc.save(file_path)
