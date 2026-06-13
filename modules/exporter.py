@@ -199,6 +199,12 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
 
     doc = Document()
     
+    # 强制全局使用宋体，避免 WPS 在包含图片的段落中因为渲染路径不同导致字体发粗（假黑体）的 Bug
+    from docx.oxml.ns import qn
+    style = doc.styles['Normal']
+    style.font.name = '宋体'
+    style._element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
+    
     # 设置标题
     heading = doc.add_heading('融智云考题库导出', 0)
     heading.alignment = 1 # 居中
