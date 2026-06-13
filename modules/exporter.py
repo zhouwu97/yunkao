@@ -36,7 +36,7 @@ def export_to_txt(questions, file_path):
                 
             f.write("\n" + "-"*30 + "\n\n")
 
-def export_to_docx(questions, file_path, progress_callback=None):
+def export_to_docx(questions, file_path, progress_callback=None, watermark=True):
     try:
         from docx import Document
         from docx.shared import Pt, RGBColor, Inches
@@ -241,20 +241,21 @@ def export_to_docx(questions, file_path, progress_callback=None):
     # 添加全页水印
     from docx.oxml import parse_xml
     from docx.oxml.ns import nsdecls
-    for section in doc.sections:
-        header = section.header
-        p_watermark = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
-        run_watermark = p_watermark.add_run()
-        xml = f'''<w:pict xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
-            <v:shapetype id="_x0000_t136" coordsize="21600,21600" o:spt="136" adj="10800" path="m@7,l@8,m@5,21600l@6,21600e">
-                <v:path textpathok="t"/>
-                <v:textpath on="t" fitshape="t"/>
-            </v:shapetype>
-            <v:shape id="WordWaterMark" type="#_x0000_t136" style="position:absolute;left:0;margin-left:0;margin-top:0;width:500pt;height:200pt;rotation:315;z-index:-251658240;mso-position-horizontal:center;mso-position-horizontal-relative:margin;mso-position-vertical:center;mso-position-vertical-relative:margin" fillcolor="#E0E0E0" stroked="f">
-                <v:textpath on="t" style="font-family:'SimHei';font-size:60pt" string="融智云考题库"/>
-            </v:shape>
-        </w:pict>'''
-        run_watermark._element.append(parse_xml(xml))
+    if watermark:
+        for section in doc.sections:
+            header = section.header
+            p_watermark = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
+            run_watermark = p_watermark.add_run()
+            xml = f'''<w:pict xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+                <v:shapetype id="_x0000_t136" coordsize="21600,21600" o:spt="136" adj="10800" path="m@7,l@8,m@5,21600l@6,21600e">
+                    <v:path textpathok="t"/>
+                    <v:textpath on="t" fitshape="t"/>
+                </v:shapetype>
+                <v:shape id="WordWaterMark" type="#_x0000_t136" style="position:absolute;left:0;margin-left:0;margin-top:0;width:500pt;height:200pt;rotation:315;z-index:-251658240;mso-position-horizontal:center;mso-position-horizontal-relative:margin;mso-position-vertical:center;mso-position-vertical-relative:margin" fillcolor="#E0E0E0" stroked="f">
+                    <v:textpath on="t" style="font-family:'SimHei';font-size:60pt" string="融智云考题库"/>
+                </v:shape>
+            </w:pict>'''
+            run_watermark._element.append(parse_xml(xml))
         
     # 添加防篡改编辑锁：设置文档为“只读”并混淆加密盐值，永久锁定水印防止被删
     try:
@@ -275,7 +276,7 @@ def export_to_pdf(questions, file_path, progress_callback=None):
     temp_docx = os.path.join(file_dir, f"~yunkao_temp_{os.getpid()}.docx")
     
     try:
-        export_to_docx(questions, temp_docx, progress_callback)
+        export_to_docx(questions, temp_docx, progress_callback, watermark=False)
         if progress_callback:
             progress_callback(len(questions), len(questions), "正在启动 Office 引擎生成 PDF (兼容 WPS)...")
             
@@ -321,6 +322,52 @@ def export_to_pdf(questions, file_path, progress_callback=None):
                 word.Quit()
         except Exception as e_com:
             raise RuntimeError(f"调用 Office 组件失败，请确保没有打开同名 PDF 文件，且 WPS 处于正常状态: {str(e_com)}")
+
+        # 4. 成功生成 PDF 后，使用 PyMuPDF 添加防盗版水印 (绕过 WPS 渲染 VML 崩溃的 BUG)
+        if progress_callback:
+            progress_callback(len(questions), len(questions), "正在添加防盗版水印...")
+        import fitz
+        from PIL import Image, ImageDraw, ImageFont
+        import io
+        
+        img = Image.new('RGBA', (800, 800), (255, 255, 255, 0))
+        d = ImageDraw.Draw(img)
+        try:
+            font = ImageFont.truetype("C:\\Windows\\Fonts\\msyh.ttc", 60)
+        except:
+            font = ImageFont.load_default()
+            
+        text = "融智云考题库"
+        try:
+            bbox = d.textbbox((0, 0), text, font=font)
+            w = bbox[2] - bbox[0]
+            h = bbox[3] - bbox[1]
+        except AttributeError:
+            w, h = d.textsize(text, font=font)
+        
+        x = (800 - w) / 2
+        y = (800 - h) / 2
+        d.text((x, y), text, fill=(200, 200, 200, 80), font=font)
+        
+        img = img.rotate(45, resample=Image.BICUBIC)
+        img_byte_arr = io.BytesIO()
+        img.save(img_byte_arr, format='PNG')
+        img_bytes = img_byte_arr.getvalue()
+        
+        pdf_doc = fitz.open(target_pdf)
+        for page in pdf_doc:
+            rect = page.rect
+            watermark_rect = fitz.Rect(
+                (rect.width - 500) / 2,
+                (rect.height - 500) / 2,
+                (rect.width + 500) / 2,
+                (rect.height + 500) / 2
+            )
+            page.insert_image(watermark_rect, stream=img_bytes)
+            
+        # 保存并覆盖
+        pdf_doc.save(target_pdf, incremental=True, encryption=fitz.PDF_ENCRYPT_KEEP)
+        pdf_doc.close()
         finally:
             pythoncom.CoUninitialize()
             
