@@ -394,12 +394,12 @@ class YunKaoExtractorApp(QMainWindow):
         
         # 自动生成不重复的文件名，避免覆盖提示
         base_path = os.path.join(default_dir, default_prefix)
-        # 默认使用 docx 作为首选格式以方便阅读
-        default_path = f"{base_path}.docx"
         counter = 1
-        while os.path.exists(default_path) or os.path.exists(f"{base_path}({counter}).docx") or os.path.exists(f"{base_path}({counter}).md") or os.path.exists(f"{base_path}.txt") or os.path.exists(f"{base_path}({counter}).txt"):
-            default_path = f"{base_path}({counter}).docx"
+        while any(os.path.exists(f"{base_path}{'(' + str(counter) + ')' if counter > 1 else ''}.{ext}") for ext in ['docx', 'pdf', 'md', 'txt']):
             counter += 1
+            
+        suffix = f"({counter})" if counter > 1 else ""
+        default_path = f"{base_path}{suffix}"
 
         file_path, filter = QFileDialog.getSaveFileName(
             self, "导出基础题库", default_path, 
