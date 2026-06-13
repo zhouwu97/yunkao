@@ -262,6 +262,7 @@ class YunKaoExtractorApp(QMainWindow):
 
         # 100% 铺满的浏览器组件
         self.browser = QWebEngineView(self)
+        self.browser.setZoomFactor(1.25)
         self.setCentralWidget(self.browser)
         self.browser.page().urlChanged.connect(self.on_url_changed)
 
@@ -540,7 +541,7 @@ class YunKaoExtractorApp(QMainWindow):
         for garbage in target.select('.right_ans_mark, .practice_analysis'):
             garbage.decompose()
             
-        title_tag = target.select_one('.practice_slide_title .txt, .practice_slide_title')
+        title_tag = target.select_one('.practice_slide_title .title') or target.select_one('.practice_slide_title .txt') or target.select_one('.practice_slide_title')
         title_text = self.extract_rich_text(title_tag).strip('\r\n') if title_tag else "未知题目"
 
         options = []

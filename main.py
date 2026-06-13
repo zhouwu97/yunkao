@@ -16,7 +16,13 @@ def check_token_validity(token):
     except Exception:
         return False
 
+import os
+
 if __name__ == "__main__":
+    # Disable hardware acceleration to fix random black screens when maximizing
+    os.environ["QT_OPENGL"] = "software"
+    os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-gpu"
+    
     app = QApplication(sys.argv)
     
     # 尝试读取本地保存的登录状态
