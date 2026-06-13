@@ -211,10 +211,6 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
         p = doc.add_paragraph()
         p.add_run(f"{i}. ").bold = True
         add_rich_text_to_paragraph(p, q['title'])
-        # 让整段题目加粗
-        for run in p.runs:
-            run.bold = True
-        
         # 选项
         for opt in q['options']:
             p_opt = doc.add_paragraph(style='List Bullet')
