@@ -270,6 +270,7 @@ def export_to_pdf(questions, file_path, progress_callback=None):
     # 强制将临时 Word 放在最终导出的同级目录下，防止存放在 Temp 目录触发 WPS/Office 的“受保护的视图”而导致导出失败
     file_dir = os.path.dirname(os.path.abspath(file_path))
     temp_docx = os.path.join(file_dir, f"~yunkao_temp_{os.getpid()}.docx")
+    temp_pdf = os.path.join(file_dir, f"~yunkao_temp_{os.getpid()}.pdf")
     
     try:
         export_to_docx(questions, temp_docx, progress_callback, watermark=False)
@@ -297,20 +298,16 @@ def export_to_pdf(questions, file_path, progress_callback=None):
             word.DisplayAlerts = 0
             doc = word.Documents.Open(os.path.abspath(temp_docx))
             try:
-                # 如果目标 PDF 已存在，先强制删除，防止 WPS 覆盖时弹窗报错或因文件被占用而拒绝访问
-                target_pdf = os.path.abspath(file_path)
-                if os.path.exists(target_pdf):
-                    try:
-                        os.remove(target_pdf)
-                    except Exception as rm_err:
-                        raise RuntimeError(f"无法覆盖已存在的文件，请确保该 PDF 未在其他软件中打开！({str(rm_err)})")
+                # 导出到临时 PDF，避免 WPS 云同步功能干扰或增量保存导致文件丢失
+                if os.path.exists(temp_pdf):
+                    os.remove(temp_pdf)
                         
                 try:
-                    doc.SaveAs(target_pdf, 17) # 17 = wdFormatPDF
+                    doc.SaveAs(os.path.abspath(temp_pdf), 17) # 17 = wdFormatPDF
                 except Exception as save_err:
                     try:
                         # 兼容部分极其特殊的 WPS 版本
-                        doc.ExportAsFixedFormat(target_pdf, 17)
+                        doc.ExportAsFixedFormat(os.path.abspath(temp_pdf), 17)
                     except:
                         raise save_err
             finally:
@@ -352,7 +349,15 @@ def export_to_pdf(questions, file_path, progress_callback=None):
         img.save(img_byte_arr, format='PNG')
         img_bytes = img_byte_arr.getvalue()
         
-        pdf_doc = fitz.open(target_pdf)
+        # 确保目标文件未被占用
+        target_pdf = os.path.abspath(file_path)
+        if os.path.exists(target_pdf):
+            try:
+                os.remove(target_pdf)
+            except Exception as rm_err:
+                raise RuntimeError(f"无法覆盖已存在的文件，请确保该 PDF 未在其他软件中打开！({str(rm_err)})")
+
+        pdf_doc = fitz.open(temp_pdf)
         for page in pdf_doc:
             rect = page.rect
             watermark_rect = fitz.Rect(
@@ -363,8 +368,8 @@ def export_to_pdf(questions, file_path, progress_callback=None):
             )
             page.insert_image(watermark_rect, stream=img_bytes)
             
-        # 保存并覆盖
-        pdf_doc.save(target_pdf, incremental=True, encryption=fitz.PDF_ENCRYPT_KEEP)
+        # 保存并覆盖（不使用 incremental=True，以防产生不可预知的文件锁冲突）
+        pdf_doc.save(target_pdf, encryption=fitz.PDF_ENCRYPT_KEEP)
         pdf_doc.close()
             
     except Exception as e:
@@ -373,5 +378,10 @@ def export_to_pdf(questions, file_path, progress_callback=None):
         if os.path.exists(temp_docx):
             try:
                 os.remove(temp_docx)
+            except:
+                pass
+        if os.path.exists(temp_pdf):
+            try:
+                os.remove(temp_pdf)
             except:
                 pass
