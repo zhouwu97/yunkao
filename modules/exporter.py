@@ -244,10 +244,13 @@ def export_to_docx(questions, file_path, progress_callback=None):
         header = section.header
         p_watermark = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
         run_watermark = p_watermark.add_run()
-        xml = f'''<w:pict xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml">
-            <v:shape id="WordWaterMark" style="position:absolute;left:0;margin-left:0;margin-top:0;width:500pt;height:200pt;rotation:315;z-index:-251658240;mso-position-horizontal:center;mso-position-horizontal-relative:margin;mso-position-vertical:center;mso-position-vertical-relative:margin" fillcolor="#D0D0D0" stroked="f">
-                <v:fill opacity="0.2"/>
-                <v:textpath style="font-family:'SimHei';font-size:60pt" string="融智云考题库"/>
+        xml = f'''<w:pict xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+            <v:shapetype id="_x0000_t136" coordsize="21600,21600" o:spt="136" adj="10800" path="m@7,l@8,m@5,21600l@6,21600e">
+                <v:path textpathok="t"/>
+                <v:textpath on="t" fitshape="t"/>
+            </v:shapetype>
+            <v:shape id="WordWaterMark" type="#_x0000_t136" style="position:absolute;left:0;margin-left:0;margin-top:0;width:500pt;height:200pt;rotation:315;z-index:-251658240;mso-position-horizontal:center;mso-position-horizontal-relative:margin;mso-position-vertical:center;mso-position-vertical-relative:margin" fillcolor="#E0E0E0" stroked="f">
+                <v:textpath on="t" style="font-family:'SimHei';font-size:60pt" string="融智云考题库"/>
             </v:shape>
         </w:pict>'''
         run_watermark._element.append(parse_xml(xml))
