@@ -50,7 +50,7 @@ def export_to_docx(questions, file_path, progress_callback=None):
     def add_rich_text_to_paragraph(p, text):
         """将包含 ![img](url) 的富文本添加到段落中，自动下载并嵌入图片"""
         last_end = 0
-        for match in re.finditer(r'!\[[^\]]*\]\(((?:[^)(]+|\([^)(]*\))*)\)', text):
+        for match in re.finditer(r'!\[[^\]]*\]\(([^()]*(?:\([^()]*\)[^()]*)*)\)', text):
             # 添加图片前面的文本
             text_before = text[last_end:match.start()]
             if text_before:
