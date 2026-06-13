@@ -261,20 +261,33 @@ def export_to_pdf(questions, file_path, progress_callback=None):
     import os
     import tempfile
     
-    try:
-        from docx2pdf import convert
-    except ImportError:
-        raise ImportError("未安装 docx2pdf 库，无法导出 PDF。请运行 pip install docx2pdf pywin32")
-        
     temp_docx = os.path.join(tempfile.gettempdir(), f"yunkao_temp_{os.getpid()}.docx")
     
     try:
         export_to_docx(questions, temp_docx, progress_callback)
         if progress_callback:
-            progress_callback(len(questions), len(questions), "正在启动 Word 引擎生成 PDF (可能需要几秒钟)...")
-        convert(temp_docx, file_path)
+            progress_callback(len(questions), len(questions), "正在启动 Office 引擎生成 PDF (兼容 WPS)...")
+            
+        import win32com.client
+        import pythoncom
+        pythoncom.CoInitialize()
+        
+        try:
+            word = win32com.client.Dispatch("Word.Application")
+            word.Visible = False
+            doc = word.Documents.Open(os.path.abspath(temp_docx))
+            try:
+                doc.SaveAs(os.path.abspath(file_path), 17) # 17 = wdFormatPDF
+            finally:
+                doc.Close(0)
+                word.Quit()
+        except Exception as e_com:
+            raise RuntimeError(f"调用 Office 组件失败，请确保电脑安装了 Microsoft Word 或 WPS Office: {str(e_com)}")
+        finally:
+            pythoncom.CoUninitialize()
+            
     except Exception as e:
-        raise RuntimeError(f"PDF 转换失败，请确保电脑已安装 Microsoft Word: {str(e)}")
+        raise RuntimeError(f"PDF 转换失败: {str(e)}")
     finally:
         if os.path.exists(temp_docx):
             try:
