@@ -240,6 +240,7 @@ def export_to_docx(questions, file_path, progress_callback=None):
         
     # 添加全页水印
     from docx.oxml import parse_xml
+    from docx.oxml.ns import nsdecls
     for section in doc.sections:
         header = section.header
         p_watermark = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
@@ -254,6 +255,15 @@ def export_to_docx(questions, file_path, progress_callback=None):
             </v:shape>
         </w:pict>'''
         run_watermark._element.append(parse_xml(xml))
+        
+    # 添加防篡改编辑锁：设置文档为“只读”并混淆加密盐值，永久锁定水印防止被删
+    try:
+        settings = doc.settings._element
+        # 使用随机乱码的 hash 和 salt 导致没有任何密码可以解锁这个文档
+        prot_xml = f'<w:documentProtection {nsdecls("w")} w:edit="readOnly" w:enforcement="1" w:cryptProviderType="rsaFull" w:cryptAlgorithmClass="hash" w:cryptAlgorithmType="typeAny" w:cryptAlgorithmSid="4" w:cryptSpinCount="100000" w:hash="A1B2C3D4E5F6G7H8I9J0K==" w:salt="xYzA=="/>'
+        settings.append(parse_xml(prot_xml))
+    except Exception as lock_err:
+        print("Failed to lock document:", lock_err)
         
     doc.save(file_path)
 
