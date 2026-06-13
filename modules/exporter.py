@@ -273,16 +273,43 @@ def export_to_pdf(questions, file_path, progress_callback=None):
         pythoncom.CoInitialize()
         
         try:
-            word = win32com.client.Dispatch("Word.Application")
+            # 优先尝试 WPS，防止用户电脑上有过期/损坏的微软 Office 导致命令拒绝
+            word = None
+            for app_name in ["KWPS.Application", "WPS.Application", "Word.Application"]:
+                try:
+                    word = win32com.client.DispatchEx(app_name)
+                    break
+                except:
+                    continue
+            
+            if not word:
+                raise Exception("未找到可用的 Word 或 WPS 组件")
+                
             word.Visible = False
+            word.DisplayAlerts = 0
             doc = word.Documents.Open(os.path.abspath(temp_docx))
             try:
-                doc.SaveAs(os.path.abspath(file_path), 17) # 17 = wdFormatPDF
+                # 如果目标 PDF 已存在，先强制删除，防止 WPS 覆盖时弹窗报错或因文件被占用而拒绝访问
+                target_pdf = os.path.abspath(file_path)
+                if os.path.exists(target_pdf):
+                    try:
+                        os.remove(target_pdf)
+                    except Exception as rm_err:
+                        raise RuntimeError(f"无法覆盖已存在的文件，请确保该 PDF 未在其他软件中打开！({str(rm_err)})")
+                        
+                try:
+                    doc.SaveAs(target_pdf, 17) # 17 = wdFormatPDF
+                except Exception as save_err:
+                    try:
+                        # 兼容部分极其特殊的 WPS 版本
+                        doc.ExportAsFixedFormat(target_pdf, 17)
+                    except:
+                        raise save_err
             finally:
                 doc.Close(0)
                 word.Quit()
         except Exception as e_com:
-            raise RuntimeError(f"调用 Office 组件失败，请确保电脑安装了 Microsoft Word 或 WPS Office: {str(e_com)}")
+            raise RuntimeError(f"调用 Office 组件失败，请确保没有打开同名 PDF 文件，且 WPS 处于正常状态: {str(e_com)}")
         finally:
             pythoncom.CoUninitialize()
             
