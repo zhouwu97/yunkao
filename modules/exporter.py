@@ -256,3 +256,28 @@ def export_to_docx(questions, file_path, progress_callback=None):
         run_watermark._element.append(parse_xml(xml))
         
     doc.save(file_path)
+
+def export_to_pdf(questions, file_path, progress_callback=None):
+    import os
+    import tempfile
+    
+    try:
+        from docx2pdf import convert
+    except ImportError:
+        raise ImportError("未安装 docx2pdf 库，无法导出 PDF。请运行 pip install docx2pdf pywin32")
+        
+    temp_docx = os.path.join(tempfile.gettempdir(), f"yunkao_temp_{os.getpid()}.docx")
+    
+    try:
+        export_to_docx(questions, temp_docx, progress_callback)
+        if progress_callback:
+            progress_callback(len(questions), len(questions), "正在启动 Word 引擎生成 PDF (可能需要几秒钟)...")
+        convert(temp_docx, file_path)
+    except Exception as e:
+        raise RuntimeError(f"PDF 转换失败，请确保电脑已安装 Microsoft Word: {str(e)}")
+    finally:
+        if os.path.exists(temp_docx):
+            try:
+                os.remove(temp_docx)
+            except:
+                pass

@@ -32,6 +32,9 @@ class ExportThread(QThread):
             if self.filter_type.startswith("Word"):
                 from modules.exporter import export_to_docx
                 export_to_docx(self.questions, self.file_path, progress_callback=report_progress)
+            elif self.filter_type.startswith("PDF"):
+                from modules.exporter import export_to_pdf
+                export_to_pdf(self.questions, self.file_path, progress_callback=report_progress)
             elif self.filter_type.startswith("Markdown"):
                 from modules.exporter import export_to_markdown
                 export_to_markdown(self.questions, self.file_path)
@@ -400,7 +403,7 @@ class YunKaoExtractorApp(QMainWindow):
 
         file_path, filter = QFileDialog.getSaveFileName(
             self, "导出基础题库", default_path, 
-            "Word 文档 (*.docx);;Markdown 文件 (*.md);;文本文件 (*.txt)"
+            "PDF 文件 (*.pdf);;Word 文档 (*.docx);;Markdown 文件 (*.md);;文本文件 (*.txt)"
         )
         if not file_path:
             return
