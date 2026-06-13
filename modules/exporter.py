@@ -203,7 +203,16 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
     heading = doc.add_heading('融智云考题库导出', 0)
     heading.alignment = 1 # 居中
     
+    # 开头添加防诈骗提示
+    anti_scam_text = "此文件免费导出，若是购买来的，请退款。作者qq2170194804（不是卖家的QQ）"
+    p_scam_start = doc.add_paragraph()
+    p_scam_start.alignment = 1
+    run_scam_start = p_scam_start.add_run(anti_scam_text)
+    run_scam_start.bold = True
+    run_scam_start.font.color.rgb = RGBColor(255, 0, 0)
+    
     total = len(questions)
+    mid_point = total // 2
     for i, q in enumerate(questions, 1):
         if progress_callback:
             progress_callback(i, total, f"正在处理第 {i}/{total} 题，渲染图片公式中...")
@@ -234,6 +243,22 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
             
         doc.add_paragraph("-" * 40)
         
+        # 题库中间添加防诈骗提示
+        if i == mid_point and total > 1:
+            p_scam_mid = doc.add_paragraph()
+            p_scam_mid.alignment = 1
+            run_scam_mid = p_scam_mid.add_run(anti_scam_text)
+            run_scam_mid.bold = True
+            run_scam_mid.font.color.rgb = RGBColor(255, 0, 0)
+            doc.add_paragraph("-" * 40)
+
+    # 结尾添加防诈骗提示
+    p_scam_end = doc.add_paragraph()
+    p_scam_end.alignment = 1
+    run_scam_end = p_scam_end.add_run(anti_scam_text)
+    run_scam_end.bold = True
+    run_scam_end.font.color.rgb = RGBColor(255, 0, 0)
+        
     # 添加全页水印
     from docx.oxml import parse_xml
     from docx.oxml.ns import nsdecls
@@ -247,8 +272,11 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
                     <v:path textpathok="t"/>
                     <v:textpath on="t" fitshape="t"/>
                 </v:shapetype>
-                <v:shape id="WordWaterMark" type="#_x0000_t136" style="position:absolute;left:0;margin-left:0;margin-top:0;width:500pt;height:200pt;rotation:315;z-index:-251658240;mso-position-horizontal:center;mso-position-horizontal-relative:margin;mso-position-vertical:center;mso-position-vertical-relative:margin" fillcolor="#E0E0E0" stroked="f">
-                    <v:textpath on="t" style="font-family:'SimHei';font-size:60pt" string="融智云考题库"/>
+                <v:shape id="WordWaterMark1" type="#_x0000_t136" style="position:absolute;left:0;margin-left:0;margin-top:-100pt;width:600pt;height:150pt;rotation:315;z-index:-251658240;mso-position-horizontal:center;mso-position-horizontal-relative:margin;mso-position-vertical:center;mso-position-vertical-relative:margin" fillcolor="#E0E0E0" stroked="f">
+                    <v:textpath on="t" style="font-family:'SimHei';font-size:50pt" string="此题库免费，注意防诈。"/>
+                </v:shape>
+                <v:shape id="WordWaterMark2" type="#_x0000_t136" style="position:absolute;left:0;margin-left:0;margin-top:100pt;width:600pt;height:100pt;rotation:315;z-index:-251658240;mso-position-horizontal:center;mso-position-horizontal-relative:margin;mso-position-vertical:center;mso-position-vertical-relative:margin" fillcolor="#E0E0E0" stroked="f">
+                    <v:textpath on="t" style="font-family:'Arial';font-size:40pt" string="GitHub SYLUlive"/>
                 </v:shape>
             </w:pict>'''
             run_watermark._element.append(parse_xml(xml))
@@ -328,22 +356,28 @@ def export_to_pdf(questions, file_path, progress_callback=None):
         img = Image.new('RGBA', (800, 800), (255, 255, 255, 0))
         d = ImageDraw.Draw(img)
         try:
-            font = ImageFont.truetype("C:\\Windows\\Fonts\\msyh.ttc", 60)
+            font = ImageFont.truetype("C:\\Windows\\Fonts\\msyh.ttc", 50)
+            font_small = ImageFont.truetype("C:\\Windows\\Fonts\\msyh.ttc", 40)
         except:
             font = ImageFont.load_default()
+            font_small = ImageFont.load_default()
             
-        text = "融智云考题库"
-        try:
-            bbox = d.textbbox((0, 0), text, font=font)
-            w = bbox[2] - bbox[0]
-            h = bbox[3] - bbox[1]
-        except AttributeError:
-            w, h = d.textsize(text, font=font)
+        text1 = "此题库免费，注意防诈。"
+        text2 = "GitHub SYLUlive"
         
-        x = (800 - w) / 2
-        y = (800 - h) / 2
-        d.text((x, y), text, fill=(200, 200, 200, 80), font=font)
-        
+        def draw_centered_text(draw, txt, y_offset, fnt):
+            try:
+                bbox = draw.textbbox((0, 0), txt, font=fnt)
+                w = bbox[2] - bbox[0]
+                h = bbox[3] - bbox[1]
+            except AttributeError:
+                w, h = draw.textsize(txt, font=fnt)
+            x = (800 - w) / 2
+            y = (800 - h) / 2 + y_offset
+            draw.text((x, y), txt, fill=(200, 200, 200, 80), font=fnt)
+            
+        draw_centered_text(d, text1, -40, font)
+        draw_centered_text(d, text2, 40, font_small)
         img = img.rotate(45, resample=Image.BICUBIC)
         img_byte_arr = io.BytesIO()
         img.save(img_byte_arr, format='PNG')
