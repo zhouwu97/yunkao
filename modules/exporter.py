@@ -322,6 +322,8 @@ def export_to_pdf(questions, file_path, progress_callback=None):
                 word.Quit()
         except Exception as e_com:
             raise RuntimeError(f"调用 Office 组件失败，请确保没有打开同名 PDF 文件，且 WPS 处于正常状态: {str(e_com)}")
+        finally:
+            pythoncom.CoUninitialize()
 
         # 4. 成功生成 PDF 后，使用 PyMuPDF 添加防盗版水印 (绕过 WPS 渲染 VML 崩溃的 BUG)
         if progress_callback:
@@ -368,8 +370,6 @@ def export_to_pdf(questions, file_path, progress_callback=None):
         # 保存并覆盖
         pdf_doc.save(target_pdf, incremental=True, encryption=fitz.PDF_ENCRYPT_KEEP)
         pdf_doc.close()
-        finally:
-            pythoncom.CoUninitialize()
             
     except Exception as e:
         raise RuntimeError(f"PDF 转换失败: {str(e)}")
