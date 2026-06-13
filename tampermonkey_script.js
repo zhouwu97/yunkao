@@ -538,21 +538,11 @@
                     textElement = li;
                 }
 
-                const inputElement = li.querySelector('input[data-isright], input[type="radio"], input[type="checkbox"]');
-
-                let optionLabel = autoLabel;
-                if (letterElement) {
-                    const extracted = letterElement.textContent.replace(/[^A-Z]/g, '').trim();
-                    if (extracted) optionLabel = extracted;
-                }
-
                 const optionContent = await getRichText(textElement);
                 question.options.push({
-                    label: optionLabel,
+                    label: autoLabel,
                     text: optionContent
                 });
-
-                // 判断是否为正确答案（结合您截图中的 right_ans_mark）
                 let isRight = false;
                 if (inputElement && inputElement.getAttribute('data-isright') === '1') {
                     isRight = true;

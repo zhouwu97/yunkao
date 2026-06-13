@@ -126,8 +126,12 @@ class SoftwareLoginDialog(QDialog):
             self.user_data = data.get("user", {})
             self.current_user = user
 
-            # 登录成功，保存非敏感信息
-            save_config({'user': user})
+            # 登录成功，保存登录状态
+            cfg = load_config()
+            cfg['user'] = user
+            cfg['jwt_token'] = self.jwt_token
+            cfg['user_data'] = self.user_data
+            save_config(cfg)
 
             # 处理云考密码的本地加密存储
             if self.chk_remember_yunkao.isChecked():

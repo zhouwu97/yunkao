@@ -6,17 +6,29 @@ SERVICE_NAME = "YunKaoDesktop"
 HARDCODED_SCHOOL_CODE = "u101441"
 
 # 后端 API 基础地址（生产环境部署后替换为真实域名）
-API_BASE_URL = "http://101.42.27.44:8080"
+API_BASE_URL = "http://156.233.229.232:8080"
+
+DEFAULT_CONFIG = {
+    "extract_answer": False,
+    "export_prefix": "基础题库导出"
+}
 
 def load_config():
-    """加载本地配置文件"""
+    """加载本地配置文件，带 Fallback 容灾机制"""
+    cfg = DEFAULT_CONFIG.copy()
     if os.path.exists(CONFIG_FILE):
         try:
             with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except:
-            pass
-    return {}
+                data = json.load(f)
+                if isinstance(data, dict):
+                    cfg.update(data)
+                return cfg
+        except Exception:
+            pass  # 解析失败或损坏，走下方兜底重新写入
+            
+    # 文件不存在或损坏，写入默认配置
+    save_config(cfg)
+    return cfg
 
 def save_config(data):
     """保存配置到本地文件"""
