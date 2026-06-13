@@ -50,7 +50,7 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
     def add_rich_text_to_paragraph(p, text):
         """将包含 ![img](url) 的富文本添加到段落中，自动下载并嵌入图片"""
         last_end = 0
-        for match in re.finditer(r'!\[[^\]]*\]\(([^()]*(?:\([^()]*\)[^()]*)*)\)', text):
+        for match in re.finditer(r'!\[[^\]]*\]<([^>]+)>', text):
             # 添加图片前面的文本
             text_before = text[last_end:match.start()]
             if text_before:
@@ -208,7 +208,6 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
     p_scam_start = doc.add_paragraph()
     p_scam_start.alignment = 1
     run_scam_start = p_scam_start.add_run(anti_scam_text)
-    run_scam_start.bold = True
     run_scam_start.font.color.rgb = RGBColor(255, 0, 0)
     
     total = len(questions)
@@ -218,7 +217,7 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
             progress_callback(i, total, f"正在处理第 {i}/{total} 题，渲染图片公式中...")
         # 题目
         p = doc.add_paragraph()
-        p.add_run(f"{i}. ").bold = True
+        p.add_run(f"{i}. ")
         add_rich_text_to_paragraph(p, q['title'])
         # 选项
         for opt in q['options']:
@@ -229,7 +228,6 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
         if q.get('answer'):
             p_ans = doc.add_paragraph()
             run = p_ans.add_run("[答案]: ")
-            run.bold = True
             run.font.color.rgb = RGBColor(0, 112, 192) # 蓝色
             add_rich_text_to_paragraph(p_ans, q['answer'])
             
@@ -237,7 +235,6 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
         if q.get('analysis'):
             p_ana = doc.add_paragraph()
             run = p_ana.add_run("[解析]: ")
-            run.bold = True
             run.font.color.rgb = RGBColor(237, 125, 49) # 橙色
             add_rich_text_to_paragraph(p_ana, q['analysis'])
             
@@ -248,7 +245,6 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
             p_scam_mid = doc.add_paragraph()
             p_scam_mid.alignment = 1
             run_scam_mid = p_scam_mid.add_run(anti_scam_text)
-            run_scam_mid.bold = True
             run_scam_mid.font.color.rgb = RGBColor(255, 0, 0)
             doc.add_paragraph("-" * 40)
 
@@ -256,7 +252,6 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
     p_scam_end = doc.add_paragraph()
     p_scam_end.alignment = 1
     run_scam_end = p_scam_end.add_run(anti_scam_text)
-    run_scam_end.bold = True
     run_scam_end.font.color.rgb = RGBColor(255, 0, 0)
         
     # 添加全页水印
