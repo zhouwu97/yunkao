@@ -1,8 +1,12 @@
 {
   "extract_answer": false,
   "export_prefix": "基础题库导出",
+  "pdf_export_engine": "wps",
+  "default_export_dir": "C:\\Users\\haha",
+  "default_filename_prefix": "融智云考题库",
+  "export_with_answers": false,
   "user": "2403060128",
-  "jwt_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoyLCJyb2xlIjoiYWRtaW4iLCJ0b2tlbl92ZXJzaW9uIjoyLCJleHAiOjE3ODE5MzcwMDcsImlhdCI6MTc4MTMzMjIwN30.PRDqUvqLBjt_X9De_xjwGNHQovv2YeDFfCB1e6VNf04",
+  "jwt_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoyLCJyb2xlIjoiYWRtaW4iLCJ0b2tlbl92ZXJzaW9uIjoyLCJleHAiOjE3ODE5Njg4NTgsImlhdCI6MTc4MTM2NDA1OH0._deRtWrSEf5FH57P8guIY11HLgP5mzYMO43axEyW2WQ",
   "user_data": {
     "id": 2,
     "student_id": "2403060128",
@@ -20,7 +24,7 @@
     "device_token": "160a3797c952ea4f340",
     "credits": 51,
     "created_at": "2026-05-05T22:23:16.26493+08:00",
-    "updated_at": "2026-06-13T12:39:01.111233+08:00",
+    "updated_at": "2026-06-13T23:13:22.030128+08:00",
     "edu_student_id": "2403060128",
     "edu_cookie": "JSESSIONID=D804CF5AAA494C5D6CFEDEAC937290D9; clwz_blc_pst_xd0xc2xbdxccxcexf1WEBxb7xfexcexf1xc6xf7=134219018.20480",
     "edu_bound": true,
@@ -31,7 +35,7 @@
     "last_check_in_date": "2026-06-13",
     "is_checked_in_today": false,
     "is_following": false,
-    "followers_count": 2,
+    "followers_count": 3,
     "following_count": 1,
     "total_likes_received": 19
   }

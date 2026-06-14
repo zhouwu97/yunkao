@@ -1,13 +1,15 @@
+import webbrowser
 import keyring
 import requests
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QFormLayout, QLineEdit, QCheckBox, QLabel, QPushButton, QApplication
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit, QCheckBox, QLabel, QPushButton, QApplication
+from PySide6.QtCore import Qt
 from config.settings import load_config, save_config, SERVICE_NAME, HARDCODED_SCHOOL_CODE, API_BASE_URL
 
 class SoftwareLoginDialog(QDialog):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("融智云考导出系统 - 用户登录")
-        self.setFixedSize(380, 340)
+        self.setFixedSize(380, 420)
         self.jwt_token = None
         self.user_data = None
 
@@ -21,12 +23,23 @@ class SoftwareLoginDialog(QDialog):
         form_layout = QFormLayout()
         self.input_user = QLineEdit()
         self.input_user.setPlaceholderText("请输入学号 (10位)")
+        
+        pwd_layout = QHBoxLayout()
         self.input_main_pwd = QLineEdit()
         self.input_main_pwd.setEchoMode(QLineEdit.Password)
-        self.input_main_pwd.setPlaceholderText("输入您的 APP 登录密码")
-
+        self.input_main_pwd.setPlaceholderText("输入您的 沈理校园 登录密码")
+        
+        self.btn_show_main_pwd = QPushButton("👁")
+        self.btn_show_main_pwd.setFixedSize(24, 24)
+        self.btn_show_main_pwd.setCheckable(True)
+        self.btn_show_main_pwd.clicked.connect(lambda checked: self.input_main_pwd.setEchoMode(QLineEdit.Normal if checked else QLineEdit.Password))
+        
+        pwd_layout.addWidget(self.input_main_pwd)
+        pwd_layout.addWidget(self.btn_show_main_pwd)
+        pwd_layout.setContentsMargins(0, 0, 0, 0)
+        
         form_layout.addRow("学号:", self.input_user)
-        form_layout.addRow("密码:", self.input_main_pwd)
+        form_layout.addRow("校园密码:", pwd_layout)
         layout.addLayout(form_layout)
 
         # ---- 融智云考快捷登录区 ----
@@ -48,10 +61,21 @@ class SoftwareLoginDialog(QDialog):
         layout.addWidget(self.lbl_safe_tip)
 
         form_layout_yk = QFormLayout()
+        yk_pwd_layout = QHBoxLayout()
         self.input_yk_pwd = QLineEdit()
         self.input_yk_pwd.setEchoMode(QLineEdit.Password)
-        self.input_yk_pwd.setPlaceholderText("云考独立密码 (与系统相同则留空)")
-        form_layout_yk.addRow("云考密码:", self.input_yk_pwd)
+        self.input_yk_pwd.setPlaceholderText("默认 123456，若修改过请填写")
+        
+        self.btn_show_yk_pwd = QPushButton("👁")
+        self.btn_show_yk_pwd.setFixedSize(24, 24)
+        self.btn_show_yk_pwd.setCheckable(True)
+        self.btn_show_yk_pwd.clicked.connect(lambda checked: self.input_yk_pwd.setEchoMode(QLineEdit.Normal if checked else QLineEdit.Password))
+        
+        yk_pwd_layout.addWidget(self.input_yk_pwd)
+        yk_pwd_layout.addWidget(self.btn_show_yk_pwd)
+        yk_pwd_layout.setContentsMargins(0, 0, 0, 0)
+        
+        form_layout_yk.addRow("云考密码:", yk_pwd_layout)
         layout.addLayout(form_layout_yk)
 
         # ---- 登录按钮 ----
@@ -71,6 +95,37 @@ class SoftwareLoginDialog(QDialog):
         self.status_label.setStyleSheet("color: #cc0000; font-size: 11px;")
         layout.addWidget(self.status_label)
 
+        layout.addStretch()
+
+        # ---- 注册引导区 ----
+        register_sep = QLabel("─" * 40)
+        register_sep.setStyleSheet("color: #ccc;")
+        layout.addWidget(register_sep)
+
+        self.lbl_no_account = QLabel("还没有沈理校园账号？")
+        self.lbl_no_account.setAlignment(Qt.AlignCenter)
+        self.lbl_no_account.setStyleSheet("font-size: 12px; color: #888; margin-top: 4px;")
+        layout.addWidget(self.lbl_no_account)
+
+        self.btn_register = QPushButton("📱 下载 SYLUlive 去注册")
+        self.btn_register.setCursor(Qt.PointingHandCursor)
+        self.btn_register.setFixedHeight(32)
+        self.btn_register.setStyleSheet("""
+            QPushButton {
+                background-color: transparent;
+                color: #0078D7;
+                border: 1px solid #0078D7;
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: rgba(0, 120, 215, 0.08);
+            }
+        """)
+        self.btn_register.clicked.connect(lambda: webbrowser.open("https://github.com/zhouwu97/SYLUlive"))
+        layout.addWidget(self.btn_register)
+
         self.load_local_data()
 
     def on_remember_toggled(self, checked):
@@ -87,6 +142,10 @@ class SoftwareLoginDialog(QDialog):
             pwd = keyring.get_password(SERVICE_NAME, f"{HARDCODED_SCHOOL_CODE}_{user}")
             if pwd:
                 self.input_yk_pwd.setText(pwd)
+            else:
+                self.input_yk_pwd.setText("123456")
+        else:
+            self.input_yk_pwd.setText("123456")
 
     def do_login(self):
         user = self.input_user.text().strip()
@@ -150,6 +209,8 @@ class SoftwareLoginDialog(QDialog):
         else:
             try:
                 error_msg = resp.json().get("error", "登录失败")
+                if "密码" in error_msg or "password" in error_msg.lower():
+                    error_msg = "沈理校园账号密码错误，请检查！"
             except Exception:
                 error_msg = f"HTTP {resp.status_code}: 服务器异常或接口不存在"
             self.status_label.setText(f"❌ {error_msg}")

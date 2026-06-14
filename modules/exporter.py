@@ -58,17 +58,20 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
             
             # 尝试下载并嵌入图片
             raw_url = match.group(1)
-            align_val = None
-            align_unit = None
-            url = raw_url
-            if "|align:" in raw_url:
-                parts = raw_url.split("|align:")
-                url = parts[0]
-                align_str = parts[1]
-                v_match = re.match(r'([-0-9.]+)(px|ex|em|pt)', align_str)
-                if v_match:
-                    align_val = float(v_match.group(1))
-                    align_unit = v_match.group(2)
+            align_val, align_unit = None, None
+            explicit_w_val, explicit_w_unit = None, None
+            explicit_h_val, explicit_h_unit = None, None
+            
+            url = raw_url.split('|align:')[0].split('|w:')[0].split('|h:')[0]
+            
+            a_match = re.search(r'\|align:([-0-9.]+)(px|ex|em|pt)', raw_url)
+            if a_match: align_val, align_unit = float(a_match.group(1)), a_match.group(2)
+                
+            w_match = re.search(r'\|w:([-0-9.]+)(px|ex|em|pt|%)', raw_url)
+            if w_match: explicit_w_val, explicit_w_unit = float(w_match.group(1)), w_match.group(2)
+
+            h_match = re.search(r'\|h:([-0-9.]+)(px|ex|em|pt|%)', raw_url)
+            if h_match: explicit_h_val, explicit_h_unit = float(h_match.group(1)), h_match.group(2)
                     
             def apply_w_position(run_obj, a_val, a_unit):
                 if a_val is None: return
@@ -109,10 +112,31 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
                         
                     try:
                         # 使用 PyMuPDF 将 SVG 渲染为 PNG
+                        # 强力修复 MathJax SVG 尺寸过大问题 (PyMuPDF 无法识别 ex/em 单位，会回退到 viewBox 导致巨大化)
+                        svg_width_pt, svg_height_pt = None, None
+                        
+                        try:
+                            w_match = re.search(r'width="([0-9.]+)(ex|em|px|pt)"', svg_content)
+                            h_match = re.search(r'height="([0-9.]+)(ex|em|px|pt)"', svg_content)
+                            if w_match:
+                                val, unit = float(w_match.group(1)), w_match.group(2)
+                                if unit == 'ex': svg_width_pt = val * 8.0
+                                elif unit == 'em': svg_width_pt = val * 16.0
+                                elif unit == 'px': svg_width_pt = val * 0.75
+                                elif unit == 'pt': svg_width_pt = val
+                            if h_match:
+                                val, unit = float(h_match.group(1)), h_match.group(2)
+                                if unit == 'ex': svg_height_pt = val * 8.0
+                                elif unit == 'em': svg_height_pt = val * 16.0
+                                elif unit == 'px': svg_height_pt = val * 0.75
+                                elif unit == 'pt': svg_height_pt = val
+                        except Exception as e:
+                            pass
+                            
+                        # 获取 SVG 原始定义的物理宽高 (作为备选)
                         doc = fitz.open("svg", svg_content.encode('utf-8'))
-                        # 获取 SVG 原始定义的物理宽高
-                        svg_width_pt = doc[0].rect.width
-                        svg_height_pt = doc[0].rect.height
+                        if svg_width_pt is None: svg_width_pt = doc[0].rect.width
+                        if svg_height_pt is None: svg_height_pt = doc[0].rect.height
                         
                         # 高清渲染 (300dpi)
                         pix = doc[0].get_pixmap(alpha=True, dpi=300)
@@ -158,7 +182,14 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
                     image_data = base64.b64decode(data)
                     image_stream = BytesIO(image_data)
                     run = p.add_run()
-                    run.add_picture(image_stream)
+                    if explicit_width_pt is not None and explicit_height_pt is not None:
+                        run.add_picture(image_stream, width=Pt(explicit_width_pt), height=Pt(explicit_height_pt))
+                    elif explicit_width_pt is not None:
+                        run.add_picture(image_stream, width=Pt(explicit_width_pt))
+                    elif explicit_height_pt is not None:
+                        run.add_picture(image_stream, height=Pt(explicit_height_pt))
+                    else:
+                        run.add_picture(image_stream)
                     if align_val is not None: apply_w_position(run, align_val, align_unit)
                     last_end = match.end()
                     continue
@@ -169,16 +200,40 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
                     image_data = response.content
                     image_stream = BytesIO(image_data)
                     
-                    # 检查图片宽度，如果超过文档宽度则进行限制
                     try:
                         img = Image.open(BytesIO(image_data))
                         width, height = img.size
-                        # 假设 96 dpi，如果宽度大于 500 像素，则限制为 5 英寸
+                        
+                        is_large = width > 150 or height > 100
+                        if is_large and align_val is None:
+                            if len(p.text) > 0 and not p.text.endswith('\n'):
+                                p.add_run('\n')
+                                
                         run = p.add_run()
-                        if width > 500:
+                        
+                        explicit_width_pt, explicit_height_pt = None, None
+                        if explicit_w_val is not None:
+                            if explicit_w_unit == 'px': explicit_width_pt = explicit_w_val * 0.75
+                            elif explicit_w_unit == 'pt': explicit_width_pt = explicit_w_val
+                            elif explicit_w_unit == 'ex': explicit_width_pt = explicit_w_val * 8.0
+                            elif explicit_w_unit == 'em': explicit_width_pt = explicit_w_val * 16.0
+                        if explicit_h_val is not None:
+                            if explicit_h_unit == 'px': explicit_height_pt = explicit_h_val * 0.75
+                            elif explicit_h_unit == 'pt': explicit_height_pt = explicit_h_val
+                            elif explicit_h_unit == 'ex': explicit_height_pt = explicit_h_val * 8.0
+                            elif explicit_h_unit == 'em': explicit_height_pt = explicit_h_val * 16.0
+                            
+                        if explicit_width_pt is not None and explicit_height_pt is not None:
+                            run.add_picture(image_stream, width=Pt(explicit_width_pt), height=Pt(explicit_height_pt))
+                        elif explicit_width_pt is not None:
+                            run.add_picture(image_stream, width=Pt(explicit_width_pt))
+                        elif explicit_height_pt is not None:
+                            run.add_picture(image_stream, height=Pt(explicit_height_pt))
+                        elif width > 500:
                             run.add_picture(image_stream, width=Inches(5.0))
                         else:
                             run.add_picture(image_stream)
+                            
                         if align_val is not None: apply_w_position(run, align_val, align_unit)
                     except Exception:
                         run = p.add_run()

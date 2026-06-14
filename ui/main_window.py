@@ -265,7 +265,7 @@ class YunKaoExtractorApp(QMainWindow):
 
         # 100% 铺满的浏览器组件
         self.browser = QWebEngineView(self)
-        self.browser.setZoomFactor(1.25)
+        
         self.setCentralWidget(self.browser)
         self.browser.page().urlChanged.connect(self.on_url_changed)
 
@@ -387,6 +387,10 @@ class YunKaoExtractorApp(QMainWindow):
             QMessageBox.warning(self, "无数据", "当前没有提取到任何题目！")
             return
             
+        import json
+        with open('e:/AI/yunkao/questions_dump.json', 'w', encoding='utf-8') as f:
+            json.dump(self.extracted_questions, f, ensure_ascii=False, indent=2)
+            
         # 默认保存到桌面，方便检测重名文件
         desktop_dir = os.path.join(os.path.expanduser("~"), "Desktop")
         default_dir = self.config.get("default_export_dir", desktop_dir)
@@ -456,11 +460,31 @@ class YunKaoExtractorApp(QMainWindow):
                 if src:
                     style = child.get('style', '')
                     v_align_match = re.search(r'vertical-align:\s*([-0-9.]+)(px|ex|em|pt)', style)
-                    if v_align_match:
-                        val, unit = v_align_match.groups()
-                        text += f"![img]<{src}|align:{val}{unit}>"
+                    w_match = re.search(r'width:\s*([-0-9.]+)(px|ex|em|pt|%)', style)
+                    h_match = re.search(r'height:\s*([-0-9.]+)(px|ex|em|pt|%)', style)
+                    
+                    w_val, w_unit, h_val, h_unit = None, None, None, None
+                    if w_match: w_val, w_unit = w_match.groups()
                     else:
-                        text += f"![img]<{src}>"
+                        w_attr = child.get('width')
+                        if w_attr and re.match(r'^[-0-9.]+$', str(w_attr)): w_val, w_unit = w_attr, 'px'
+                        elif w_attr: 
+                            m = re.match(r'^([-0-9.]+)(px|ex|em|pt|%)$', str(w_attr))
+                            if m: w_val, w_unit = m.groups()
+                            
+                    if h_match: h_val, h_unit = h_match.groups()
+                    else:
+                        h_attr = child.get('height')
+                        if h_attr and re.match(r'^[-0-9.]+$', str(h_attr)): h_val, h_unit = h_attr, 'px'
+                        elif h_attr:
+                            m = re.match(r'^([-0-9.]+)(px|ex|em|pt|%)$', str(h_attr))
+                            if m: h_val, h_unit = m.groups()
+
+                    align_str = f"|align:{v_align_match.group(1)}{v_align_match.group(2)}" if v_align_match else ""
+                    w_str = f"|w:{w_val}{w_unit}" if w_val else ""
+                    h_str = f"|h:{h_val}{h_unit}" if h_val else ""
+                        
+                    text += f"![img]<{src}{align_str}{w_str}{h_str}>"
             elif hasattr(child, 'contents'):
                 if child.name in block_tags and text and not text.endswith("\n"):
                     text += "\n"

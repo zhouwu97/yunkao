@@ -10,7 +10,8 @@ API_BASE_URL = "http://156.233.229.232:8080"
 
 DEFAULT_CONFIG = {
     "extract_answer": False,
-    "export_prefix": "基础题库导出"
+    "export_prefix": "基础题库导出",
+    "pdf_export_engine": "chromium"
 }
 
 def load_config():
