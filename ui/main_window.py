@@ -1,5 +1,6 @@
 import os
 import re
+import copy
 import keyring
 import requests
 from bs4 import BeautifulSoup
@@ -10,8 +11,10 @@ from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import QUrl, Qt, QFile, QTimer, QPoint, QThread, Signal
 
 from config.settings import SERVICE_NAME, HARDCODED_SCHOOL_CODE, API_BASE_URL, load_config
+from modules.ai_answer import infer_answer_with_ai, should_use_ai, is_placeholder_answer
 from modules.js_bridge import ExtractorBridge
 from modules.exporter import export_to_markdown, export_to_txt
+from modules.question_parser import parse_active_question
 from ui.settings_dialog import SettingsDialog
 
 class ExportThread(QThread):
@@ -44,6 +47,26 @@ class ExportThread(QThread):
             self.finished.emit(True, self.file_path)
         except Exception as e:
             self.finished.emit(False, str(e))
+
+
+class AiFillThread(QThread):
+    completed = Signal(int, int, dict)
+    failed = Signal(int, int, str)
+
+    def __init__(self, session_id, question_index, question, config, jwt_token):
+        super().__init__()
+        self.session_id = session_id
+        self.question_index = question_index
+        self.question = copy.deepcopy(question)
+        self.config = dict(config)
+        self.jwt_token = jwt_token
+
+    def run(self):
+        try:
+            result = infer_answer_with_ai(self.question, self.config, jwt_token=self.jwt_token)
+            self.completed.emit(self.session_id, self.question_index, result)
+        except Exception as exc:
+            self.failed.emit(self.session_id, self.question_index, str(exc))
 
 # ==========================================
 # 1. 油猴脚本风格的悬浮操作窗 (Overlay Widget)
@@ -191,6 +214,7 @@ class TampermonkeyFloatingWindow(QFrame):
     def open_settings(self):
         dialog = SettingsDialog(self.main_app)
         dialog.config_updated.connect(self.main_app.update_config)
+        dialog.logout_requested.connect(self.main_app.do_logout)
         dialog.exec()
 
     def toggle_extraction(self):
@@ -199,7 +223,7 @@ class TampermonkeyFloatingWindow(QFrame):
             self.btn_toggle.setText("⏹ 停止提取")
             self.btn_toggle.setStyleSheet("background-color: #D83B01;")
             self.set_mini_status("🟢 自动运行中...", "#D83B01")
-            self.btn_export.setEnabled(False)
+            self.main_app.refresh_export_button()
             
             # 立即触发第一次提取
             self.main_app.trigger_extraction()
@@ -208,14 +232,10 @@ class TampermonkeyFloatingWindow(QFrame):
             self.btn_toggle.setText("▶ 开始自动提取")
             self.btn_toggle.setStyleSheet("")
             self.set_mini_status("⏸️ 提取已暂停.", "#6A9955")
-            if self.main_app.extracted_questions:
-                self.btn_export.setEnabled(True)
+            self.main_app.refresh_export_button()
 
     def clear_questions(self):
-        self.main_app.extracted_questions.clear()
-        self.lbl_progress.setText("当前进度: 已清空 0 题")
-        self.btn_export.setEnabled(False)
-        self.set_mini_status("🗑️ 题库缓存已清空", "#6A9955")
+        self.main_app.clear_extracted_questions()
 
     def set_mini_status(self, text, color="#6A9955"):
         self.lbl_status_mini.setText(text)
@@ -257,6 +277,10 @@ class YunKaoExtractorApp(QMainWindow):
         self.user_data = user_data
         self.is_vip = False
         self.extracted_questions = []
+        self.seen_question_keys = set()
+        self.pending_ai_workers = {}
+        self.ai_session_id = 0
+        self.last_question_marker = ""
         self.config = load_config()
 
         nickname = user_data.get('nickname', current_user)
@@ -285,6 +309,137 @@ class YunKaoExtractorApp(QMainWindow):
 
         self.check_vip_status()
 
+    def refresh_export_button(self):
+        if not hasattr(self, "overlay"):
+            return
+        pending_jobs = len(self.pending_ai_workers)
+        can_export = bool(self.extracted_questions) and not self.overlay.is_extracting and pending_jobs == 0
+        self.overlay.btn_export.setEnabled(can_export)
+
+    def clear_extracted_questions(self):
+        self.ai_session_id += 1
+        self.pending_ai_workers = {}
+        self.extracted_questions.clear()
+        self.seen_question_keys.clear()
+        self.last_question_marker = ""
+        self.overlay.lbl_progress.setText("当前进度: 已清空 0 题")
+        self.overlay.set_mini_status("🗑️ 题库缓存已清空", "#6A9955")
+        self.refresh_export_button()
+
+    def _build_question_key(self, question):
+        question_id = str(question.get("question_id", "") or "").strip()
+        if question_id:
+            return f"id:{question_id}"
+        options = question.get("options", []) or []
+        signature = "|".join(str(item).strip() for item in options[:4])
+        return f"sig:{question.get('question_type', '')}|{question.get('title', '').strip()}|{signature}"
+
+    def _queue_ai_fill(self, question_index, question, page_info):
+        worker = AiFillThread(
+            self.ai_session_id,
+            question_index,
+            question,
+            self.config,
+            self.jwt_token,
+        )
+        key = (self.ai_session_id, question_index)
+        self.pending_ai_workers[key] = worker
+        worker.completed.connect(self._on_ai_fill_completed)
+        worker.failed.connect(self._on_ai_fill_failed)
+        worker.finished.connect(lambda key=key: self._cleanup_ai_fill_worker(key))
+        self.overlay.set_mini_status("🤖 AI答题中...", "#D83B01")
+        self.overlay.lbl_progress.setText(
+            f"进度: {page_info} (已存 {len(self.extracted_questions)} 题，AI答题中)"
+            if page_info else f"进度: 已存 {len(self.extracted_questions)} 题，AI答题中"
+        )
+        self.refresh_export_button()
+        worker.start()
+
+    def _cleanup_ai_fill_worker(self, key):
+        self.pending_ai_workers.pop(key, None)
+        self.refresh_export_button()
+        if not self.overlay.is_extracting and not self.pending_ai_workers and self.extracted_questions:
+            self.overlay.set_mini_status("✅ AI 补全已全部完成", "#6A9955")
+
+    def _on_ai_fill_completed(self, session_id, question_index, ai_result):
+        if session_id != self.ai_session_id:
+            return
+        if not (0 <= question_index < len(self.extracted_questions)):
+            return
+
+        question = self.extracted_questions[question_index]
+        answer = ai_result.get("answer", "")
+        if answer and not is_placeholder_answer(answer):
+            question["answer"] = answer
+            question["answer_source"] = "ai"
+            question["answer_confidence"] = ai_result.get("confidence", 0.0)
+            question["needs_review"] = ai_result.get("confidence", 0.0) < 0.75
+            question["answer_route"] = ai_result.get("source", "direct")
+            question["ai_usage"] = ai_result.get("usage", {})
+            question["ai_billing"] = ai_result.get("billing", {})
+
+            ai_analysis = (ai_result.get("analysis") or "").strip()
+            if ai_analysis and not question.get("analysis"):
+                question["analysis"] = f"{ai_analysis}\n（AI生成）"
+                question["analysis_source"] = "ai"
+
+        usage = ai_result.get("usage", {}) or {}
+        billing = ai_result.get("billing", {}) or {}
+        total_tokens = int(usage.get("total_tokens", 0) or 0)
+        cache_ref_tokens = int(usage.get("cache_reference_tokens", 0) or 0)
+        billed_amount_cents = int(billing.get("billed_amount_cents", 0) or 0)
+        balance_after_cents = int(billing.get("balance_after_cents", 0) or 0)
+
+        route_text = "缓存命中" if ai_result.get("source") == "cache" else "AI答题完成"
+        usage_text = f"{total_tokens} tokens"
+        if ai_result.get("source") == "cache" and cache_ref_tokens > 0:
+            usage_text = f"本次 0 tokens / 历史 {cache_ref_tokens} tokens"
+        price_text = f"¥{billed_amount_cents / 100:.2f}"
+        balance_text = f" / 余额 ¥{balance_after_cents / 100:.2f}" if balance_after_cents > 0 else ""
+        self.overlay.set_mini_status(
+            f"🤖 {route_text}: {usage_text} / {price_text}{balance_text}",
+            "#6A9955",
+        )
+
+    def _on_ai_fill_failed(self, session_id, question_index, error_text):
+        if session_id != self.ai_session_id:
+            return
+        self.overlay.set_mini_status(f"⚠️ AI 答题失败: {error_text[:40]}", "#D83B01")
+
+    def _wait_for_question_change(self, expected_marker, attempt=0):
+        if not expected_marker:
+            QTimer.singleShot(600, self.trigger_extraction)
+            return
+
+        js_marker = """
+        (function() {
+            const active = document.querySelector('.swiper-slide-active .practice_slide_content')
+                || document.querySelector('.swiper-slide-active')
+                || document.querySelector('.practice_slide_content');
+            if (!active) return '';
+            const current = document.querySelector('.swiper-pagination-current');
+            const total = document.querySelector('#swiper-total');
+            const pageInfo = current && total ? `${current.textContent.trim()}/${total.textContent.trim()}` : '';
+            return active.getAttribute('data-questionid')
+                || active.getAttribute('data-id')
+                || pageInfo
+                || '';
+        })();
+        """
+
+        def on_marker(result):
+            current_marker = str(result or "").strip()
+            if current_marker and current_marker != expected_marker:
+                self.trigger_extraction()
+                return
+            if attempt < 12:
+                QTimer.singleShot(250, lambda: self._wait_for_question_change(expected_marker, attempt + 1))
+            else:
+                self.overlay.set_mini_status("⚠️ 页面切换较慢，继续重试提取...", "#D83B01")
+                self.trigger_extraction()
+
+        self.browser.page().runJavaScript(js_marker, 0, on_marker)
+
     def update_config(self, new_config):
         self.config = new_config
         
@@ -299,6 +454,20 @@ class YunKaoExtractorApp(QMainWindow):
                     self.overlay.clear_questions()
                     self.overlay.set_mini_status("🔄 换科啦！旧题库已自动清空", "#D83B01")
             self.last_practice_url = current_url
+
+    def do_logout(self):
+        # 处理退出登录逻辑
+        try:
+            keyring.delete_password(SERVICE_NAME, f"{HARDCODED_SCHOOL_CODE}_{self.current_user}")
+        except:
+            pass
+        self.config['jwt_token'] = ""
+        self.config['user'] = ""
+        from config.settings import save_config
+        save_config(self.config)
+        
+        self.needs_relogin = True
+        self.close()
 
     def check_vip_status(self):
         try:
@@ -345,20 +514,21 @@ class YunKaoExtractorApp(QMainWindow):
         (function() {{
             let inputs = document.querySelectorAll('input');
             let filled = 0;
+            let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
             inputs.forEach(inp => {{
                 let p = inp.placeholder || '';
                 if (p.includes('学校') || p.includes('机构')) {{
-                    inp.value = '{HARDCODED_SCHOOL_CODE}';
+                    nativeInputValueSetter.call(inp, '{HARDCODED_SCHOOL_CODE}');
                     inp.dispatchEvent(new Event('input', {{ bubbles: true }}));
                     filled++;
                 }}
                 else if (p.includes('学号') || p.includes('账号') || p.includes('用户名')) {{
-                    inp.value = '{self.current_user}';
+                    nativeInputValueSetter.call(inp, '{self.current_user}');
                     inp.dispatchEvent(new Event('input', {{ bubbles: true }}));
                     filled++;
                 }}
                 else if (inp.type === 'password') {{
-                    inp.value = '{pwd}';
+                    nativeInputValueSetter.call(inp, '{pwd}');
                     inp.dispatchEvent(new Event('input', {{ bubbles: true }}));
                     filled++;
                 }}
@@ -374,7 +544,7 @@ class YunKaoExtractorApp(QMainWindow):
         self.browser.page().runJavaScript(js_code, 0, on_fill)
 
     def trigger_extraction(self):
-        self.overlay.set_mini_status("⏳ 正在读取页面源码...", "#D83B01")
+        self.overlay.set_mini_status("⏳ 正在提取题目...", "#D83B01")
         js_cmd = """
         if (window.pybridge) {
             window.pybridge.receiveRawHtml(document.body.innerHTML);
@@ -385,6 +555,9 @@ class YunKaoExtractorApp(QMainWindow):
     def export_basic_questions(self):
         if not self.extracted_questions:
             QMessageBox.warning(self, "无数据", "当前没有提取到任何题目！")
+            return
+        if self.pending_ai_workers:
+            QMessageBox.information(self, "请稍候", "仍有题目正在等待 AI 答题完成，请稍后再导出。")
             return
             
         import json
@@ -413,12 +586,13 @@ class YunKaoExtractorApp(QMainWindow):
             return
             
         # 显示加载动画进度条
-        self.progress_dialog = QProgressDialog("正在准备导出...", None, 0, len(self.extracted_questions), self)
+        self.progress_dialog = QProgressDialog("正在准备导出...", None, 0, max(len(self.extracted_questions), 1) + 2, self)
         self.progress_dialog.setWindowTitle("导出中")
         self.progress_dialog.setWindowModality(Qt.WindowModal)
         self.progress_dialog.setMinimumDuration(0)
         self.progress_dialog.setValue(0)
         self.progress_dialog.show()
+        self.overlay.set_mini_status("📄 正在准备导出...", "#D83B01")
         
         self.export_thread = ExportThread(self.extracted_questions, file_path, filter)
         self.export_thread.progress.connect(self._on_export_progress)
@@ -430,6 +604,7 @@ class YunKaoExtractorApp(QMainWindow):
             self.progress_dialog.setLabelText(message)
             self.progress_dialog.setMaximum(total)
             self.progress_dialog.setValue(current)
+        self.overlay.set_mini_status(message, "#D83B01")
 
     def _on_export_finished(self, success, result):
         if hasattr(self, 'progress_dialog'):
@@ -448,7 +623,7 @@ class YunKaoExtractorApp(QMainWindow):
     def extract_rich_text(self, element):
         if not element: return ""
         text = ""
-        block_tags = {'p', 'div', 'tr', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'}
+        block_tags = {'p', 'div', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'}
         
         for child in element.contents:
             if isinstance(child, str):
@@ -485,6 +660,17 @@ class YunKaoExtractorApp(QMainWindow):
                     h_str = f"|h:{h_val}{h_unit}" if h_val else ""
                         
                     text += f"![img]<{src}{align_str}{w_str}{h_str}>"
+            elif child.name == 'table':
+                if text and not text.endswith("\n"):
+                    text += "\n"
+                for row in child.find_all('tr'):
+                    row_data = []
+                    for cell in row.find_all(['td', 'th']):
+                        cell_text = self.extract_rich_text(cell).strip().replace('\n', ' ')
+                        row_data.append(cell_text)
+                    if row_data:
+                        text += " \t".join(row_data) + "\n"
+                text += "\n"
             elif hasattr(child, 'contents'):
                 if child.name in block_tags and text and not text.endswith("\n"):
                     text += "\n"
@@ -494,152 +680,52 @@ class YunKaoExtractorApp(QMainWindow):
         return text
 
     def process_html_with_bs4(self, html_content):
-        # [DEBUG] Save the raw HTML to disk so we can analyze it
-        try:
-            with open(r"e:\AI\yunkao\debug_dom.html", "w", encoding="utf-8") as f:
-                f.write(html_content)
-        except Exception as e:
-            print("Failed to save debug DOM:", e)
+        if self.config.get("debug_save_dom"):
+            try:
+                with open(r"e:\AI\yunkao\debug_dom.html", "w", encoding="utf-8") as f:
+                    f.write(html_content)
+            except Exception as e:
+                print("Failed to save debug DOM:", e)
 
         if not html_content or html_content == "ERROR_NOT_FOUND":
             self.overlay.set_mini_status("⚠️ 未找到题目内容，已自动停止", "#D83B01")
             self.overlay.is_extracting = False
             self.overlay.btn_toggle.setText("▶ 开始自动提取")
             self.overlay.btn_toggle.setStyleSheet("")
-            if self.extracted_questions:
-                self.overlay.btn_export.setEnabled(True)
+            self.refresh_export_button()
             return
 
-        soup = BeautifulSoup(html_content, 'html.parser')
-        
-        target = soup.select_one('.swiper-slide-active')
-        if not target: target = soup.select_one('.practice_slide_content')
-        if not target:
+        parsed_question = parse_active_question(html_content)
+        if not parsed_question:
             self.overlay.set_mini_status("⚠️ 当前页面没有题目", "#D83B01")
             return
 
-        page_info = ""
-        current_node = soup.select_one('.swiper-pagination-current')
-        total_node = soup.select_one('#swiper-total')
-        
-        if current_node and total_node:
-            page_info = f"{current_node.get_text(strip=True)}/{total_node.get_text(strip=True)}"
+        page_info = parsed_question.pop("page_info", "")
+        question_marker = parsed_question.pop("marker", "")
+        question_key = self._build_question_key(parsed_question)
+
+        if question_key not in self.seen_question_keys:
+            self.seen_question_keys.add(question_key)
+            self.extracted_questions.append(parsed_question)
+            question_index = len(self.extracted_questions) - 1
+            self.last_question_marker = question_marker or question_key
+
+            if should_use_ai(parsed_question, self.config):
+                self._queue_ai_fill(question_index, parsed_question, page_info)
+            else:
+                prog_text = (
+                    f"进度: {page_info} (已存 {len(self.extracted_questions)} 题)"
+                    if page_info else f"进度: 已存 {len(self.extracted_questions)} 题"
+                )
+                self.overlay.lbl_progress.setText(prog_text)
+                self.overlay.set_mini_status(
+                    f"✅ 解析成功: {parsed_question.get('title', '')[:10]}...",
+                    "#6A9955",
+                )
+            self.refresh_export_button()
         else:
-            matches = re.findall(r'(\d+)\s*/\s*(\d+)', soup.get_text())
-            if matches:
-                best_match = max(matches, key=lambda x: int(x[1]))
-                page_info = f"{best_match[0]}/{best_match[1]}"
-                
-            if not page_info:
-                pagination = soup.select_one('.swiper-pagination-fraction, .swiper-pagination, .page_num')
-                page_info = pagination.get_text(strip=True) if pagination else ""
-
-        # 提取高级答案功能
-        answer_text = ""
-        analysis_text = ""
-        
-        # 寻找真正的题目容器
-        content_div = target if 'practice_slide_content' in target.get('class', []) else target.select_one('.practice_slide_content')
-        
-        # 优先从页面上显示的正确答案区块提取富文本
-        ans_mark = target.select_one('.right_ans_mark')
-        if ans_mark is not None:
-            # 提取前移除可能的 "正确答案：" 标签 span 以防止重复
-            label_span = ans_mark.select_one('.label, .title')
-            if label_span and "正确答案" in label_span.get_text():
-                label_span.decompose()
-            answer_text = self.extract_rich_text(ans_mark)
-            answer_text = re.sub(r'^正确答案[：:]?\s*', '', answer_text).strip('\r\n')
-
-        # 备用逻辑：从其他解析区块获取
-        if not answer_text:
-            ans_node = target.select_one('.answer-text')
-            if ans_node is not None:
-                answer_text = self.extract_rich_text(ans_node).strip('\r\n')
-        
-        if not answer_text:
-            if content_div and content_div.has_attr('data-answer'):
-                answer_text = content_div['data-answer'].strip()
-                    
-        # 尝试精确定位真正的解析文本
-        # 必须分步提取，不能用逗号并列，因为带有逗号的 select_one 会返回 DOM 中第一个匹配的元素，从而导致父容器被优先选中！
-        analysis_node = target.select_one('.practice_analysis .analysis-content .desc')
-        if not analysis_node:
-            analysis_node = target.select_one('.analysis-content .desc')
-            
-        if analysis_node is not None:
-            raw_analysis = self.extract_rich_text(analysis_node).strip('\r\n')
-            if raw_analysis:
-                analysis_text = raw_analysis
-        for garbage in target.select('.right_ans_mark, .practice_analysis'):
-            garbage.decompose()
-            
-        title_tag = target.select_one('.practice_slide_title .title') or target.select_one('.practice_slide_title .txt') or target.select_one('.practice_slide_title')
-        title_text = self.extract_rich_text(title_tag).strip('\r\n') if title_tag else "未知题目"
-
-        options = []
-        correct_labels = []
-        for i, li in enumerate(target.select('.option_content li, .options li')):
-            auto_label = chr(65 + i)
-            
-            # 检查这是否是正确选项
-            if li.select_one('input[data-isright="1"]') or 'is-right' in li.get('class', []) or 'correct' in li.get('class', []):
-                correct_labels.append(auto_label)
-                
-            txt_tag = li.select_one('.txt')
-            opt_elem = txt_tag if txt_tag else li
-            opt_text = self.extract_rich_text(opt_elem).strip('\r\n')
-            options.append(f"{auto_label}. {opt_text}")
-
-        # 获取题型，用于后续特殊题型的答案提取
-        type_tag = target.select_one('.practice_slide_title .type')
-        question_type = type_tag.get_text() if type_tag else ""
-
-        # 如果通过选项直接找到了正确答案，就覆盖之前的 answer_text
-        if correct_labels:
-            real_answer = "".join(correct_labels)
-            # 处理判断题
-            if '判断' in question_type:
-                if real_answer == 'A': real_answer = '对'
-                elif real_answer == 'B': real_answer = '错'
-            answer_text = real_answer
-        elif '填空' in question_type:
-            # 填空题答案提取逻辑
-            fill_answers = []
-            for elem in target.select('.fill_option li .txt, .answer-input-result'):
-                text = self.extract_rich_text(elem).strip('\r\n')
-                if text: fill_answers.append(text)
-            if fill_answers:
-                answer_text = "；".join(fill_answers)
-            # 如果上面没找到，再试试其他常见容器
-            elif not answer_text or answer_text == 'B':
-                ans_content = target.select_one('.subjective-answer, .answer-content, .answer-detail')
-                if ans_content: answer_text = self.extract_rich_text(ans_content).strip('\r\n')
-        elif '简答' in question_type or '计算' in question_type or '名词解释' in question_type or '论述' in question_type:
-            # 主观题答案提取逻辑
-            ans_content = target.select_one('.subjective-answer, .answer-content, .answer-detail')
-            if ans_content:
-                answer_text = self.extract_rich_text(ans_content).strip('\r\n')
-
-        # 过滤掉作为干扰项的默认 B 答案（如果前面没成功提取到，且仍然是 B）
-        if answer_text == 'B' and not correct_labels and ('填空' in question_type or '简答' in question_type or '计算' in question_type):
-            answer_text = ""
-
-        q_dict = {"title": title_text, "options": options}
-        if answer_text:
-            q_dict["answer"] = answer_text
-        if analysis_text:
-            q_dict["analysis"] = analysis_text
-        
-        # 避免重复提取
-        is_duplicate = any(q['title'] == q_dict['title'] for q in self.extracted_questions)
-        if not is_duplicate:
-            self.extracted_questions.append(q_dict)
-            prog_text = f"进度: {page_info} (已存 {len(self.extracted_questions)} 题)" if page_info else f"进度: 已存 {len(self.extracted_questions)} 题"
-            self.overlay.lbl_progress.setText(prog_text)
-            self.overlay.set_mini_status(f"✅ 解析成功: {title_text[:10]}...", "#6A9955")
-        else:
-            self.overlay.set_mini_status(f"ℹ️ 题目已存在，跳过", "#A7A7A7")
+            self.last_question_marker = question_marker or question_key
+            self.overlay.set_mini_status("ℹ️ 题目已存在，跳过", "#A7A7A7")
 
         # 解析当前页码和总页码，用于辅助判断是否真的到了最后一题
         current_page = 0
@@ -666,8 +752,7 @@ class YunKaoExtractorApp(QMainWindow):
             """
             def on_next_result(result):
                 if result:
-                    # 点击成功，等待800ms后提取下一题
-                    QTimer.singleShot(800, self.trigger_extraction)
+                    self._wait_for_question_change(self.last_question_marker)
                 else:
                     # 按钮不可点，检查是否真的到了最后一题
                     if 0 < current_page < total_page:

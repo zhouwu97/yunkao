@@ -1,0 +1,2451 @@
+[
+  {
+    "title": "某二层交换机上的MAC地址表如下图所示。当交换机从E1/0/2接口收到一个目的MAC地址为00-13-72-8E-4B-C1的帧时,交换机会将该帧(    )。\n![img]<http://ce-images.oss-cn-beijing.aliyuncs.com/school_53/course_4145/f012a3ed42036d9ec1b4c870f90956091fe5ddfb.png|w:353px|h:261px>\n某二层交换机上的MAC地址表",
+    "options": [
+      "A. 从E1/0/1接口发送出去",
+      "B. 从E1/0/2接口发送出去",
+      "C. 从E1/0/3接口发送出去",
+      "D. 从E1/0/4接口发送出去",
+      "E. 从交换机上的所有接口发送出去   ",
+      "F. 直接丢弃"
+    ],
+    "answer": "F",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "局域网交换机首先完整地接收数据帧,并进行差错检测。如果正确,则根据帧目的地址确定输出端口号再转发出去。这种交换方式为(    )。",
+    "options": [
+      "A. 直接交换",
+      "B. 改进直接交换",
+      "C. 存储转发交换",
+      "D. 查询交换"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "以下信道中哪一种是广播共享信道?(    )",
+    "options": [
+      "A. 载波侦听多路访问信道",
+      "B. 频分多路复用信道",
+      "C. 时分多路复用信道",
+      "D. 其它选项都是"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "在一个采用CSMA/CD协议的网络中,传输介质是一根完整的电缆,传输速率1Gbps,电缆中的信号传播速度是200 000km/s。若最小数据帧长度减少800b,则最远的两个站点之间的距离至少需要(    )。",
+    "options": [
+      "A. 增加160m",
+      "B. 增加80m",
+      "C. 减少160m",
+      "D. 减少80m"
+    ],
+    "answer": "D",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "网桥属于OSI模型的第(    )层。",
+    "options": [
+      "A. 1 ",
+      "B. 2 ",
+      "C. 3",
+      "D. 4"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "以太网交换机一个端口在接收到数据帧时,如果没有在MAC地址表中查找到目的MAC地址,通常如何处理?(    )",
+    "options": [
+      "A. 把以太网帧复制到所有的端口",
+      "B. 把以太网帧单点传送到特定端口",
+      "C. 把以太网帧发送到除本端口以外的所有端口",
+      "D. 丢弃该帧",
+      "E. 把以太网帧发送到一组特定的端口"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "1000BASE-LX标准支持的传输介质是(    )。",
+    "options": [
+      "A. 单模光纤",
+      "B. 多模光纤",
+      "C. 屏蔽双绞线",
+      "D. 非屏蔽双绞线"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "局域网的协议结构一般不包括(    )。",
+    "options": [
+      "A. 网络层 ",
+      "B. 物理层",
+      "C. 数据链路层",
+      "D. 介质访问控制层"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "快速以太网是由(    )标准定义的。",
+    "options": [
+      "A. IEEE 802.4(令牌总线)",
+      "B. IEEE 802.3u",
+      "C. IEEE 802.1q ",
+      "D. IEEE 802.3i",
+      "E. IEEE 802.1d"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "目前,我国应用最为广泛的LAN标准是基于(    )的以太网标准。",
+    "options": [
+      "A. IEEE 802.1",
+      "B. IEEE 802.2",
+      "C. IEEE 802.3",
+      "D. IEEE 802.5"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "10BASE-T是指(    )。",
+    "options": [
+      "A. 粗同轴电缆",
+      "B. 细同轴电缆",
+      "C. 双绞线",
+      "D. 光纤"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "全双工通信",
+    "options": [],
+    "answer": "通信双方可以同时进行发送和接收信息的通信方式。",
+    "answer_source": "ai",
+    "question_type": "名词解释",
+    "answer_confidence": 0.95,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 202,
+      "completion_tokens": 95,
+      "total_tokens": 297,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "全双工通信是数据通信的一种方式，允许数据在两个方向上同时传输，如电话通话。"
+  },
+  {
+    "title": "网络中的结点可以是计算机，集线器，交换机或路由器等。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "已知收发两端之间的传输距离为2000 km，信号在媒体上的传播速率为2´105km/s。数据长度为109bit，数据发送速率为200 kbps。 试计算这种情况下的发送时延和传播时延。",
+    "options": [],
+    "answer": "发送时延为5000秒；传播时延为0.01秒",
+    "answer_source": "ai",
+    "question_type": "简答及计算题",
+    "answer_confidence": 1.0,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 250,
+      "completion_tokens": 226,
+      "total_tokens": 476,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "发送时延=数据长度/发送速率=10^9/(200×10^3)=5000秒；传播时延=距离/传播速度=2000/(2×10^5)=0.01秒"
+  },
+  {
+    "title": "下面关于CSMA/CD网络的叙述哪个是正确的?(    )",
+    "options": [
+      "A. 信号都是以广播方式发送的",
+      "B. 一个节点的数据发往最近的路由器,路由器将数据直接发到目的地",
+      "C. 如果源节点知道目的地的IP和MAC地址,信号是直接送往目的地",
+      "D. 任何一个节点的通信数据要通过整个网络,且每一个节点都接收并检验该数据"
+    ],
+    "answer": "D",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "万兆以太网标准支持的传输介质是(    )。",
+    "options": [
+      "A. 光纤",
+      "B. 双绞线",
+      "C. 细同轴电缆",
+      "D. 粗同轴电缆"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "对全双工以太网的描述正确的是(    )。",
+    "options": [
+      "A. 可以在共享式以太网中实现全双工技术",
+      "B. 可以在一对双绞线上同时接收和发送以太网帧",
+      "C. 仅可以用于点对点连接",
+      "D. 可用于点对点和点对多点连接"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "画出 1011010010的曼彻斯特编码、差分曼彻斯特编码的波形图。曼彻斯特编码规定中间的跳变从高到低代表数字“1”，从低到高代表数字“0”；差分曼彻斯特编码波形假定线路从低电平开始。",
+    "options": [],
+    "answer": "曼彻斯特编码（假设起始电平为高）：电平序列（1高0低）为 1,0,0,1,1,0,1,0,0,1,1,0,0,1,0,1,1,0,0,1。即每个比特：1→10，0→01，0→01，1→10，1→10，0→01，1→10，0→01，0→01，1→10。差分曼彻斯特编码（起始低电平）：电平序列为 0,1,0,1,1,0,0,1,0,1,1,0,1,0,1,0,0,1,0,1。即每个比特：1→01，0→01，1→10，1→01，0→01，1→10，0→10，0→10，1→01，0→01。",
+    "answer_source": "ai",
+    "question_type": "简答及计算题",
+    "answer_confidence": 0.9,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 260,
+      "completion_tokens": 2915,
+      "total_tokens": 3175,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "曼彻斯特编码每个比特中间跳变，1为高到低，0为低到高。差分曼彻斯特编码起始低，比特开始处跳变表示0，不变表示1，中间总有跳变。"
+  },
+  {
+    "title": "关于交换式局域网的描述中,错误的是(    )。",
+    "options": [
+      "A. 核心设备是局域网交换机  ",
+      "B. 支持多节点之间的并发连接",
+      "C. 需通过广播方式发送数据  ",
+      "D. 通常可提供虚拟局域网服务"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "信噪比（signal-to-noise ratio ） :指指信号的平均功率和噪声的平均功率之比，记为 S/N。信噪比（dB）=10*log10（S/N）。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "比特率（bit rate ） 指单位时间（每秒）内传送的比特数。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "采用了(    )的网络中,工作站在发送数据之前,要检查网络是否空闲,只有在网络不阻塞时,工作站才能发送数据。",
+    "options": [
+      "A. TCP",
+      "B. IP",
+      "C. ICMP",
+      "D. CSMA/CD"
+    ],
+    "answer": "D",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "在数据链路层,数据的传送单位是(    )。",
+    "options": [
+      "A. 链路",
+      "B. 帧",
+      "C. 信元",
+      "D. 码元"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "若某通信链路的数据传输速率为2400 b/s，采用8相位调制，则该链路的波特率是（          ）？",
+    "options": [
+      "A. 空1：\n略",
+      "B. 空2：\n略"
+    ],
+    "answer": "800",
+    "answer_source": "ai",
+    "question_type": "填空题",
+    "answer_confidence": 1.0,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 239,
+      "completion_tokens": 267,
+      "total_tokens": 506,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "比特率=波特率×log2(M)，M=8，log2(8)=3，所以波特率=2400/3=800波特。"
+  },
+  {
+    "title": "若数据链路层采用回退N(go-back-N)滑动窗口协议,发送帧的序号用7bit表示,发送窗口的最大值为(    )。",
+    "options": [
+      "A. 7 ",
+      "B. 64",
+      "C. 127",
+      "D. 128"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "以太网中使用生成树算法的目的是什么?(    )",
+    "options": [
+      "A. 避免来自同一端口的路由更新数据包转发到本端口",
+      "B. 生成无环路的逻辑树状结构,尽最大可能在局域网段之间建立一条通路",
+      "C. 在每一个局域网段之间建立一条路径",
+      "D. 确保数据信息到达每一个节点"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "LAN Switch在网络层次模型中的地位是(    )。",
+    "options": [
+      "A. 物理层",
+      "B. 链路层",
+      "C. 网络层",
+      "D. 其它选项都不是"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "半双工（half duplex ） 指通信的双方都可以发送信息，但不能双方同时发送(当然也就不能同时接收)。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "收发两端之间的传输距离为2000 km，信号在媒体上的传播速率为2´105km/s。数据长度为109bit，数据发送速率为200 kbps。 试计算这种情况下的发送时延和传播时延。",
+    "options": [],
+    "answer": "发送时延5000s，传播时延0.01s",
+    "answer_source": "ai",
+    "question_type": "简答及计算题",
+    "answer_confidence": 1.0,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 249,
+      "completion_tokens": 219,
+      "total_tokens": 468,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "发送时延=数据长度/发送速率=10^9bit/(200×10^3bps)=5000s；传播时延=距离/传播速率=2000km/(2×10^5km/s)=0.01s"
+  },
+  {
+    "title": "IEEE针对无线局域网制定的协议标准是(    )。",
+    "options": [
+      "A. IEEE 802.3",
+      "B. IEEE 802.11",
+      "C. IEEE 802.15",
+      "D. IEEE 802.16"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "以太网物理地址的长度是(    )。",
+    "options": [
+      "A. 46b",
+      "B. 48b",
+      "C. 56b",
+      "D. 64b"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "以太网交换机的每一个端口可以看作一个(    )。",
+    "options": [
+      "A. 冲突域",
+      "B. 广播域",
+      "C. 管理域",
+      "D. 阻塞域"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "以太网的帧数据字段的最小长度是(    )。",
+    "options": [
+      "A. 18B",
+      "B. 46B ",
+      "C. 64B",
+      "D. 1500B"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "循环冗余检验 CRC（Cyclic Redundancy Check） 是为了保证数据传输的可靠性，CRC 是数据链路层广泛使用的一种检错技术。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "采用12个10Mbps端口的半双工以太网交换机互联局域网,每个站点可获得的平均带宽为(    )。",
+    "options": [
+      "A. 0.83Mbps ",
+      "B. 0.083Mbps",
+      "C. 8.3Mbps",
+      "D. 10Mbps"
+    ],
+    "answer": "D",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "决定局域网特性的主要技术要素包括(    )、传输介质与介质访问控制方法。",
+    "options": [
+      "A. 所使用的协议",
+      "B. 网络拓扑结构",
+      "C. 数据传输环境",
+      "D. 主机的时钟频率"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "关于交换式局域网的描述中,正确的是(    )。",
+    "options": [
+      "A. 支持多个节点的并发连接",
+      "B. 采用的核心设备是集线器",
+      "C. 采用共享总线方式发送数据  ",
+      "D. 建立在虚拟局域网基础上"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "写出下列曼彻斯特编码波形对应的二进制信息。规定中间的跳变从高到低代表数字“1”，从低到高代表数字“0”。",
+    "options": [],
+    "answer": "无法确定，需要波形图",
+    "answer_source": "ai",
+    "question_type": "简答及计算题",
+    "answer_confidence": 0.1,
+    "needs_review": true,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 233,
+      "completion_tokens": 135,
+      "total_tokens": 368,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "题目未提供曼彻斯特编码波形图，无法根据规定规则解码二进制信息。"
+  },
+  {
+    "title": "已知要发送的比特序列为101101001，画出其曼彻斯特编码对应的图形。规定中间的跳变从高到低代表数字“1”，从低到高代表数字“0”。",
+    "options": [],
+    "answer": "曼彻斯特编码规则：比特1为从高到低跳变，比特0为从低到高跳变。对于序列101101001，每个比特持续两个单位时间，中间跳变。波形描述：第1位1：高-低；第2位0：低-高；第3位1：高-低；第4位1：高-低；第5位0：低-高；第6位1：高-低；第7位0：低-高；第8位0：低-高；第9位1：高-低。连续波形：起始高电平，依次跳变。",
+    "answer_source": "ai",
+    "question_type": "简答及计算题",
+    "answer_confidence": 1.0,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 242,
+      "completion_tokens": 976,
+      "total_tokens": 1218,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "根据曼彻斯特编码定义，直接对应比特绘制波形。"
+  },
+  {
+    "title": "决定局域性的主要技术要素是介质访问控制方法、传输介质与(    )。",
+    "options": [
+      "A. 网络拓扑",
+      "B. 体系结构",
+      "C. 数据库软件 ",
+      "D. 服务器软件"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "当桥接收的分组的目的MAC地址在桥的映射表中没有对应的表项时,采取的策略是(    )。",
+    "options": [
+      "A. 丢掉该分组",
+      "B. 将该分组分片",
+      "C. 向其他端口广播该分组",
+      "D. 其它选项答案均不对"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "广域网 WAN（Wide Area Network） 的任务是通过长距离运送主机发送的数据。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "存储转发（store and forward ） 指路由器收到一个分组，先检查分组是否正确，并过滤掉冲突包错误。确定包正确后，取出目的地址，通过查找表找到想要发送的输出端口地址，然后将该包发送出去。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "全双工（full duplex） 指通信的双方可以同时发送和接收信息。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "关于以太网帧结构的描述中,错误的是(    )。",
+    "options": [
+      "A. 数据字段保存高层待发的数据",
+      "B. 前导码字段的长度计入帧头长度",
+      "C. 类型字段表示协议类型",
+      "D. 目的地址字段是目的节点的硬件地址"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "香农定理 指在带宽受限且有噪声的信道中，为了不产生误差，信息的数据传输速率有上限值。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "关于传统以太网的描述中,错误的是(    )。",
+    "options": [
+      "A. 它是典型的总线型局域网",
+      "B. 需要解决介质访问控制问题",
+      "C. 属于共享介质类型的局域网  ",
+      "D. 只支持双绞线作为传输介质"
+    ],
+    "answer": "D",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "已知：接收码字为1101011101，使用的生成多项式为G（x）=x4+X3+1。\n问接收是否正确？若正确，指出冗余码和原信息码。",
+    "options": [],
+    "answer": "接收正确；冗余码：1101；原信息码：110101",
+    "answer_source": "ai",
+    "question_type": "简答及计算题",
+    "answer_confidence": 1.0,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 241,
+      "completion_tokens": 3411,
+      "total_tokens": 3652,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "使用生成多项式G(x)=x^4+x^3+1（二进制11001）对接收码字1101011101进行模2除法，余数为0，故接收正确。其中前6位为信息码，后4位为冗余码。"
+  },
+  {
+    "title": "ARP的主要作用是什么?(    )",
+    "options": [
+      "A. 将URL转换成IP地址",
+      "B. 将IPv4地址解析为MAC地址",
+      "C. 向网络设备提供动态IP配置",
+      "D. 将内部私有地址转换为外部公有地址"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "二层以太网交换机在MAC地址表中查找与帧目的MAC地址匹配的表项,从而将帧从相应接口转发出去,如果查找失败,交换机将(    )。",
+    "options": [
+      "A. 把帧丢弃",
+      "B. 把帧由除入端口以外的所有其他端口发送出去",
+      "C. 查找快速转发表",
+      "D. 查找路由表"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "以太网中采用二进制指数后退算法处理冲突问题,下列数据帧中重传时再次发生冲突概率最低的是(    )。",
+    "options": [
+      "A. 首次重传的帧    ",
+      "B. 发生两次冲突的帧",
+      "C. 发生三次冲突的帧",
+      "D. 发生四次冲突的帧"
+    ],
+    "answer": "D",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "在下列网间连接器中,在数据链路层实现网络互联需要(    )。",
+    "options": [
+      "A. 中继器",
+      "B. 网桥",
+      "C. 路由器",
+      "D. 网关"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "一个VLAN可以看作是一个(    )。",
+    "options": [
+      "A. 冲突域",
+      "B. 广播域",
+      "C. 管理域",
+      "D. 阻塞域"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "传统以太网的MAC帧长最短是多少？最长是多少？请简单叙述传统以太网的介质访问控制方法原理并说明传统以太网的争用期（或碰撞窗口）的大小。",
+    "options": [],
+    "answer": "最短64字节，最长1518字节。传统以太网采用CSMA/CD（载波监听多路访问/碰撞检测）介质访问控制方法：站点在发送前先监听信道，空闲则发送；发送过程中继续监听，若检测到碰撞则立即停止发送并发送强化碰撞信号，然后随机退避一段时间后重新尝试。争用期（碰撞窗口）为51.2微秒（对应512比特时间）。",
+    "answer_source": "ai",
+    "question_type": "简答及计算题",
+    "answer_confidence": 0.98,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 238,
+      "completion_tokens": 535,
+      "total_tokens": 773,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "传统以太网MAC帧最小长度为64字节（不含前导码和SFD），最大长度为1518字节。CSMA/CD工作原理为“先听后说，边听边说”，争用期基于最小帧长和传输速率计算得出。"
+  },
+  {
+    "title": "PPP（Point-to-Point Protocol ） 是点对点协议。即用户计算机和 ISP 进行通信时所使用的数据链路层协议。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "生成树(spanning tree)算法的作用是(    )。",
+    "options": [
+      "A. 发现网络中允许通过帧的最大长度",
+      "B. 避免转发的帧在网络中死循环",
+      "C. 减小重新传输帧时再次发生冲突的概率",
+      "D. 逆向地址学习"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "在下列选项中,对正确接收到的数据帧进行确认的MAC协议是(    )。",
+    "options": [
+      "A. CSMA  ",
+      "B. CDMA  ",
+      "C. CSMA/CD ",
+      "D. CSMA/CA"
+    ],
+    "answer": "D",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "ARP（Address Resolution Protocol） 协议把 IP 地址解析为硬件地址。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "IEEE 802.1Q的标记报头将随着介质不同而发生变化,按照IEEE 802.1Q标准,标记实际上嵌在(    )。",
+    "options": [
+      "A. 不固定",
+      "B. 源MAC地址和目标MAC地址前",
+      "C. 源MAC地址和目标MAC地址后",
+      "D. 源MAC地址和目标MAC地址中间"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "单工（simplex ）:指只能有一个方向的通信而没有反方向的交互。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "在某个网络中，R1和R2为相邻路由器。其中表1为R1的路由表，表2为R2的RIP广播报文，请根据RIP路由选择算法更新R1的路由表，写出更新后的R1路由表，并写出是否更新的理由。\n![img]<https://ce-images.oss-cn-beijing.aliyuncs.com/images/school_U101441/course_210300009_2023/5364da2a-a889-b0d6-9861-4c82b5ecc7e4.png|w:225px>",
+    "options": [],
+    "answer": "略",
+    "answer_source": "dom",
+    "question_type": "综合题"
+  },
+  {
+    "title": "争用期",
+    "options": [],
+    "answer": "争用期是CSMA/CD协议中，从数据发送开始到最远站点检测到冲突所需的最长时间，等于信号在总线上最远两端传播时延的两倍。",
+    "answer_source": "ai",
+    "question_type": "名词解释",
+    "answer_confidence": 0.95,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 201,
+      "completion_tokens": 164,
+      "total_tokens": 365,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "该概念为计算机网络基础知识点，常出现在以太网相关题目中。"
+  },
+  {
+    "title": "局部地区通信网络简称局域网,英文缩写为(    )。",
+    "options": [
+      "A. WAN",
+      "B. LAN",
+      "C. SAN",
+      "D. MAN"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "交换机工作在OSI 7层的哪一层?(    )",
+    "options": [
+      "A. 一层",
+      "B. 二层",
+      "C. 三层",
+      "D. 三层以上"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "透明传输",
+    "options": [],
+    "answer": "透明传输是指数据在传输过程中，无论数据内容如何，都能被正确、完整地传送到目的地，用户或上层协议不需要关心传输的具体实现细节。",
+    "answer_source": "ai",
+    "question_type": "名词解释",
+    "answer_confidence": 0.95,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 200,
+      "completion_tokens": 207,
+      "total_tokens": 407,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "透明传输是网络通信中的基本概念，强调数据对上层协议的透明性。"
+  },
+  {
+    "title": "TCP/IP共几层",
+    "options": [
+      "A. 空1：\n共4层"
+    ],
+    "answer": "空1：\n共4层",
+    "answer_source": "dom",
+    "question_type": "填空题"
+  },
+  {
+    "title": "以太网帧的地址字段中保存的是(    )。",
+    "options": [
+      "A. 主机名",
+      "B. 端口号",
+      "C. MAC地址  ",
+      "D. IP地址"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "已知一数据报的数据部分为 2000 字节长（使用固定首部），需要通过MTU为576字节的物理网络，试画表格写出分片后下面每片各项的值，并对表中各字段的含义加以说明。\n总长度 \t标识 \tMF \tDF \t片偏移",
+    "options": [],
+    "answer": "分片结果表格如下：\n\n| 片序号 | 总长度 | 标识 | MF | DF | 片偏移 |\n|--------|--------|------|----|----|--------|\n| 1      | 572    | X    | 1  | 0  | 0      |\n| 2      | 572    | X    | 1  | 0  | 69     |\n| 3      | 572    | X    | 1  | 0  | 138    |\n| 4      | 364    | X    | 0  | 0  | 207    |\n\n说明：IP首部固定20字节，MTU=576字节，故每个分片数据部分最大为576-20=556字节，但非最后一片数据部分需为8的倍数，故取552字节。分片数=ceil(2000/552)=4片。前三片数据长度552字节，最后一片344字节。标识X为同一数据报的相同值。MF=1表示后续还有分片，最后一片MF=0。DF=0表示允许分片。片偏移以8字节为单位，计算为数据部分起始字节偏移/8。",
+    "answer_source": "ai",
+    "question_type": "综合题",
+    "answer_confidence": 1.0,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 261,
+      "completion_tokens": 1163,
+      "total_tokens": 1424,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "根据IP分片原理，固定首部20字节，MTU 576，数据部分2000字节，计算分片参数。非最后一片数据长度取8的倍数552，最后一片344。总长度=数据长度+20。片偏移依次为0、69、138、207。"
+  },
+  {
+    "title": "在一个CSMA/CA网络上,计算机A有一个2时槽的帧际间隔,计算机B的帧际间隔是6时槽,计算机C的帧际间隔是4时槽。哪个设备具有最高的优先级?(    )",
+    "options": [
+      "A. 计算机A",
+      "B. 计算机B",
+      "C. 计算机C",
+      "D. 在CSMA/CA网络中不能够分配优先级"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "频移键控 FSK",
+    "options": [],
+    "answer": "频移键控（FSK）是一种数字调制技术，通过改变载波信号的频率来传输数字信息，通常用不同的频率代表二进制数据的0和1。",
+    "answer_source": "ai",
+    "question_type": "名词解释",
+    "answer_confidence": 0.95,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 204,
+      "completion_tokens": 175,
+      "total_tokens": 379,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "这是通信原理中的基本调制方式之一，标准定义明确。"
+  },
+  {
+    "title": "帧（frame） 是一个数据链路层的传输单元，由一个数据链路层首部和其携带的封包所组成协议数据单元。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "广播式网络",
+    "options": [],
+    "answer": "广播式网络是一种所有节点共享同一通信信道的网络，任一节点发送的数据可以被其他所有节点接收，适用于局域网，如以太网。",
+    "answer_source": "ai",
+    "question_type": "名词解释",
+    "answer_confidence": 0.95,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 201,
+      "completion_tokens": 135,
+      "total_tokens": 336,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "广播式网络是计算机网络的基础概念，特点是共享信道和广播传输。"
+  },
+  {
+    "title": "一个标准的1000Mb/s交换式以太网结构中(    )。",
+    "options": [
+      "A. 只能包含100Mb/s交换机",
+      "B. 只能包括1000Mb/s,100Mb/s或10Mb/s交换机",
+      "C. 包括1000Mb/s和100Mb/s交换机",
+      "D. 只能包括1000Mb/s交换机"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "以下属于物理层的设备是(    )。",
+    "options": [
+      "A. 中继器",
+      "B. 以太网交换机",
+      "C. 桥",
+      "D. 网关"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "VLAN的划分不包括以下哪种方法?(    )",
+    "options": [
+      "A. 基于端口",
+      "B. 基于MAC地址",
+      "C. 基于协议",
+      "D. 基于物理位置"
+    ],
+    "answer": "D",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "以下网络设备中,可能引起广播风暴的是(    )。",
+    "options": [
+      "A. 网关",
+      "B. 网桥",
+      "C. 防火墙",
+      "D. 路由器"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "MTU（Maximum Transfer Uint ） 是最大传送单元。帧的数据部分的的长度上限。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "以下关于MAC的说法中错误的是(    )。",
+    "options": [
+      "A. MAC地址在每次启动后都会改变",
+      "B. MAC地址一共有48b,它们从出厂时就被固化在网卡中",
+      "C. MAC地址也称作物理地址,或通常所说的计算机的硬件地址",
+      "D. MAC地址每次启动后都不会变化"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "下面(    )设备可以看作一种多端口的网桥设备。",
+    "options": [
+      "A. 中继器",
+      "B. 交换机",
+      "C. 路由器",
+      "D. 集线器"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "本地网络上的主机通过下列所述的哪种方式查找其他的网络设备?(    )",
+    "options": [
+      "A. 端口号",
+      "B. 硬件地址",
+      "C. 默认网关",
+      "D. 逻辑网络地址"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "个人区域网 PAN（Personal Area Network） 是在个人工作的地方把属于个人使用的电子设备用无线技术连接起来的网络 。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "10BASE2",
+    "options": [],
+    "answer": "10BASE2是IEEE 802.3标准中定义的细同轴电缆以太网规范，传输速率为10 Mbps，最大段长度为185米，使用基带传输，采用总线拓扑结构。",
+    "answer_source": "ai",
+    "question_type": "名词解释",
+    "answer_confidence": 0.95,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 201,
+      "completion_tokens": 164,
+      "total_tokens": 365,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "10BASE2是早期以太网的一种物理层标准，其中'10'表示10 Mbps速率，'BASE'表示基带传输，'2'表示最大段长约为200米（实际为185米）。"
+  },
+  {
+    "title": "以太网是(    )标准的具体实现。",
+    "options": [
+      "A. 802.3",
+      "B. 802.4",
+      "C. 802.5",
+      "D. 802.2"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "计算机在局域网络上的硬件地址也可以称为MAC地址,这是因为(    )。",
+    "options": [
+      "A. 硬件地址是传输数据时,在传输媒介访问控制层用到的地址",
+      "B. 它是地址,MAC是物理地址的简称",
+      "C. 它是物理层地址,MAC是物理层的简称",
+      "D. 它是链路层地址MAC是链路层的简称"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "网桥（bridge） 是一种用于数据链路层实现中继，连接两个或多个局域网的网络互连设备。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "局域网交换机具有很多特点。下面关于局域网交换机的论述中哪种说法是不正确的?(    )",
+    "options": [
+      "A. 低传输延迟",
+      "B. 高传输带宽",
+      "C. 可以根据用户级别设置访问权限",
+      "D. 允许不同传输速率的网卡共存于同一个网络"
+    ],
+    "answer": "D",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "关于共享介质局域网的描述中,错误的是(    )。",
+    "options": [
+      "A. 采用广播方式发送数据",
+      "B. 所有网络节点使用同一信道",
+      "C. 不需要介质访问控制方法  ",
+      "D. 数据在传输过程中可能冲突"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "就交换技术而言,局域网中的以太网采用的是(    )。",
+    "options": [
+      "A. 分组交换技术",
+      "B. 电路交换技术",
+      "C. 报文交换技术",
+      "D. 分组交换与电路交换结合技术"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "简述协议、服务之间的关系？",
+    "options": [],
+    "answer": "协议是控制两个对等实体进行通信的规则的集合，服务是下层实体向上层实体提供的一组功能。协议是水平的，服务是垂直的。服务由下层通过服务访问点提供给上层，协议保证对等实体之间能够正确通信。",
+    "answer_source": "ai",
+    "question_type": "简答及计算题",
+    "answer_confidence": 0.95,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 206,
+      "completion_tokens": 229,
+      "total_tokens": 435,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "协议和服务是计算机网络中的基本概念，协议定义了对等实体间的通信规则，服务定义了上下层之间的功能提供关系。"
+  },
+  {
+    "title": "两台主机之间的数据链路层采用后退N帧协议(GBN)传输数据,数据传输速率是16kbps,单向传播时延为270ms,数据帧长度是128~512B。接收方总是以与数据帧等长的帧进行确认。为使信道利用率达到最高,帧序号的比特数至少为(    )。",
+    "options": [
+      "A. 5 ",
+      "B. 4  ",
+      "C. 3  ",
+      "D. 2"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "在CSMA/CD网络中,所有的工作站都可以独占带宽。(    )",
+    "options": [
+      "A. True",
+      "B. False"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "IEEE 802局域网标准对应OSI模型的哪些层次?(    )",
+    "options": [
+      "A. 数据链路和网络层",
+      "B. 物理和数据链路层",
+      "C. 物理层          ",
+      "D. 数据链路层"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "交换机如何知道将帧转发到哪个端口?(    )",
+    "options": [
+      "A. 用MAC地址表",
+      "B. 用ARP地址表",
+      "C. 读取源ARP地址",
+      "D. 读取源MAC地址"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "在以太网中,工作站在发数据之前,要检查网络是否空闲,只有在网络不阻塞时工作站才能发送数据,是采用了(    )机制。",
+    "options": [
+      "A. IP",
+      "B. TCP",
+      "C. ICMP",
+      "D. 数据侦听与冲突控制CSMA/CD"
+    ],
+    "answer": "D",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "IEEE 802.3标准,定义了CSMA/CD总线介质访问控制子层与(    )。",
+    "options": [
+      "A. 服务器软件",
+      "B. 路由器协议",
+      "C. 物理层规范",
+      "D. 通信软件结构"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "集线器",
+    "options": [],
+    "answer": "集线器是一种多端口的中继器，工作在OSI模型的物理层，用于连接多个网络设备，将接收到的信号整形放大后广播到所有端口。",
+    "answer_source": "ai",
+    "question_type": "名词解释",
+    "answer_confidence": 1.0,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 201,
+      "completion_tokens": 156,
+      "total_tokens": 357,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "集线器是网络基础设备，主要用于局域网中，但存在冲突域和广播域的问题，现已较少使用。"
+  },
+  {
+    "title": "下面关于局域网的说法,不正确的是(    )。",
+    "options": [
+      "A. 局域网是一种通信网",
+      "B. 连入局域网的数据通信设备只包括计算机",
+      "C. 局域网覆盖有限的地理范围",
+      "D. 局域网具有高数据传输率"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "在下列关于二层以太网交换机的描述中,哪一个是错误的?(    )",
+    "options": [
+      "A. 二层以太网交换机的各个端口可以支持不同的速率",
+      "B. 二层以太网交换机可以隔离广播帧",
+      "C. 二层以太网交换机需要对收到的数据帧进行处理,增加了传输时延",
+      "D. 二层以太网交换机在转发帧时不改变帧的源地址"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "可以分割广播域的设备有(    )。",
+    "options": [
+      "A. 网桥",
+      "B. 中继器",
+      "C. 具有VLAN功能的以太网交换机",
+      "D. 路由器"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "按照作用范围的不同，计算机网络分为广域网 WAN、城域网 MAN、局域网 LAN、个人区域网 PAN。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "ADSL（Asymmetric Digital Subscriber Line ） 的含义是非对称数字用户线。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "CDMA",
+    "options": [],
+    "answer": "码分多址（Code Division Multiple Access）",
+    "answer_source": "ai",
+    "question_type": "名词解释",
+    "answer_confidence": 0.95,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 200,
+      "completion_tokens": 140,
+      "total_tokens": 340,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "CDMA是一种利用扩频技术实现多址通信的技术，通过不同的码序列区分用户。"
+  },
+  {
+    "title": "交换机端口可以分为半双工与全双工两类。对于100Mb/s的全双工端口,端口带宽为(    )。",
+    "options": [
+      "A. 100Mp/s",
+      "B. 200Mb/s",
+      "C. 400Mp/s",
+      "D. 800Mp/s"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "数据链路（data link） 指把实现控制数据运输的协议的硬件和软件加到链路上就构成了数据链路。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "下列哪一项最好地描述了循环冗余检验的特征?(    )",
+    "options": [
+      "A. 逐个地检查每一个字符",
+      "B. 查出99%以上的差错",
+      "C. 查不出有偶数个位出错的差错",
+      "D. 不如纵向冗余检查可靠"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "1000BASE-T标准支持的传输介质是(    )。",
+    "options": [
+      "A. 非屏蔽双绞线",
+      "B. 同轴电缆",
+      "C. 单模光纤",
+      "D. 多模光纤"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "适用于非屏蔽双绞线的Ethernet网卡应提供下列哪一种接口?(    )",
+    "options": [
+      "A. BNC接口",
+      "B. E1/T1接口",
+      "C. AUI接口",
+      "D. RJ-45接口"
+    ],
+    "answer": "D",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "IXP（Internet eXchange Point） 是 互联网交换点 IXP ，其主要作用就是允许两个网络直接相连并交换分组，而不需要再通过第三个网络来转发分组。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "LAN的拓扑形式一般以(    )为主。",
+    "options": [
+      "A. 总线型  ",
+      "B. 环状",
+      "C. 令牌环  ",
+      "D. 载波侦听与冲突检测CSMA/CD"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "时分复用（TDM）指所有用户在同样的时间占用不同的带宽资源。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "数据链路层采用选择重传协议(SR)传输数据,发送方己发送了0~3号数据帧,现已收到1号帧的确认,而0、2号帧依次超时,则此时需要重传的帧数是(    )。",
+    "options": [
+      "A. 1 ",
+      "B. 2",
+      "C. 3",
+      "D. 4"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "快速以太网使用的物理介质主要有(    )。",
+    "options": [
+      "A. 同轴电缆",
+      "B. 双绞线",
+      "C. 电缆",
+      "D. V. 24电缆"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "链路控制协议LCP",
+    "options": [],
+    "answer": "链路控制协议（LCP）是点对点协议（PPP）的一部分，用于建立、配置、维护和终止点对点链路连接，支持身份验证、压缩和多链路捆绑等功能。",
+    "answer_source": "ai",
+    "question_type": "名词解释",
+    "answer_confidence": 0.95,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 203,
+      "completion_tokens": 180,
+      "total_tokens": 383,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "LCP是PPP协议的关键子协议，负责链路层的控制和管理。"
+  },
+  {
+    "title": "以下关于以太网地址的描述,哪个是错误的?(    )",
+    "options": [
+      "A. 以太网地址就是通常所说的MAC地址",
+      "B. MAC地址又叫做局域网硬件地址",
+      "C. MAC地址通常通过域名解析查得",
+      "D. 以太网地址通常存储在网卡中"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "共有四个站进行码分多址CDMA通信。四个站的码片序列分别为：\nA: (-1+1-1+1+1+1-1-1)  B: (-1+1-1-1-1-1+1-1)\nC:(-1-1-1+1+1-1+1+1)   D: (-1-1+1-1+1+1+1-1)\n现收到这样的码片序列：（-1+1-3+1-1-3+1+1） 。\n请问哪个站发送了数据流？发送数据段站是发送的“0”，还是“1”？\n请写出A站的计算过程。",
+    "options": [],
+    "answer": "B和C站发送了比特1，D站发送了比特0，A站未发送。A站计算过程：将收到的序列与A的码片序列逐位相乘求和：(-1)*(-1) + (+1)*(+1) + (-1)*(-3) + (+1)*(+1) + (+1)*(-1) + (+1)*(-3) + (-1)*(+1) + (-1)*(+1) = 1+1+3+1-1-3-1-1=0，结果为0，表示A没有发送数据。",
+    "answer_source": "ai",
+    "question_type": "简答及计算题",
+    "answer_confidence": 1.0,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 353,
+      "completion_tokens": 941,
+      "total_tokens": 1294,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "通过内积运算，A的结果为0，B和C的结果为8（归一化后为1），D的结果为-8（归一化后为-1，即发送0）。"
+  },
+  {
+    "title": "带宽（bandwidth） 指在计算机网络中，表示在单位时间内从网络中的某一点到另一点所能通过的“最高数据率”。常用来表示网络的通信线路所能传送数据的能力。单位是“比特每秒”，记为 b/s。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "IEEE 802.3u标准支持的最大数据传输速率是(    )。",
+    "options": [
+      "A. 10Gb/s",
+      "B. 1Gb/s",
+      "C. 100Mb/s",
+      "D. 10Mb/s"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "下图是在IEEE 802．3标准以太网中冲突发生的过程，描述图示碰撞过程，简要说明CSMA/CD的协议原理。\n![img]<https://ce-images.oss-cn-beijing.aliyuncs.com/images/school_U101441/course_210300009_2023/9c576cc6-4920-d421-5d3b-2bc01a7f1045.png|w:465px>",
+    "options": [],
+    "answer": "略",
+    "answer_source": "dom",
+    "question_type": "综合题"
+  },
+  {
+    "title": "IEEE 802.3u标准是指(    )。",
+    "options": [
+      "A. 以太网",
+      "B. 快速以太网  ",
+      "C. 令牌环网  ",
+      "D. FDDI网"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "现有一个学校需要创建内部网络，该学校包括信息学院、经贸学院、机械学院、材料学院、化工学院、外语学院共6个部门，每个部门约有20～30台计算机，试问：\n⑴若要将几个部门从网络上进行分开。如果分配该学校所用的地址？已知分配该学校使用的是一个C类地址为201.168.16.0，如何划分网络，将几个部门分开？\n    ⑵确定各部门的网络地址和子网掩码，并写出分配给每个部门网络中的主机IP地址范围。\n⑶每个子网的可用IP地址数是多少？划分子网后，该C类网络的IP地址将损失多少个？",
+    "options": [],
+    "answer": "⑴ 采用划分子网的方法，向主机位借3位作为子网位，子网掩码为255.255.255.224（/27）。可划分8个子网，取前6个分配给信息学院、经贸学院、机械学院、材料学院、化工学院、外语学院。\n⑵ 各部门网络地址、子网掩码和主机IP地址范围如下：\n- 信息学院：网络地址201.168.16.0/27，可用IP范围201.168.16.1~201.168.16.30，广播地址201.168.16.31。\n- 经贸学院：网络地址201.168.16.32/27，可用IP范围201.168.16.33~201.168.16.62，广播地址201.168.16.63。\n- 机械学院：网络地址201.168.16.64/27，可用IP范围201.168.16.65~201.168.16.94，广播地址201.168.16.95。\n- 材料学院：网络地址201.168.16.96/27，可用IP范围201.168.16.97~201.168.16.126，广播地址201.168.16.127。\n- 化工学院：网络地址201.168.16.128/27，可用IP范围201.168.16.129~201.168.16.158，广播地址201.168.16.159。\n- 外语学院：网络地址201.168.16.160/27，可用IP范围201.168.16.161~201.168.16.190，广播地址201.168.16.191。\n⑶ 每个子网的可用IP地址数为30个（2^5-2）。划分子网后，该C类网络原本有254个可用IP地址（201.168.16.1~201.168.16.254），现8个子网共提供240个可用IP，损失14个IP地址。",
+    "answer_source": "ai",
+    "question_type": "综合题",
+    "answer_confidence": 0.95,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 338,
+      "completion_tokens": 1134,
+      "total_tokens": 1472,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "该题考察子网划分。C类地址主机位8位，需6个子网，借3位得/27掩码，每个子网30个可用IP，满足需求。列出前6个子网详细配置，最后计算IP损失。"
+  },
+  {
+    "title": "若某通信链路的数据传输速率为2400 b/s，采用4相位调制，则该链路的波特率是（      ）Baud？。",
+    "options": [
+      "A. 空1：\n略",
+      "B. 空2：\n略"
+    ],
+    "answer": "1200",
+    "answer_source": "ai",
+    "question_type": "填空题",
+    "answer_confidence": 1.0,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 242,
+      "completion_tokens": 212,
+      "total_tokens": 454,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "数据速率 = 波特率 × log2(调制电平数)，4相位调制即4种相位，log2(4)=2，因此波特率 = 2400 / 2 = 1200 Baud。"
+  },
+  {
+    "title": "简述电子邮件的收发过程。",
+    "options": [],
+    "answer": "电子邮件收发过程主要包括：发件人使用用户代理（如Outlook）编写邮件，通过SMTP协议发送到发件人的邮件服务器；发件人邮件服务器根据收件人地址，通过SMTP协议将邮件转发到收件人的邮件服务器；收件人通过用户代理使用POP3或IMAP协议从收件人邮件服务器下载或读取邮件。",
+    "answer_source": "ai",
+    "question_type": "简答及计算题",
+    "answer_confidence": 0.95,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 207,
+      "completion_tokens": 226,
+      "total_tokens": 433,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "该过程涉及用户代理、邮件服务器以及SMTP（发送）、POP3/IMAP（接收）协议，是电子邮件系统的标准工作流程。"
+  },
+  {
+    "title": "10Base5",
+    "options": [],
+    "answer": "10Base5是一种早期的以太网物理层标准，其中“10”表示数据传输速率为10 Mbps，“Base”表示基带传输，“5”表示最大段长为500米，使用粗同轴电缆（RG-8）作为传输介质，采用总线拓扑结构。",
+    "answer_source": "ai",
+    "question_type": "名词解释",
+    "answer_confidence": 0.95,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 201,
+      "completion_tokens": 145,
+      "total_tokens": 346,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "该标准是IEEE 802.3规范的一部分，也被称为粗缆以太网。"
+  },
+  {
+    "title": "简述TCP与UDP协议的相同点和区别？",
+    "options": [],
+    "answer": "相同点：TCP和UDP都是传输层协议，都使用端口号标识应用进程，都支持全双工通信。\n区别：TCP是面向连接的、可靠的、有序的传输协议，提供流量控制和拥塞控制，开销较大；UDP是无连接的、不可靠的、无序的传输协议，没有流量控制和拥塞控制，开销小、实时性高。",
+    "answer_source": "ai",
+    "question_type": "简答及计算题",
+    "answer_confidence": 0.95,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 210,
+      "completion_tokens": 253,
+      "total_tokens": 463,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "TCP和UDP是网络基础中的传输层协议，共同特点包括位于传输层、使用端口号、全双工通信；区别在于连接性、可靠性、有序性、控制机制和开销。"
+  },
+  {
+    "title": "带宽",
+    "options": [],
+    "answer": "带宽指在单位时间内能够传输的数据量，通常以比特每秒（bps）为单位，或指信号所占用的频率范围，即最高频率与最低频率之差。",
+    "answer_source": "ai",
+    "question_type": "名词解释",
+    "answer_confidence": 0.95,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 199,
+      "completion_tokens": 158,
+      "total_tokens": 357,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "带宽是通信和计算机网络中的基本概念，用于衡量信道容量或数据传输速率。"
+  },
+  {
+    "title": "统计时分复用 (Statistic TDM) 指改进的时分复用，能够明显提高信道的利用率。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "信号（signal） 是数据的电气的或电磁的表现。或者说信号是适合在传输介质上传输的对象。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "若HDLC帧的数据段中出现比特串“010111110101”,为解决透明传输,则比特填充后的输出为(    )。",
+    "options": [
+      "A. 0100111110101",
+      "B. 010111110101",
+      "C. 0101111010101",
+      "D. 0101111100101"
+    ],
+    "answer": "D",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "CSMA/CD方法用来解决多节点如何共享公用总线传输介质的问题,网中(    )。",
+    "options": [
+      "A. 不存在集中控制的节点",
+      "B. 存在一个集中控制的节点",
+      "C. 存在多个集中控制的节点",
+      "D. 可以有也可以没有集中控制的节点"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "通常以太网采用了(    )协议以支持总线型的结构。",
+    "options": [
+      "A. 总线型  ",
+      "B. 环状",
+      "C. 令牌环  ",
+      "D. 载波侦听与冲突检测CSMA/CD"
+    ],
+    "answer": "D",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "以太网的MAC协议提供的是(    )。",
+    "options": [
+      "A. 无连接不可靠服务",
+      "B. 无连接可靠服务",
+      "C. 有连接不可靠服务",
+      "D. 有连接可靠服务"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "OSI/RM",
+    "options": [],
+    "answer": "OSI/RM（Open Systems Interconnection Reference Model）即开放系统互连参考模型，是由国际标准化组织（ISO）制定的一个概念性网络通信模型，将网络通信划分为7个层次：物理层、数据链路层、网络层、传输层、会话层、表示层和应用层，用于指导网络协议的设计和互操作。",
+    "answer_source": "ai",
+    "question_type": "名词解释",
+    "answer_confidence": 1.0,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 202,
+      "completion_tokens": 169,
+      "total_tokens": 371,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "这是计算机网络基础概念，标准定义。"
+  },
+  {
+    "title": "分组（packet ） 是因特网中传送的数据单元。由首部 和数据段组成。分组又称为包，首部可称为包头。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "按照信号传送方向与时间的关系，数据通信可分为三种类型：单工通信、半双工通信和全双工通信，简述它们的不同。",
+    "options": [],
+    "answer": "单工通信指信号只能单向传输，一方发送，一方接收；半双工通信允许双方交替进行双向传输，但同一时刻只能单向；全双工通信允许双方同时进行双向传输。",
+    "answer_source": "ai",
+    "question_type": "简答及计算题",
+    "answer_confidence": 0.95,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 232,
+      "completion_tokens": 157,
+      "total_tokens": 389,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "基于数据通信的基本分类，区别在于传输方向的同时性。"
+  },
+  {
+    "title": "数据链路层要解决的三个基本问题：封装成帧、透明传输和               。",
+    "options": [
+      "A. 空1：\n略",
+      "B. 空2：\n略"
+    ],
+    "answer": "差错控制",
+    "answer_source": "ai",
+    "question_type": "填空题",
+    "answer_confidence": 0.95,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 231,
+      "completion_tokens": 93,
+      "total_tokens": 324,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "数据链路层的三个基本问题包括封装成帧、透明传输和差错控制。"
+  },
+  {
+    "title": "数据链路层如何找到本地网络上的主机?(    )",
+    "options": [
+      "A. 端口号 ",
+      "B. 硬件地址",
+      "C. 默认网关",
+      "D. 逻辑网络地址"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "以太网交换机进行转发决策时使用的PDU地址是(    )。",
+    "options": [
+      "A. 目的物理地址   ",
+      "B. 目的IP地址",
+      "C. 源物理地址     ",
+      "D. 源IP地址"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "网络的体系结构",
+    "options": [],
+    "answer": "网络的体系结构是计算机网络各层次及其协议的集合，是对网络及其部件所应完成功能的精确定义，通常指OSI参考模型或TCP/IP协议栈的层次结构。",
+    "answer_source": "ai",
+    "question_type": "名词解释",
+    "answer_confidence": 1.0,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 201,
+      "completion_tokens": 145,
+      "total_tokens": 346,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "这是计算机网络基础概念，定义了网络功能的分层模型。"
+  },
+  {
+    "title": "ARP是一个使用广播的地址解析协议,并且使用了ARP高速缓存,原因是使用广播会耗费大量带宽。(    )",
+    "options": [
+      "A. TRUE  ",
+      "B. FALSE"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "对于某个带宽为4000 Hz的低通信道，采用8种不同的物理状态来表示数据，按照奈奎斯特定理，信道的最大传输速率是（     ）？",
+    "options": [
+      "A. 空1：\n略",
+      "B. 空2：\n略"
+    ],
+    "answer": "24000 bps",
+    "answer_source": "ai",
+    "question_type": "填空题",
+    "answer_confidence": 1.0,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 246,
+      "completion_tokens": 317,
+      "total_tokens": 563,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "根据奈奎斯特定理，最大数据传输速率 = 2 × 带宽 × log2(状态数) = 2 × 4000 × log2(8) = 2 × 4000 × 3 = 24000 bps。"
+  },
+  {
+    "title": "100BASE-TX的标准物理介质是(    )。",
+    "options": [
+      "A. 粗同轴电缆",
+      "B. 细同轴电缆",
+      "C. 3类双绞线",
+      "D. 5类双绞线",
+      "E. 光纤"
+    ],
+    "answer": "D",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "幅移键控ASK",
+    "options": [],
+    "answer": "幅移键控（ASK）是一种数字调制方式，通过改变载波信号的幅度来表示二进制信息，通常用高幅度表示“1”，低幅度或零幅度表示“0”。",
+    "answer_source": "ai",
+    "question_type": "名词解释",
+    "answer_confidence": 0.95,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 203,
+      "completion_tokens": 142,
+      "total_tokens": 345,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "ASK是数字通信中最基本的调制方式之一，原理简单，但抗干扰能力较弱。"
+  },
+  {
+    "title": "数据链路层采用后退N帧(GBN)协议,发送方已经发送了编号为0~7的帧,当计时器超时,若发送方只收到0、2、3号帧的确认,则发送方需要重传的帧数是(    )。",
+    "options": [
+      "A. 2 ",
+      "B. 3 ",
+      "C. 4  ",
+      "D. 5"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "PPP协议使用同步传输技术传送比特串01111101101111111111011111。试问经过零比特填充后变成怎样的比特串？若接收端收到的PPP帧的数据部分00011101111101111101100111110，请删除发送端加入的比特后恢复原比特串信息。",
+    "options": [],
+    "answer": "略",
+    "answer_source": "dom",
+    "question_type": "简答及计算题"
+  },
+  {
+    "title": "数据链路层添加链路层的控制信息到数据包中,形成(    ),再传递到物理层,在物理层网络传送了原始的比特流。",
+    "options": [
+      "A. 帧 ",
+      "B. 信元",
+      "C. 数据包"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "下列不属于数据链路层的功能是(    )。",
+    "options": [
+      "A. 使用滑动窗口协议进行流量控制",
+      "B. 提供数据的透明传输机制",
+      "C. 为应用进程之间提供端到端的可靠通信",
+      "D. 将IP分组封装成帧"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "请简述以太网的介质访问控制方法，并说明载波侦听的最小时间。",
+    "options": [],
+    "answer": "以太网采用CSMA/CD（载波侦听多路访问/冲突检测）介质访问控制方法。载波侦听的最小时间是指争用期（冲突窗口），对于10Mbps以太网，最小时间为51.2μs（对应512比特时间），即最短帧长（64字节）的传输时间。",
+    "answer_source": "ai",
+    "question_type": "简答及计算题",
+    "answer_confidence": 0.9,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 218,
+      "completion_tokens": 253,
+      "total_tokens": 471,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "CSMA/CD是经典以太网的核心机制，载波侦听的最小时间等同于争用期，确保冲突能被检测到。"
+  },
+  {
+    "title": "有关集线器说法不正确的是(    )。",
+    "options": [
+      "A. 集线器只能提供信号的放大功能,不能中转信号",
+      "B. 集线器可以堆叠级联使用,线路总长度不能超过以太网最大网段长度",
+      "C. 集线器只包含物理层协议",
+      "D. 使用集线器的计算机网络中,当一方在发送时,其他机器不能发送"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "有关虚拟局域网的概念,下面哪个说法不正确?(    )",
+    "options": [
+      "A. 虚拟网络是建立在局域网交换机上的,以软件方式实现的逻辑分组",
+      "B. 可以使用交换机的端口划分虚拟局域网,且虚拟局域网可以跨越多个交换机",
+      "C. 在使用MAC地址划分的虚拟局域网中,连接到集线器上的所有节点只能被划分到一个虚网中",
+      "D. 在虚网中的逻辑工作组各节点可以分布在同一物理网段上,也可以分布在不同的物理网段上"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "网络协议",
+    "options": [],
+    "answer": "网络协议是计算机网络中为进行数据交换而建立的规则、标准或约定的集合。",
+    "answer_source": "ai",
+    "question_type": "名词解释",
+    "answer_confidence": 0.95,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 200,
+      "completion_tokens": 109,
+      "total_tokens": 309,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "网络协议定义了通信实体之间如何建立连接、传输数据、处理错误等，常见的如TCP/IP协议。"
+  },
+  {
+    "title": "基带信号（baseband signal） 指来自信源的信号。指没有经过调制的数字信号或模拟信号。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "划分子网是在IP地址的(    )部分。",
+    "options": [
+      "A. 网段地址",
+      "B. 主机地址",
+      "C. 子网网段",
+      "D. 默认子网掩码"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "数据链路层使用的主要是点对点信道和广播信道两种。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "具有拓扑中心的网络结构是(    )。",
+    "options": [
+      "A. 网状拓扑  ",
+      "B. 树状拓扑  ",
+      "C. 环状拓扑",
+      "D. 星状拓扑"
+    ],
+    "answer": "D",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "局域网 LAN（Local Area Network） 是指学校或企业大多拥有多个互连的局域网。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "以太网中,是根据(    )地址来区分不同的设备的。",
+    "options": [
+      "A. IP地址",
+      "B. MAC地址",
+      "C. IPX地址",
+      "D. LLC地址"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "基于集线器的以太网采用的网络拓扑是(    )。",
+    "options": [
+      "A. 树状拓扑",
+      "B. 网状拓扑",
+      "C. 星状拓扑",
+      "D. 环状拓扑"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "根据CSMA/CD协议的工作原理,下列情形中需要提高最短帧长度的是(    )。",
+    "options": [
+      "A. 网络传输速率不变,冲突域的最大距离变短",
+      "B. 冲突域的最大距离不变,网络传输速率提高",
+      "C. 上层协议使用TCP的概率增加",
+      "D. 在冲突域不变的情况下减少线路中的中继器数量"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "标准以太网使用(    )标准线缆。",
+    "options": [
+      "A. 10 BASE-T",
+      "B. 100 BASE-T",
+      "C. 10 BASE-5",
+      "D. 10 BASE-2"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "IEEE 802.3u是快速以太网交换机的标准。(    )",
+    "options": [
+      "A. True",
+      "B. False"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "RFC(Request For Comments) 的意思是“请求评议”，包含了关于 Internet 几乎所有的重要的文字资料。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "采用CSMA/CD技术的以太网上的两台主机同时发送数据,产生碰撞时,主机应该做何处理?(    )",
+    "options": [
+      "A. 产生冲突的两台主机停止传输,在一个随机时间后再重新发送",
+      "B. 产生冲突的两台主机发送重定向信息,各自寻找一条空闲路径传输帧报文",
+      "C. 产生冲突的两台主机停止传输,同时启动计时器,15s后重传数据",
+      "D. 主机发送错误信息,继续传输数据"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "对于某个带宽为4000Hz的低通信道，采用16种不同的物理状态来表示数据，按照奈奎斯特定理，信道的最大传输速率是多少              ？",
+    "options": [
+      "A. 空1：\n略",
+      "B. 空2：\n略"
+    ],
+    "answer": "32000bps",
+    "answer_source": "ai",
+    "question_type": "填空题",
+    "answer_confidence": 1.0,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 247,
+      "completion_tokens": 168,
+      "total_tokens": 415,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "根据奈奎斯特定理，最大传输速率 = 2 * 带宽 * log2(状态数) = 2 * 4000 * 4 = 32000 bps。"
+  },
+  {
+    "title": "吞吐量",
+    "options": [],
+    "answer": "吞吐量是指单位时间内系统能够处理的数据量或请求数量，通常用于衡量网络、存储或系统的性能。",
+    "answer_source": "ai",
+    "question_type": "名词解释",
+    "answer_confidence": 0.95,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 200,
+      "completion_tokens": 125,
+      "total_tokens": 325,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "吞吐量是性能测试中的核心指标，表示系统在单位时间内成功传输或处理的数据总量。"
+  },
+  {
+    "title": "数据链路层采用go-back-N方式进行流量和差错控制,发送方已经发送了编号为0~6的帧。当计时器超时,只收到了对1、3和5号帧的确认,发送方需要重传的帧的数目是(    )。",
+    "options": [
+      "A. 1  ",
+      "B. 2",
+      "C. 5",
+      "D. 6"
+    ],
+    "answer": "A",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "目前使用最广泛,也是相对传统的一种主流网络结构是(    )。",
+    "options": [
+      "A. 树状拓扑结构",
+      "B. 环状拓扑结构",
+      "C. 总线型拓扑结构",
+      "D. 星状拓扑结构"
+    ],
+    "answer": "D",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "下面哪种LAN是应用CSMA/CD协议的?(    )",
+    "options": [
+      "A. 令牌环",
+      "B. FDDI",
+      "C. Ethernet",
+      "D. Novell"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "在选择重传协议(SR)中,当帧的序号字段为3比特,且接收窗口与发送窗口尺寸相同时,发送窗口的最大尺寸为(    )。",
+    "options": [
+      "A. 2 ",
+      "B. 4 ",
+      "C. 6",
+      "D. 8"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "频分复用(FDM) 指所有用户在不同的时间占用同样的频带宽度（分时不分频）。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "已知要发送的数据为101001。采用CRC的生成多项式为G（X）\n=X3+X2+1。试求应添加在数据后面的余数。（写出计算过程）",
+    "options": [],
+    "answer": "001",
+    "answer_source": "ai",
+    "question_type": "简答及计算题",
+    "answer_confidence": 0.95,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 239,
+      "completion_tokens": 1893,
+      "total_tokens": 2132,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "数据101001左移3位得101001000，除以生成多项式1101（X^3+X^2+1），模2除法得到余数001。"
+  },
+  {
+    "title": "一个无分类地址167.199.170.82/27，从这个地址中我们可以得到的首地址、末地址及该地址块的主机数分别是什么？",
+    "options": [],
+    "answer": "首地址：167.199.170.64；末地址：167.199.170.95；主机数：30",
+    "answer_source": "ai",
+    "question_type": "简答及计算题",
+    "answer_confidence": 1.0,
+    "needs_review": false,
+    "answer_route": "direct",
+    "ai_usage": {
+      "prompt_tokens": 234,
+      "completion_tokens": 994,
+      "total_tokens": 1228,
+      "cache_reference_tokens": 0
+    },
+    "ai_billing": {
+      "billed_credits": 0,
+      "reserved_credits": 0
+    },
+    "analysis": "给定IP地址167.199.170.82/27，子网掩码27位，主机位5位。网络地址为IP与子网掩码按位与得167.199.170.64，广播地址为主机位全1即167.199.170.95，可用主机数为2^5-2=30。"
+  },
+  {
+    "title": "调制（modulation ） 指对信号源的信息进行处理后加到载波信号上，使其变为适合在信道传输的形式的过程。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "数据链路层只使用广播信道。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "每块以太网卡都有它自己的时钟,两个网卡在互相通信的时候为了知道什么时候一位结束、下一位开始,它们是如何严格地具有同样的频率的?(    )",
+    "options": [
+      "A. 量化机制",
+      "B. 曼彻斯特机制  ",
+      "C. 奇检验机制",
+      "D. 定时令牌机制"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "一个16端口的2层以太网交换机,冲突域和广播域的个数分别是(    )。",
+    "options": [
+      "A. 1,1     ",
+      "B. 16,16   ",
+      "C. 1,16   ",
+      "D. 16,1"
+    ],
+    "answer": "D",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "如果要将两台计算机通过双绞线直接连接,正确的线序是(    )。",
+    "options": [
+      "A. 1-1、2-2、3-3、4-4、5-5、6-6、7-7、8-8",
+      "B. 1-2、2-1、3-6、4-4、5-5、6-3、7-7、8-8",
+      "C. 1-3、2-6、3-1、4-4、5-5、6-2、7-7、8-8"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "在数据传输过程中，若接收方收到的二进制比特序列为10110011010，接收双方采用的生成多项式为G(x)=X4+X3+1，则该二进制比特序列在传输中是否出错? 请给出计算过程，说明判断的依据。",
+    "options": [],
+    "answer": "略",
+    "answer_source": "dom",
+    "question_type": "简答及计算题"
+  },
+  {
+    "title": "ISP（Internet Service Provider） 是因特网服务提供者（提供商）。",
+    "options": [
+      "A. 对",
+      "B. 错"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "判断题"
+  },
+  {
+    "title": "在拓扑结构上,快速以太网采用(    )。",
+    "options": [
+      "A. 总线型拓扑结构",
+      "B. 环状拓扑结构",
+      "C. 星状拓扑结构",
+      "D. 树状拓扑结构"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "以下关于以太网交换机的说法哪个是正确的?(    )",
+    "options": [
+      "A. 以太网交换机是一种工作在网络层的设备",
+      "B. 以太网交换机最基本的工作原理就是802.1d",
+      "C. 生成树协议解决了以太网交换机组建虚拟局域网的需求",
+      "D. 使用以太网交换机可以隔离冲突域"
+    ],
+    "answer": "D",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "在以太网上“阻塞(JAM)”信号的功能是(    )。",
+    "options": [
+      "A. 当发现冲突时,CSMA/CA发送一个“阻塞”信号。当所有的站都检测到阻塞信号时,它们立即停止发送尝试",
+      "B. 当发现冲突时,CSMA/CD发送一个“阻塞”信号。当所有的站都检测到阻塞信号时,它们立即停止发送尝试",
+      "C. 当媒体空闲时,CSMA/CD发送一个“阻塞”信号。当所有的站都检测到阻塞信号时,它们立即开始竞争访问媒体",
+      "D. 当媒体空闲时,CSMA/CA发送一个“阻塞”信号。当所有的站都检测到阻塞信号时,它们立即开始竞争访问媒体"
+    ],
+    "answer": "B",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  },
+  {
+    "title": "当在同一局域网上的两个设备具有相同的静态MAC地址时会发生什么样的情况?(    )",
+    "options": [
+      "A. 首次引导的设备排它地使用该地址,第二个设备不能通信",
+      "B. 最后引导的设备排它地使用该地址,另一个设备不能通信",
+      "C. 在网络上的这两个设备都不能正确通信",
+      "D. 两个设备都可以通信,因为它们可以读分组的整个内容,知道哪些分组是发给它们的,而不是发给其他站的"
+    ],
+    "answer": "C",
+    "answer_source": "dom",
+    "question_type": "单选题"
+  }
+]

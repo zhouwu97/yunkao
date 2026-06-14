@@ -11,7 +11,14 @@ API_BASE_URL = "http://156.233.229.232:8080"
 DEFAULT_CONFIG = {
     "extract_answer": False,
     "export_prefix": "基础题库导出",
-    "pdf_export_engine": "chromium"
+    "pdf_export_engine": "chromium",
+    "ai_auto_fill_missing_answers": False,
+    "ai_mode": "custom",
+    "ai_provider": "openai",
+    "ai_base_url": "https://api.openai.com/v1",
+    "ai_api_key": "",
+    "ai_model": "gpt-4o-mini",
+    "ai_supports_images": True
 }
 
 def load_config():

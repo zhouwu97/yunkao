@@ -9,7 +9,14 @@ def export_to_markdown(questions, file_path):
                 f.write(f"- {opt}\n")
             
             if q.get('answer'):
-                f.write(f"\n**[答案]**\n{q['answer']}\n")
+                answer_title = "[答案]"
+                if q.get("answer_source") == "ai":
+                    confidence = q.get("answer_confidence")
+                    if isinstance(confidence, (int, float)):
+                        answer_title = f"[AI推测答案 | 置信度 {confidence:.2f}]"
+                    else:
+                        answer_title = "[AI推测答案]"
+                f.write(f"\n**{answer_title}**\n{q['answer']}\n")
             if q.get('analysis'):
                 f.write(f"\n**[解析]**\n{q['analysis']}\n")
                 
@@ -29,7 +36,14 @@ def export_to_txt(questions, file_path):
                 
             if q.get('answer'):
                 ans_txt = re.sub(r'!\[[^\]]*\]\((?:[^)(]+|\([^)(]*\))*\)', '[图片]', q['answer'])
-                f.write(f"\n  [答案]: {ans_txt}\n")
+                answer_title = "[答案]"
+                if q.get("answer_source") == "ai":
+                    confidence = q.get("answer_confidence")
+                    if isinstance(confidence, (int, float)):
+                        answer_title = f"[AI推测答案|置信度{confidence:.2f}]"
+                    else:
+                        answer_title = "[AI推测答案]"
+                f.write(f"\n  {answer_title}: {ans_txt}\n")
             if q.get('analysis'):
                 ana_txt = re.sub(r'!\[[^\]]*\]\((?:[^)(]+|\([^)(]*\))*\)', '[图片]', q['analysis'])
                 f.write(f"  [解析]: {ana_txt}\n")
@@ -265,7 +279,7 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
     heading.alignment = 1 # 居中
     
     # 开头添加防诈骗提示
-    anti_scam_text = "此文件免费导出，若是购买来的，请退款。作者qq2170194804（不是卖家的QQ）"
+    anti_scam_text = "此文档禁止倒卖,鼓励免费分享，工具作者邮箱wu22402@gmail.com"
     p_scam_start = doc.add_paragraph()
     p_scam_start.alignment = 1
     run_scam_start = p_scam_start.add_run(anti_scam_text)
@@ -301,12 +315,20 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
             
         doc.add_paragraph("-" * 40)
         
+        import random
         # 题库中间添加防诈骗提示
         if i == mid_point and total > 1:
             p_scam_mid = doc.add_paragraph()
             p_scam_mid.alignment = 1
             run_scam_mid = p_scam_mid.add_run(anti_scam_text)
             run_scam_mid.font.color.rgb = RGBColor(255, 0, 0)
+            doc.add_paragraph("-" * 40)
+        # 随机插入黑色提示防倒卖（约15%概率，避免和首尾以及中间冲突）
+        elif total > 5 and i != total and random.random() < 0.15:
+            p_scam_rand = doc.add_paragraph()
+            p_scam_rand.alignment = 1
+            run_scam_rand = p_scam_rand.add_run(anti_scam_text)
+            run_scam_rand.font.color.rgb = RGBColor(0, 0, 0)
             doc.add_paragraph("-" * 40)
 
     # 结尾添加防诈骗提示
@@ -458,8 +480,16 @@ def export_to_pdf(questions, file_path, progress_callback=None):
             )
             page.insert_image(watermark_rect, stream=img_bytes)
             
-        # 保存并覆盖（不使用 incremental=True，以防产生不可预知的文件锁冲突）
-        pdf_doc.save(target_pdf, encryption=fitz.PDF_ENCRYPT_KEEP)
+        # 保存并加密（设定固定的所有者密码并限制权限，防止被直接编辑倒卖）
+        owner_pw = "yunkao2170194804"
+        # 允许打印、复制、高质量打印和辅助功能。禁止：修改、批注、组装、表单填写
+        perm = int(fitz.PDF_PERM_PRINT | fitz.PDF_PERM_COPY | fitz.PDF_PERM_ACCESSIBILITY | fitz.PDF_PERM_PRINT_HQ)
+        pdf_doc.save(
+            target_pdf, 
+            encryption=fitz.PDF_ENCRYPT_AES_256,
+            owner_pw=owner_pw,
+            permissions=perm
+        )
         pdf_doc.close()
             
     except Exception as e:
