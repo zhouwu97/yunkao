@@ -364,15 +364,6 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
             </w:pict>'''
             run_watermark._element.append(parse_xml(xml))
         
-    # 添加防篡改编辑锁：设置文档为“只读”并混淆加密盐值，永久锁定水印防止被删
-    try:
-        settings = doc.settings._element
-        # 使用随机乱码的 hash 和 salt 导致没有任何密码可以解锁这个文档
-        prot_xml = f'<w:documentProtection {nsdecls("w")} w:edit="readOnly" w:enforcement="1" w:cryptProviderType="rsaFull" w:cryptAlgorithmClass="hash" w:cryptAlgorithmType="typeAny" w:cryptAlgorithmSid="4" w:cryptSpinCount="100000" w:hash="A1B2C3D4E5F6G7H8I9J0K==" w:salt="xYzA=="/>'
-        settings.append(parse_xml(prot_xml))
-    except Exception as lock_err:
-        print("Failed to lock document:", lock_err)
-        
     doc.save(file_path)
 
 def export_to_pdf(questions, file_path, progress_callback=None):
@@ -481,12 +472,13 @@ def export_to_pdf(questions, file_path, progress_callback=None):
             
             rect = page.rect
             watermark_rect = fitz.Rect(
-                (rect.width - 500) / 2,
-                (rect.height - 500) / 2,
-                (rect.width + 500) / 2,
-                (rect.height + 500) / 2
+                (rect.width - 360) / 2,
+                (rect.height - 360) / 2 + 20,
+                (rect.width + 360) / 2,
+                (rect.height + 360) / 2 + 20
             )
-            page.insert_image(watermark_rect, stream=img_bytes)
+            # 放到底层背景，避免阅读器/WPS 选中对象时压住正文
+            page.insert_image(watermark_rect, stream=img_bytes, overlay=False)
             
         # 保存并加密（设定固定的所有者密码并限制权限，防止被直接编辑倒卖）
         owner_pw = "yunkao2170194804"

@@ -427,110 +427,6 @@ class YunKaoExtractorApp(QMainWindow):
             return
         self.overlay.set_mini_status(f"⚠️ AI 答题失败: {error_text[:40]}", "#D83B01")
 
-    def _get_question_state(self, callback):
-        js_state = """
-        (function() {
-            const active = document.querySelector('.swiper-slide-active .practice_slide_content')
-                || document.querySelector('.swiper-slide-active')
-                || document.querySelector('.practice_slide_content');
-            const current = document.querySelector('.swiper-pagination-current');
-            const total = document.querySelector('#swiper-total');
-            const nextBtn = document.querySelector('.swiper-button-next');
-            const currentText = current ? current.textContent.trim() : '';
-            const totalText = total ? total.textContent.trim() : '';
-            return {
-                marker: active ? (
-                    active.getAttribute('data-questionid')
-                    || active.getAttribute('data-id')
-                    || active.getAttribute('data-question-id')
-                    || ''
-                ) : '',
-                pageInfo: currentText && totalText ? `${currentText}/${totalText}` : '',
-                currentPage: currentText ? parseInt(currentText, 10) || 0 : 0,
-                totalPage: totalText ? parseInt(totalText, 10) || 0 : 0,
-                canNext: !!(nextBtn
-                    && !nextBtn.classList.contains('swiper-button-disabled')
-                    && nextBtn.offsetParent !== null)
-            };
-        })();
-        """
-        self.browser.page().runJavaScript(js_state, 0, callback)
-
-    def _wait_for_question_change(self, expected_marker, expected_page=0, attempt=0):
-        if not expected_marker and not expected_page:
-            QTimer.singleShot(600, self.trigger_extraction)
-            return
-
-        def on_state(result):
-            state = result or {}
-            current_marker = str(state.get("marker") or "").strip()
-            current_page = int(state.get("currentPage") or 0)
-
-            if (current_marker and current_marker != expected_marker) or (
-                expected_page and current_page and current_page != expected_page
-            ):
-                self.trigger_extraction()
-                return
-
-            if attempt < 16:
-                QTimer.singleShot(
-                    300,
-                    lambda: self._wait_for_question_change(expected_marker, expected_page, attempt + 1),
-                )
-            else:
-                self.overlay.set_mini_status("⚠️ 页面切换较慢，尝试重新翻到下一题...", "#D83B01")
-                self._retry_next_question(expected_marker, expected_page)
-
-        self._get_question_state(on_state)
-
-    def _retry_next_question(self, expected_marker, expected_page=0, attempt=0):
-        def on_state(result):
-            state = result or {}
-            current_marker = str(state.get("marker") or "").strip()
-            current_page = int(state.get("currentPage") or 0)
-            total_page = int(state.get("totalPage") or 0)
-            can_next = bool(state.get("canNext"))
-
-            if (current_marker and current_marker != expected_marker) or (
-                expected_page and current_page and current_page != expected_page
-            ):
-                self.trigger_extraction()
-                return
-
-            if 0 < current_page < total_page and can_next:
-                js_next = """
-                (function() {
-                    const nextBtn = document.querySelector('.swiper-button-next');
-                    if (nextBtn && !nextBtn.classList.contains('swiper-button-disabled')) {
-                        nextBtn.click();
-                        return true;
-                    }
-                    return false;
-                })();
-                """
-                self.browser.page().runJavaScript(
-                    js_next,
-                    0,
-                    lambda _: QTimer.singleShot(
-                        500, lambda: self._wait_for_question_change(expected_marker, expected_page)
-                    ),
-                )
-                return
-
-            if attempt < 6 and 0 < current_page < total_page:
-                self.overlay.set_mini_status(
-                    f"⚠️ 页面加载卡顿，继续重试 ({current_page}/{total_page})...",
-                    "#D83B01",
-                )
-                QTimer.singleShot(
-                    1200, lambda: self._retry_next_question(expected_marker, expected_page, attempt + 1)
-                )
-            else:
-                self.overlay.set_mini_status("🛑 已到达最后一题，提取完毕", "#6A9955")
-                self.overlay.toggle_extraction()
-
-        self._get_question_state(on_state)
-
     def update_config(self, new_config):
         self.config = new_config
 
@@ -791,8 +687,34 @@ class YunKaoExtractorApp(QMainWindow):
 
         parsed_question = parse_active_question(html_content)
         if not parsed_question:
-            self.overlay.set_mini_status("⚠️ 当前页面没有题目", "#D83B01")
+            # 页面可能仍在渲染，短暂等待后重试一次
+            if getattr(self, '_parse_retry_count', 0) < 1:
+                self._parse_retry_count = getattr(self, '_parse_retry_count', 0) + 1
+                self.overlay.set_mini_status("⏳ 题目内容未就绪，等待重试...", "#D83B01")
+                QTimer.singleShot(800, self.trigger_extraction)
+                return
+            self._parse_retry_count = 0
+            self.overlay.set_mini_status("⚠️ 题目解析失败，尝试跳到下一题...", "#D83B01")
+            # 不静默死亡，改为触发翻页
+            if self.overlay.is_extracting:
+                js_next = """
+                (function() {
+                    let nextBtn = document.querySelector('.swiper-button-next');
+                    if (nextBtn && !nextBtn.classList.contains('swiper-button-disabled')) {
+                        nextBtn.click();
+                        return true;
+                    }
+                    return false;
+                })();
+                """
+                def on_next_fallback(result):
+                    if result:
+                        QTimer.singleShot(800, self.trigger_extraction)
+                    else:
+                        self.overlay.set_mini_status("⚠️ 无法翻页，请手动检查", "#D83B01")
+                self.browser.page().runJavaScript(js_next, 0, on_next_fallback)
             return
+        self._parse_retry_count = 0
 
         page_info = parsed_question.pop("page_info", "")
         question_marker = parsed_question.pop("marker", "")
@@ -846,22 +768,17 @@ class YunKaoExtractorApp(QMainWindow):
             """
             def on_next_result(result):
                 if result:
-                    self._wait_for_question_change(self.last_question_marker, current_page)
+                    # 点击成功，等待 800ms 让 swiper 动画完成后再提取下一题
+                    QTimer.singleShot(800, self.trigger_extraction)
                 else:
                     # 按钮不可点，检查是否真的到了最后一题
                     if 0 < current_page < total_page:
-                        # 还没到最后一题时，优先重试翻页，避免把临时禁用误判成结束
+                        # 还没到最后一题，可能是动画未完成或 DOM 未更新
                         self.overlay.set_mini_status(
                             f"⚠️ 页面加载卡顿，等待重试 ({current_page}/{total_page})...",
                             "#D83B01",
                         )
-                        QTimer.singleShot(
-                            1200,
-                            lambda: self._retry_next_question(
-                                self.last_question_marker,
-                                current_page,
-                            ),
-                        )
+                        QTimer.singleShot(2000, self.trigger_extraction)
                     else:
                         # 到了最后一题
                         self.overlay.set_mini_status("🛑 已到达最后一题，提取完毕", "#6A9955")
