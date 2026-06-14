@@ -168,45 +168,66 @@ def _is_subjective_type(question_type):
 
 def _extract_raw_answer(target, content_div):
     answer_text = ""
+
+    # 0. 优先取 data-answer（前端直接注入的正确答案，最可靠）
+    if content_div is not None and content_div.has_attr("data-answer"):
+        data_answer = str(content_div["data-answer"]).strip()
+        if data_answer:
+            return data_answer
+
+    # 1. .answer-text
     answer_node = target.select_one(".answer-text")
     if answer_node is not None:
         answer_text = extract_rich_text(answer_node).strip("\r\n")
 
+    # 2. .practice_analysis .answer
     if not answer_text:
         answer_container = target.select_one(".practice_analysis .answer, .answer")
         if answer_container is not None:
             answer_text = extract_rich_text(answer_container)
             answer_text = re.sub(r"^正确答案[：:]?\s*", "", answer_text).strip("\r\n")
 
-    if content_div is not None and content_div.has_attr("data-answer"):
-        data_answer = str(content_div["data-answer"]).strip()
-        if data_answer:
-            answer_text = data_answer
-
     return answer_text
 
 
 def _normalize_judgment_answer(answer_text, option_records):
-    normalized = re.sub(r"\s+", "", answer_text or "").upper()
+    """判断题答案标准化。输入可能是 A/B/对/错/True/False 等，统一返回 对/错。"""
+    normalized = re.sub(r"\s+", "", answer_text or "")
     if not normalized:
         return ""
 
+    # 判断"对"和"错"分别对应哪个选项 label
     positive_label = "A"
     negative_label = "B"
+    positive_text = "对"
+    negative_text = "错"
     for record in option_records[:2]:
         option_text = re.sub(r"\s+", "", record.get("text", ""))
-        if any(token in option_text for token in ("对", "正确", "是", "√")):
+        if any(token in option_text for token in ("对", "正确", "是", "√", "True")):
             positive_label = record["label"]
-        if any(token in option_text for token in ("错", "错误", "否", "×")):
+            positive_text = "对"
+        if any(token in option_text for token in ("错", "错误", "否", "×", "False")):
             negative_label = record["label"]
+            negative_text = "错"
 
-    if normalized in {"A", "对", "正确", "TRUE", "YES", "√"}:
-        return positive_label
-    if normalized in {"B", "错", "错误", "FALSE", "NO", "×"}:
-        return negative_label
-    if normalized.startswith("正确答案"):
-        stripped = re.sub(r"^正确答案[：:]?", "", normalized)
-        return _normalize_judgment_answer(stripped, option_records)
+    # 匹配正面答案
+    if normalized.upper() in {"A", "对", "正确", "TRUE", "YES", "√", "是"}:
+        return "对"
+    # 匹配负面答案
+    if normalized.upper() in {"B", "错", "错误", "FALSE", "NO", "×", "否"}:
+        return "错"
+    # 如果匹配到选项 label
+    if normalized.upper() == positive_label.upper():
+        return "对"
+    if normalized.upper() == negative_label.upper():
+        return "错"
+
+    # 兜底：如果原文包含"正确"或"错误"关键词
+    if "正确" in normalized or "对" in normalized:
+        return "对"
+    if "错误" in normalized or "错" in normalized:
+        return "错"
+
     return answer_text.strip()
 
 
@@ -312,6 +333,18 @@ def parse_active_question(html_content):
     elif _is_judgment_type(question_type):
         seed_answer = "".join(correct_labels) if correct_labels else raw_answer
         answer_text = _normalize_judgment_answer(seed_answer, option_records)
+        # [DEBUG] 判断题诊断：单独保存判断题 DOM
+        try:
+            with open(r"e:\AI\yunkao\debug_judgment.html", "w", encoding="utf-8") as f:
+                f.write(str(target))
+            print(f"[判断题] 已保存 DOM 到 debug_judgment.html")
+            print(f"  title={title_text[:40]}")
+            print(f"  option_records={[(r['label'], r['text'][:30], r['is_correct']) for r in option_records]}")
+            print(f"  correct_labels={correct_labels}")
+            print(f"  raw_answer='{raw_answer}'")
+            print(f"  final_answer='{answer_text}'")
+        except Exception:
+            pass
     elif _is_fill_type(question_type):
         answer_text = _extract_fill_answer(target, raw_answer)
     elif _is_subjective_type(question_type):
