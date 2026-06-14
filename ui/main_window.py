@@ -670,12 +670,12 @@ class YunKaoExtractorApp(QMainWindow):
         return text
 
     def process_html_with_bs4(self, html_content):
-        # [DEBUG] 每次提取都保存 DOM 快照
-        try:
-            with open(r"e:\AI\yunkao\debug_dom.html", "w", encoding="utf-8") as f:
-                f.write(html_content)
-        except Exception as e:
-            print("Failed to save debug DOM:", e)
+        if self.config.get("debug_save_dom"):
+            try:
+                with open(r"e:\AI\yunkao\debug_dom.html", "w", encoding="utf-8") as f:
+                    f.write(html_content)
+            except Exception as e:
+                print("Failed to save debug DOM:", e)
 
         if not html_content or html_content == "ERROR_NOT_FOUND":
             self.overlay.set_mini_status("⚠️ 未找到题目内容，已自动停止", "#D83B01")
