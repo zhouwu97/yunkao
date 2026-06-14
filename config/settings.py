@@ -12,13 +12,17 @@ DEFAULT_CONFIG = {
     "extract_answer": False,
     "export_prefix": "基础题库导出",
     "pdf_export_engine": "chromium",
+    "auto_open_after_export": True,
     "ai_auto_fill_missing_answers": False,
     "ai_mode": "custom",
     "ai_provider": "openai",
     "ai_base_url": "https://api.openai.com/v1",
     "ai_api_key": "",
     "ai_model": "gpt-4o-mini",
-    "ai_supports_images": True
+    "ai_supports_images": True,
+    # 融智云考助手独立配置
+    "official_model_id": 0,
+    "official_supports_images": True,
 }
 
 def load_config():

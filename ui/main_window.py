@@ -16,6 +16,8 @@ from modules.js_bridge import ExtractorBridge
 from modules.exporter import export_to_markdown, export_to_txt
 from modules.question_parser import parse_active_question
 from ui.settings_dialog import SettingsDialog
+from ui.admin_dialog import AdminDialog
+import json
 
 class ExportThread(QThread):
     finished = Signal(bool, str)
@@ -212,9 +214,14 @@ class TampermonkeyFloatingWindow(QFrame):
             self.is_minimized = True
 
     def open_settings(self):
-        dialog = SettingsDialog(self.main_app)
+        dialog = SettingsDialog(self.main_app, jwt_token=self.main_app.jwt_token)
         dialog.config_updated.connect(self.main_app.update_config)
         dialog.logout_requested.connect(self.main_app.do_logout)
+        dialog.open_admin_panel.connect(self.main_app.open_admin_panel)
+        # 检查管理员权限
+        user_data = self.main_app.user_data or {}
+        is_admin = user_data.get("role") in ("admin", "super_admin")
+        dialog.set_admin_visible(is_admin)
         dialog.exec()
 
     def toggle_extraction(self):
@@ -369,14 +376,16 @@ class YunKaoExtractorApp(QMainWindow):
 
         question = self.extracted_questions[question_index]
         answer = ai_result.get("answer", "")
+        source = ai_result.get("source", "ai")
         if answer and not is_placeholder_answer(answer):
             question["answer"] = answer
             question["answer_source"] = "ai"
             question["answer_confidence"] = ai_result.get("confidence", 0.0)
             question["needs_review"] = ai_result.get("confidence", 0.0) < 0.75
-            question["answer_route"] = ai_result.get("source", "direct")
+            question["answer_route"] = source
             question["ai_usage"] = ai_result.get("usage", {})
             question["ai_billing"] = ai_result.get("billing", {})
+            question["ai_model"] = ai_result.get("model", {})
 
             ai_analysis = (ai_result.get("analysis") or "").strip()
             if ai_analysis and not question.get("analysis"):
@@ -385,20 +394,32 @@ class YunKaoExtractorApp(QMainWindow):
 
         usage = ai_result.get("usage", {}) or {}
         billing = ai_result.get("billing", {}) or {}
+        model_info = ai_result.get("model", {}) or {}
         total_tokens = int(usage.get("total_tokens", 0) or 0)
         cache_ref_tokens = int(usage.get("cache_reference_tokens", 0) or 0)
         billed_amount_cents = int(billing.get("billed_amount_cents", 0) or 0)
         balance_after_cents = int(billing.get("balance_after_cents", 0) or 0)
+        cache_hit = billing.get("cache_hit", False)
 
-        route_text = "缓存命中" if ai_result.get("source") == "cache" else "AI答题完成"
+        model_name = model_info.get("model_name", "")
+        if source == "cache":
+            route_text = f"缓存命中({model_name})" if model_name else "缓存命中"
+        elif source == "ai":
+            route_text = f"官方AI({model_name})" if model_name else "官方AI"
+        else:
+            route_text = "自定义API"
+
         usage_text = f"{total_tokens} tokens"
-        if ai_result.get("source") == "cache" and cache_ref_tokens > 0:
-            usage_text = f"本次 0 tokens / 历史 {cache_ref_tokens} tokens"
+        if cache_hit and cache_ref_tokens > 0:
+            usage_text = f"本次 0t / 参考 {cache_ref_tokens}t"
+        if not cache_hit and source != "direct":
+            usage_text = f"输入 {usage.get('prompt_tokens', 0)}t / 输出 {usage.get('completion_tokens', 0)}t"
+
         price_text = f"¥{billed_amount_cents / 100:.2f}"
         balance_text = f" / 余额 ¥{balance_after_cents / 100:.2f}" if balance_after_cents > 0 else ""
         self.overlay.set_mini_status(
             f"🤖 {route_text}: {usage_text} / {price_text}{balance_text}",
-            "#6A9955",
+            "#6A9955" if cache_hit else "#DAA520",
         )
 
     def _on_ai_fill_failed(self, session_id, question_index, error_text):
@@ -406,42 +427,116 @@ class YunKaoExtractorApp(QMainWindow):
             return
         self.overlay.set_mini_status(f"⚠️ AI 答题失败: {error_text[:40]}", "#D83B01")
 
-    def _wait_for_question_change(self, expected_marker, attempt=0):
-        if not expected_marker:
-            QTimer.singleShot(600, self.trigger_extraction)
-            return
-
-        js_marker = """
+    def _get_question_state(self, callback):
+        js_state = """
         (function() {
             const active = document.querySelector('.swiper-slide-active .practice_slide_content')
                 || document.querySelector('.swiper-slide-active')
                 || document.querySelector('.practice_slide_content');
-            if (!active) return '';
             const current = document.querySelector('.swiper-pagination-current');
             const total = document.querySelector('#swiper-total');
-            const pageInfo = current && total ? `${current.textContent.trim()}/${total.textContent.trim()}` : '';
-            return active.getAttribute('data-questionid')
-                || active.getAttribute('data-id')
-                || pageInfo
-                || '';
+            const nextBtn = document.querySelector('.swiper-button-next');
+            const currentText = current ? current.textContent.trim() : '';
+            const totalText = total ? total.textContent.trim() : '';
+            return {
+                marker: active ? (
+                    active.getAttribute('data-questionid')
+                    || active.getAttribute('data-id')
+                    || active.getAttribute('data-question-id')
+                    || ''
+                ) : '',
+                pageInfo: currentText && totalText ? `${currentText}/${totalText}` : '',
+                currentPage: currentText ? parseInt(currentText, 10) || 0 : 0,
+                totalPage: totalText ? parseInt(totalText, 10) || 0 : 0,
+                canNext: !!(nextBtn
+                    && !nextBtn.classList.contains('swiper-button-disabled')
+                    && nextBtn.offsetParent !== null)
+            };
         })();
         """
+        self.browser.page().runJavaScript(js_state, 0, callback)
 
-        def on_marker(result):
-            current_marker = str(result or "").strip()
-            if current_marker and current_marker != expected_marker:
+    def _wait_for_question_change(self, expected_marker, expected_page=0, attempt=0):
+        if not expected_marker and not expected_page:
+            QTimer.singleShot(600, self.trigger_extraction)
+            return
+
+        def on_state(result):
+            state = result or {}
+            current_marker = str(state.get("marker") or "").strip()
+            current_page = int(state.get("currentPage") or 0)
+
+            if (current_marker and current_marker != expected_marker) or (
+                expected_page and current_page and current_page != expected_page
+            ):
                 self.trigger_extraction()
                 return
-            if attempt < 12:
-                QTimer.singleShot(250, lambda: self._wait_for_question_change(expected_marker, attempt + 1))
-            else:
-                self.overlay.set_mini_status("⚠️ 页面切换较慢，继续重试提取...", "#D83B01")
-                self.trigger_extraction()
 
-        self.browser.page().runJavaScript(js_marker, 0, on_marker)
+            if attempt < 16:
+                QTimer.singleShot(
+                    300,
+                    lambda: self._wait_for_question_change(expected_marker, expected_page, attempt + 1),
+                )
+            else:
+                self.overlay.set_mini_status("⚠️ 页面切换较慢，尝试重新翻到下一题...", "#D83B01")
+                self._retry_next_question(expected_marker, expected_page)
+
+        self._get_question_state(on_state)
+
+    def _retry_next_question(self, expected_marker, expected_page=0, attempt=0):
+        def on_state(result):
+            state = result or {}
+            current_marker = str(state.get("marker") or "").strip()
+            current_page = int(state.get("currentPage") or 0)
+            total_page = int(state.get("totalPage") or 0)
+            can_next = bool(state.get("canNext"))
+
+            if (current_marker and current_marker != expected_marker) or (
+                expected_page and current_page and current_page != expected_page
+            ):
+                self.trigger_extraction()
+                return
+
+            if 0 < current_page < total_page and can_next:
+                js_next = """
+                (function() {
+                    const nextBtn = document.querySelector('.swiper-button-next');
+                    if (nextBtn && !nextBtn.classList.contains('swiper-button-disabled')) {
+                        nextBtn.click();
+                        return true;
+                    }
+                    return false;
+                })();
+                """
+                self.browser.page().runJavaScript(
+                    js_next,
+                    0,
+                    lambda _: QTimer.singleShot(
+                        500, lambda: self._wait_for_question_change(expected_marker, expected_page)
+                    ),
+                )
+                return
+
+            if attempt < 6 and 0 < current_page < total_page:
+                self.overlay.set_mini_status(
+                    f"⚠️ 页面加载卡顿，继续重试 ({current_page}/{total_page})...",
+                    "#D83B01",
+                )
+                QTimer.singleShot(
+                    1200, lambda: self._retry_next_question(expected_marker, expected_page, attempt + 1)
+                )
+            else:
+                self.overlay.set_mini_status("🛑 已到达最后一题，提取完毕", "#6A9955")
+                self.overlay.toggle_extraction()
+
+        self._get_question_state(on_state)
 
     def update_config(self, new_config):
         self.config = new_config
+
+    def open_admin_panel(self):
+        dialog = AdminDialog(self, jwt_token=self.jwt_token)
+        dialog.exec()
         
     def on_url_changed(self, url):
         self.overlay.btn_back.setEnabled(self.browser.page().history().canGoBack())
@@ -560,7 +655,6 @@ class YunKaoExtractorApp(QMainWindow):
             QMessageBox.information(self, "请稍候", "仍有题目正在等待 AI 答题完成，请稍后再导出。")
             return
             
-        import json
         with open('e:/AI/yunkao/questions_dump.json', 'w', encoding='utf-8') as f:
             json.dump(self.extracted_questions, f, ensure_ascii=False, indent=2)
             
@@ -752,13 +846,22 @@ class YunKaoExtractorApp(QMainWindow):
             """
             def on_next_result(result):
                 if result:
-                    self._wait_for_question_change(self.last_question_marker)
+                    self._wait_for_question_change(self.last_question_marker, current_page)
                 else:
                     # 按钮不可点，检查是否真的到了最后一题
                     if 0 < current_page < total_page:
-                        # 还没到最后一题，说明可能是网页卡顿（尤其是多开时），动画未完成或DOM未更新
-                        self.overlay.set_mini_status(f"⚠️ 页面加载卡顿，等待重试 ({current_page}/{total_page})...", "#D83B01")
-                        QTimer.singleShot(2000, self.trigger_extraction)
+                        # 还没到最后一题时，优先重试翻页，避免把临时禁用误判成结束
+                        self.overlay.set_mini_status(
+                            f"⚠️ 页面加载卡顿，等待重试 ({current_page}/{total_page})...",
+                            "#D83B01",
+                        )
+                        QTimer.singleShot(
+                            1200,
+                            lambda: self._retry_next_question(
+                                self.last_question_marker,
+                                current_page,
+                            ),
+                        )
                     else:
                         # 到了最后一题
                         self.overlay.set_mini_status("🛑 已到达最后一题，提取完毕", "#6A9955")
