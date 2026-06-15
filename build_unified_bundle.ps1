@@ -38,7 +38,7 @@ try {
         Pop-Location
     }
 
-    $bundleTarget = Join-Path $yunkaoRoot "dist\yunkao\oneclass"
+    $bundleTarget = Join-Path $yunkaoRoot "dist\yunkao\_internal\oneclass"
     if (Test-Path $bundleTarget) {
         Remove-Item $bundleTarget -Recurse -Force
     }
@@ -48,9 +48,9 @@ try {
     Write-Host ""
     Write-Host "统一包已准备完成：" -ForegroundColor Green
     Write-Host "  云考入口: $(Join-Path $yunkaoRoot 'dist\yunkao\yunkao.exe')"
-    Write-Host "  OneClass 运行时: $bundleTarget"
+    Write-Host "  内置 OneClass 运行时: $bundleTarget"
     Write-Host ""
-    Write-Host "打包后的 yunkao.exe 会优先启动同目录下的 oneclass\\oneclass.exe。"
+    Write-Host "用户只需要启动 yunkao.exe；OneClass 作为内置运行时由它自动拉起。"
 }
 finally {
     Pop-Location

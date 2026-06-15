@@ -38,6 +38,7 @@ def resolve_bundled_oneclass_exe() -> Path | None:
         return None
     exe_dir = Path(sys.executable).resolve().parent
     candidates = [
+        exe_dir / "_internal" / "oneclass" / "oneclass.exe",
         exe_dir / "oneclass" / "oneclass.exe",
         exe_dir / "oneclass.exe",
     ]
