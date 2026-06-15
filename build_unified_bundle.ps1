@@ -18,7 +18,22 @@ if (-not (Test-Path $oneclassRoot)) {
 
 Push-Location $yunkaoRoot
 try {
+    $yunkaoDistDir = Join-Path $yunkaoRoot "dist\yunkao"
+    if (Test-Path $yunkaoDistDir) {
+        Remove-Item $yunkaoDistDir -Recurse -Force
+    }
+
     & $yunkaoPython -m PyInstaller --noconfirm --clean yunkao_dev.spec
+
+    $builtYunkaoExe = Join-Path $yunkaoRoot "build\yunkao_dev\yunkao.exe"
+    if (-not (Test-Path $builtYunkaoExe)) {
+        throw "未找到最新构建的 yunkao.exe: $builtYunkaoExe"
+    }
+
+    if (-not (Test-Path $yunkaoDistDir)) {
+        New-Item -ItemType Directory -Force -Path $yunkaoDistDir | Out-Null
+    }
+    Copy-Item $builtYunkaoExe (Join-Path $yunkaoDistDir "yunkao.exe") -Force
 
     Push-Location $oneclassRoot
     try {
@@ -38,12 +53,12 @@ try {
         Pop-Location
     }
 
-    $legacyBundleTarget = Join-Path $yunkaoRoot "dist\yunkao\oneclass"
+    $legacyBundleTarget = Join-Path $yunkaoDistDir "oneclass"
     if (Test-Path $legacyBundleTarget) {
         Remove-Item $legacyBundleTarget -Recurse -Force
     }
 
-    $bundleTarget = Join-Path $yunkaoRoot "dist\yunkao\_internal\oneclass"
+    $bundleTarget = Join-Path $yunkaoDistDir "_internal\oneclass"
     if (Test-Path $bundleTarget) {
         Remove-Item $bundleTarget -Recurse -Force
     }
