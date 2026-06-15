@@ -1,5 +1,6 @@
 import json
 import os
+import signal
 import subprocess
 import sys
 from pathlib import Path
@@ -10,6 +11,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMessageBox,
+    QProgressBar,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -56,6 +58,17 @@ class UnifiedHomePage(QWidget):
         self.user_data = user_data or {}
         self.yunkao_window = None
         self.oneclass_process = None
+        self.oneclass_sync_timer = QTimer(self)
+        self.oneclass_sync_timer.setInterval(2500)
+        self.oneclass_sync_timer.timeout.connect(self._poll_oneclass_activation)
+        self.oneclass_sync_deadline = 0
+        self.oneclass_sync_notified = False
+        self.oneclass_runtime_timer = QTimer(self)
+        self.oneclass_runtime_timer.setInterval(1200)
+        self.oneclass_runtime_timer.timeout.connect(self._update_oneclass_runtime_state)
+        self.oneclass_runtime_timer.start()
+        self.refresh_button = None
+        self.stop_oneclass_button = None
         self.needs_relogin = False
 
         nickname = self.user_data.get("nickname") or current_user
@@ -66,8 +79,15 @@ class UnifiedHomePage(QWidget):
             "QFrame#Card { background:white; border-radius:16px; }"
             "QPushButton { border:0; border-radius:10px; padding:12px 16px; font-weight:bold; }"
             "QPushButton#Primary { background:#1677ff; color:white; }"
+            "QPushButton#Primary:hover { background:#3b8cff; }"
+            "QPushButton#Primary:pressed { background:#0f5ed7; }"
             "QPushButton#Secondary { background:#eef4ff; color:#1268d3; }"
+            "QPushButton#Secondary:hover { background:#dbeafe; }"
+            "QPushButton#Secondary:pressed { background:#bfdbfe; color:#0f5ed7; }"
             "QPushButton#Danger { background:#fff1f2; color:#be123c; }"
+            "QPushButton#Danger:hover { background:#ffe4e6; }"
+            "QPushButton#Danger:pressed { background:#fecdd3; }"
+            "QPushButton:disabled { background:#cbd5e1; color:white; }"
         )
 
         root = QVBoxLayout(self)
@@ -101,17 +121,28 @@ class UnifiedHomePage(QWidget):
                 "融智云考",
                 "题库导出、AI 补全，以及云考余额充值与消耗。",
                 self.wallet_label,
+                None,
+                None,
                 "打开云考",
                 self.open_yunkao,
             )
         )
 
         self.oneclass_label = QLabel("OneClass 授权：检查中...")
+        self.oneclass_progress_label = QLabel("")
+        self.oneclass_progress_label.setWordWrap(True)
+        self.oneclass_progress_label.setStyleSheet("color:#64748b;font-size:12px;")
+        self.oneclass_progress = QProgressBar()
+        self.oneclass_progress.setTextVisible(False)
+        self.oneclass_progress.setFixedHeight(10)
+        self.oneclass_progress.hide()
         cards.addWidget(
             self._build_card(
                 "OneClass 授权",
                 "OneClass 单独购买，付款后授权绑定当前机器，不会增加云考余额。",
                 self.oneclass_label,
+                self.oneclass_progress_label,
+                self.oneclass_progress,
                 "启动 OneClass",
                 self.open_oneclass,
                 secondary_text="购买 OneClass / 同步授权",
@@ -121,10 +152,15 @@ class UnifiedHomePage(QWidget):
 
         bottom = QHBoxLayout()
         bottom.addStretch()
-        refresh = QPushButton("刷新状态")
-        refresh.setObjectName("Secondary")
-        refresh.clicked.connect(self.refresh_status)
-        bottom.addWidget(refresh)
+        self.refresh_button = QPushButton("刷新状态")
+        self.refresh_button.setObjectName("Secondary")
+        self.refresh_button.clicked.connect(self.handle_refresh_click)
+        bottom.addWidget(self.refresh_button)
+        self.stop_oneclass_button = QPushButton("停止 OneClass")
+        self.stop_oneclass_button.setObjectName("Secondary")
+        self.stop_oneclass_button.clicked.connect(self.stop_oneclass)
+        self.stop_oneclass_button.setEnabled(False)
+        bottom.addWidget(self.stop_oneclass_button)
         logout = QPushButton("退出登录")
         logout.setObjectName("Danger")
         logout.clicked.connect(self.logout)
@@ -138,6 +174,8 @@ class UnifiedHomePage(QWidget):
         title,
         desc,
         status_label,
+        progress_label,
+        progress_bar,
         primary_text,
         primary_callback,
         secondary_text=None,
@@ -161,6 +199,11 @@ class UnifiedHomePage(QWidget):
         status_label.setWordWrap(True)
         status_label.setStyleSheet("color:#0f766e;font-weight:bold;")
         layout.addWidget(status_label)
+
+        if progress_label is not None:
+            layout.addWidget(progress_label)
+        if progress_bar is not None:
+            layout.addWidget(progress_bar)
         layout.addStretch()
 
         primary = QPushButton(primary_text)
@@ -178,6 +221,28 @@ class UnifiedHomePage(QWidget):
     def refresh_status(self):
         self.refresh_wallet()
         self.refresh_oneclass()
+        self._update_oneclass_runtime_state()
+
+    def handle_refresh_click(self):
+        if self.refresh_button is not None:
+            self.refresh_button.setEnabled(False)
+            self.refresh_button.setText("正在刷新...")
+        if not self.oneclass_sync_timer.isActive():
+            self._set_oneclass_progress("正在手动刷新授权状态，请稍等…", active=True)
+        QTimer.singleShot(120, self.refresh_status)
+        QTimer.singleShot(1200, self._restore_refresh_button)
+
+    def _restore_refresh_button(self):
+        if self.refresh_button is not None:
+            self.refresh_button.setText("刷新状态")
+            self.refresh_button.setEnabled(True)
+
+    def _update_oneclass_runtime_state(self):
+        running = bool(self.oneclass_process and self.oneclass_process.poll() is None)
+        if self.stop_oneclass_button is not None:
+            self.stop_oneclass_button.setEnabled(running)
+        if running and not self.oneclass_sync_timer.isActive():
+            self.oneclass_progress_label.setText("OneClass 正在运行。可在控制台按 Ctrl+C 停止，或点击下方“停止 OneClass”。")
 
     def refresh_wallet(self):
         try:
@@ -187,6 +252,16 @@ class UnifiedHomePage(QWidget):
         except Exception as exc:
             self.wallet_label.setText(f"云考余额：获取失败（{exc}）")
 
+    def _set_oneclass_progress(self, message: str = "", active: bool = False) -> None:
+        self.oneclass_progress_label.setText(message)
+        if active:
+            self.oneclass_progress.show()
+            self.oneclass_progress.setRange(0, 0)
+        else:
+            self.oneclass_progress.hide()
+            self.oneclass_progress.setRange(0, 100)
+            self.oneclass_progress.setValue(0)
+
     def _oneclass_command(self, *args):
         bundled_exe = resolve_bundled_oneclass_exe()
         if bundled_exe is not None:
@@ -195,20 +270,34 @@ class UnifiedHomePage(QWidget):
         main_py = ONECLASS_ROOT / "main.py"
         return [python, str(main_py), *args]
 
+    def _oneclass_workdir(self) -> Path:
+        bundled_exe = resolve_bundled_oneclass_exe()
+        if bundled_exe is not None:
+            return bundled_exe.parent
+        if ONECLASS_ROOT.exists():
+            return ONECLASS_ROOT
+        return Path(sys.executable).resolve().parent
+
+    def _read_oneclass_status(self) -> dict[str, object]:
+        result = subprocess.run(
+            self._oneclass_command("status-json"),
+            cwd=str(self._oneclass_workdir()),
+            capture_output=True,
+            text=True,
+            timeout=12,
+        )
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout or "").strip()
+            raise RuntimeError(detail or "OneClass 状态读取失败")
+        return json.loads((result.stdout or "{}").strip() or "{}")
+
     def refresh_oneclass(self):
         bundled_exe = resolve_bundled_oneclass_exe()
         if bundled_exe is None and not ONECLASS_ROOT.exists():
             self.oneclass_label.setText("OneClass 授权：未找到运行时（源码目录或打包 oneclass.exe）")
             return
         try:
-            result = subprocess.run(
-                self._oneclass_command("status-json"),
-                cwd=str(ONECLASS_ROOT if ONECLASS_ROOT.exists() else Path(sys.executable).resolve().parent),
-                capture_output=True,
-                text=True,
-                timeout=12,
-            )
-            data = json.loads((result.stdout or "{}").strip() or "{}")
+            data = self._read_oneclass_status()
             if data.get("active"):
                 tier = data.get("tier") or "unknown"
                 order_no = data.get("order_no") or "-"
@@ -216,11 +305,51 @@ class UnifiedHomePage(QWidget):
                 self.oneclass_label.setText(
                     f"OneClass 授权：已激活（{tier}）\n订单：{order_no}\n更新截止：{updates_until}"
                 )
+                if not self.oneclass_sync_timer.isActive():
+                    self._set_oneclass_progress("授权已就绪，可以直接启动 OneClass。", active=False)
             else:
                 reason = data.get("reason") or "未激活"
                 self.oneclass_label.setText(f"OneClass 授权：{reason}")
+                if not self.oneclass_sync_timer.isActive():
+                    self._set_oneclass_progress("未购买时会提示购买；付款后这里会自动刷新授权状态。", active=False)
         except Exception as exc:
             self.oneclass_label.setText(f"OneClass 授权：检查失败（{exc}）")
+            if not self.oneclass_sync_timer.isActive():
+                self._set_oneclass_progress("点击“刷新状态”可重试读取 OneClass 授权。", active=False)
+
+    def _begin_oneclass_sync_monitor(self, message: str) -> None:
+        self.oneclass_sync_deadline = 72
+        self.oneclass_sync_notified = False
+        self._set_oneclass_progress(message, active=True)
+        self.oneclass_sync_timer.start()
+
+    def _poll_oneclass_activation(self) -> None:
+        try:
+            data = self._read_oneclass_status()
+        except Exception as exc:
+            self.oneclass_sync_deadline -= 1
+            self._set_oneclass_progress(f"正在等待授权写入，稍后自动重试…（读取失败：{exc}）", active=True)
+            if self.oneclass_sync_deadline <= 0:
+                self.oneclass_sync_timer.stop()
+                self._set_oneclass_progress("等待超时。你可以点击“刷新状态”或再次进入“同步授权”。", active=False)
+            return
+
+        if data.get("active"):
+            self.oneclass_sync_timer.stop()
+            self.refresh_oneclass()
+            self._set_oneclass_progress("付款已同步完成，首页授权状态已自动刷新。", active=False)
+            if not self.oneclass_sync_notified:
+                self.oneclass_sync_notified = True
+                QMessageBox.information(self, "OneClass", "付款已同步完成，OneClass 授权状态已刷新。")
+            return
+
+        self.oneclass_sync_deadline -= 1
+        reason = str(data.get("reason") or "未激活").strip()
+        self.oneclass_label.setText(f"OneClass 授权：{reason}")
+        self._set_oneclass_progress("已打开支付窗口，正在等待付款确认并自动刷新授权状态…", active=True)
+        if self.oneclass_sync_deadline <= 0:
+            self.oneclass_sync_timer.stop()
+            self._set_oneclass_progress("暂时还没有同步成功。付款后可点击“刷新状态”或再次进入“同步授权”。", active=False)
 
     def open_yunkao(self):
         if self.yunkao_window is None:
@@ -237,16 +366,60 @@ class UnifiedHomePage(QWidget):
         if self.oneclass_process and self.oneclass_process.poll() is None:
             QMessageBox.information(self, "OneClass", "OneClass 已在运行中。")
             return
+        try:
+            status = self._read_oneclass_status()
+        except Exception as exc:
+            QMessageBox.warning(self, "启动失败", f"启动前检查 OneClass 授权失败：{exc}")
+            return
+        if not status.get("active"):
+            reason = str(status.get("reason") or "未激活")
+            self.refresh_oneclass()
+            QMessageBox.information(
+                self,
+                "需要授权",
+                f"当前还不能启动 OneClass：{reason}\n\n请先点击“购买 OneClass / 同步授权”。",
+            )
+            return
         env = os.environ.copy()
         env["ONECLASS_LOGIN_JWT"] = self.jwt_token
         try:
+            creationflags = 0
+            if sys.platform == "win32":
+                creationflags = (
+                    getattr(subprocess, "CREATE_NEW_CONSOLE", 0)
+                    | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+                )
             self.oneclass_process = subprocess.Popen(
                 self._oneclass_command(),
-                cwd=str(ONECLASS_ROOT if ONECLASS_ROOT.exists() else Path(sys.executable).resolve().parent),
+                cwd=str(self._oneclass_workdir()),
                 env=env,
+                creationflags=creationflags,
             )
+            self._update_oneclass_runtime_state()
         except Exception as exc:
             QMessageBox.warning(self, "启动失败", f"无法启动 OneClass：{exc}")
+
+    def stop_oneclass(self):
+        if not self.oneclass_process or self.oneclass_process.poll() is not None:
+            self._update_oneclass_runtime_state()
+            QMessageBox.information(self, "OneClass", "OneClass 当前没有在运行。")
+            return
+        try:
+            if sys.platform == "win32" and hasattr(signal, "CTRL_BREAK_EVENT"):
+                self.oneclass_process.send_signal(signal.CTRL_BREAK_EVENT)
+                self.oneclass_process.wait(timeout=4)
+            else:
+                self.oneclass_process.terminate()
+                self.oneclass_process.wait(timeout=4)
+        except Exception:
+            try:
+                self.oneclass_process.kill()
+            except Exception:
+                pass
+        finally:
+            self._update_oneclass_runtime_state()
+            if not self.oneclass_sync_timer.isActive():
+                self._set_oneclass_progress("OneClass 已停止。重新启动时会弹出独立控制台。", active=False)
 
     def purchase_oneclass(self):
         env = os.environ.copy()
@@ -254,9 +427,10 @@ class UnifiedHomePage(QWidget):
         try:
             subprocess.Popen(
                 self._oneclass_command("purchase", "--jwt-token", self.jwt_token),
-                cwd=str(ONECLASS_ROOT if ONECLASS_ROOT.exists() else Path(sys.executable).resolve().parent),
+                cwd=str(self._oneclass_workdir()),
                 env=env,
             )
+            self._begin_oneclass_sync_monitor("已打开支付窗口，等待你完成付款。授权成功后这里会自动刷新。")
         except Exception as exc:
             QMessageBox.warning(self, "购买失败", f"无法打开 OneClass 购买窗口：{exc}")
 
