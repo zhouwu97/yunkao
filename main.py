@@ -85,7 +85,7 @@ if getattr(sys, 'frozen', False):
 from PySide6.QtWidgets import QApplication, QDialog
 from config.settings import load_config, API_BASE_URL
 from ui.login_dialog import SoftwareLoginDialog
-from ui.main_window import YunKaoExtractorApp
+from ui.unified_home import UnifiedHomePage
 
 def check_token_validity(token):
     try:
@@ -110,7 +110,7 @@ if __name__ == "__main__":
         
         # 如果有令牌且验证依然有效，直接进入主界面
         if saved_token and saved_user and check_token_validity(saved_token):
-            window = YunKaoExtractorApp(
+            window = UnifiedHomePage(
                 current_user=saved_user,
                 jwt_token=saved_token,
                 user_data=saved_user_data
@@ -124,7 +124,7 @@ if __name__ == "__main__":
             # 显示登录弹窗
             login_dialog = SoftwareLoginDialog()
             if login_dialog.exec() == QDialog.Accepted:
-                window = YunKaoExtractorApp(
+                window = UnifiedHomePage(
                     current_user=login_dialog.current_user,
                     jwt_token=login_dialog.jwt_token,
                     user_data=login_dialog.user_data
