@@ -38,6 +38,11 @@ try {
         Pop-Location
     }
 
+    $legacyBundleTarget = Join-Path $yunkaoRoot "dist\yunkao\oneclass"
+    if (Test-Path $legacyBundleTarget) {
+        Remove-Item $legacyBundleTarget -Recurse -Force
+    }
+
     $bundleTarget = Join-Path $yunkaoRoot "dist\yunkao\_internal\oneclass"
     if (Test-Path $bundleTarget) {
         Remove-Item $bundleTarget -Recurse -Force
