@@ -4,7 +4,7 @@ from modules.question_parser import parse_active_question
 
 
 class QuestionParserTests(unittest.TestCase):
-    def test_judgment_answer_is_normalized_to_option_label(self):
+    def test_judgment_answer_is_normalized_to_readable_text(self):
         html = """
         <div class="swiper-slide swiper-slide-active">
           <div class="practice_slide_content" data-questionid="42">
@@ -28,7 +28,7 @@ class QuestionParserTests(unittest.TestCase):
 
         question = parse_active_question(html)
         self.assertIsNotNone(question)
-        self.assertEqual(question["answer"], "B")
+        self.assertEqual(question["answer"], "错")
         self.assertEqual(question["question_id"], "42")
         self.assertEqual(question["page_info"], "12/186")
 

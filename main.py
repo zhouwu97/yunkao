@@ -2,20 +2,80 @@ import sys
 import os
 import ctypes
 
-# 隐藏黑框 (Hide Console Window)
-# 注意：由于 PyArmor 免费试用版会在启动时强制向控制台打印版权信息，如果在使用 PyInstaller 
-# 打包时使用 console=False (无控制台模式)，会导致没有控制台句柄可以写入，从而引发 OSError 并导致程序瞬间崩溃闪退。
-# 因此我们必须打包为 console=True 并在程序启动时使用 Windows API 瞬间隐藏黑框。
-# 若购买了 PyArmor 正式版，打包时即可安全地使用 console=False，此代码也可移除。
-if sys.platform == 'win32':
+def _quote_windows_arg(value):
+    value = str(value)
+    if not value or any(char in value for char in ' \t"'):
+        return '"' + value.replace('"', '\\"') + '"'
+    return value
+
+
+def ensure_windows_admin():
+    if sys.platform != "win32":
+        return True
+
     try:
-        kernel32 = ctypes.windll.kernel32
-        user32 = ctypes.windll.user32
-        hwnd = kernel32.GetConsoleWindow()
+        if ctypes.windll.shell32.IsUserAnAdmin():
+            return True
+
+        if getattr(sys, "frozen", False):
+            executable = sys.executable
+            arguments = " ".join(_quote_windows_arg(arg) for arg in sys.argv[1:])
+        else:
+            executable = sys.executable
+            arguments = " ".join(
+                [_quote_windows_arg(os.path.abspath(__file__))]
+                + [_quote_windows_arg(arg) for arg in sys.argv[1:]]
+            )
+
+        result = ctypes.windll.shell32.ShellExecuteW(
+            None, "runas", executable, arguments, os.getcwd(), 1
+        )
+        if result <= 32:
+            ctypes.windll.user32.MessageBoxW(
+                None,
+                "程序需要管理员权限才能运行。",
+                "融智云考助手",
+                0x10,
+            )
+        return False
+    except Exception:
+        return False
+
+
+def silence_native_console():
+    """Hide the console and redirect native Chromium output before Qt starts."""
+    if sys.platform != "win32":
+        return
+
+    try:
+        hwnd = ctypes.windll.kernel32.GetConsoleWindow()
         if hwnd:
-            user32.ShowWindow(hwnd, 0) # SW_HIDE = 0
+            ctypes.windll.user32.ShowWindow(hwnd, 0)
     except Exception:
         pass
+
+    try:
+        null_out = open(os.devnull, "w", encoding="utf-8")
+        os.dup2(null_out.fileno(), 1)
+        os.dup2(null_out.fileno(), 2)
+        sys.stdout = null_out
+        sys.stderr = null_out
+    except Exception:
+        pass
+
+
+if not ensure_windows_admin():
+    sys.exit(0)
+
+silence_native_console()
+
+# Must be configured before importing QtWebEngine.
+os.environ["QT_OPENGL"] = "software"
+os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+    "--disable-gpu --disable-gpu-compositing --log-level=3 "
+    "--disable-logging"
+)
+
 import requests
 
 if getattr(sys, 'frozen', False):
@@ -39,10 +99,6 @@ def check_token_validity(token):
         return False
 
 if __name__ == "__main__":
-    # Disable hardware acceleration to fix random black screens when maximizing
-    os.environ["QT_OPENGL"] = "software"
-    os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--disable-gpu"
-    
     app = QApplication(sys.argv)
     
     while True:

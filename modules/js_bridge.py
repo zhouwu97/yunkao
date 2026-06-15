@@ -1,5 +1,6 @@
 from PySide6.QtCore import QObject, Slot
 
+
 class ExtractorBridge(QObject):
     def __init__(self, main_window):
         super().__init__()
@@ -8,3 +9,7 @@ class ExtractorBridge(QObject):
     @Slot(str)
     def receiveRawHtml(self, html_content):
         self.main_window.process_html_with_bs4(html_content)
+
+    @Slot(str, int)
+    def receiveRawHtmlForRun(self, html_content, run_id):
+        self.main_window.process_html_with_bs4(html_content, run_id)

@@ -4,9 +4,10 @@ import json
 CONFIG_FILE = "config.json"
 SERVICE_NAME = "YunKaoDesktop"
 HARDCODED_SCHOOL_CODE = "u101441"
+CONFIG_VERSION = 1
 
 # 后端 API 基础地址（生产环境部署后替换为真实域名）
-API_BASE_URL = "http://156.233.229.232:8080"
+API_BASE_URL = "https://sylu.zhouwu.ccwu.cc"
 
 DEFAULT_CONFIG = {
     "extract_answer": False,
@@ -23,23 +24,39 @@ DEFAULT_CONFIG = {
     # 融智云考助手独立配置
     "official_model_id": 0,
     "official_supports_images": True,
+    "config_version": CONFIG_VERSION,
 }
 
 def load_config():
-    """加载本地配置文件，带 Fallback 容灾机制"""
+    """加载本地配置文件，带 Fallback 容灾机制与版本迁移"""
     cfg = DEFAULT_CONFIG.copy()
-    if os.path.exists(CONFIG_FILE):
+    file_existed = os.path.exists(CONFIG_FILE)
+    migrated = False
+    loaded_version = 0
+
+    if file_existed:
         try:
             with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 if isinstance(data, dict):
+                    loaded_version = data.get("config_version", 0)
                     cfg.update(data)
-                return cfg
         except Exception:
             pass  # 解析失败或损坏，走下方兜底重新写入
-            
-    # 文件不存在或损坏，写入默认配置
-    save_config(cfg)
+
+    # 版本迁移：旧配置无 config_version 字段，首次升级强制切换为极速内核
+    if loaded_version < CONFIG_VERSION:
+        if file_existed and loaded_version < 1:
+            # 旧配置首次升级：强制使用极速内核 (Chromium)
+            # 之后用户手动选择经典内核时保留选择，不重复覆盖
+            cfg["pdf_export_engine"] = "chromium"
+        cfg["config_version"] = CONFIG_VERSION
+        migrated = True
+
+    # 文件不存在或发生迁移/损坏，写入配置
+    if not file_existed or migrated:
+        save_config(cfg)
+
     return cfg
 
 def save_config(data):

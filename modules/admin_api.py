@@ -44,6 +44,9 @@ class AdminAPI:
     def delete_provider(self, provider_id):
         return self._delete(f"/providers/{provider_id}")
 
+    def get_remote_models(self, provider_id):
+        return self._get(f"/providers/{provider_id}/remote-models")
+
     # ============ 模型管理 ============
     def get_models(self, provider_key=None):
         params = {}
@@ -95,3 +98,10 @@ class AdminAPI:
     # ============ 统计 ============
     def get_stats(self):
         return self._get("/stats")
+
+    # ============ 在线支付配置 ============
+    def get_pay_config(self):
+        return self._get("/pay/config")
+
+    def update_pay_config(self, data):
+        return self._put("/pay/config", data)

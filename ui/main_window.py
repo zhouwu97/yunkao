@@ -14,6 +14,8 @@ from config.settings import SERVICE_NAME, HARDCODED_SCHOOL_CODE, API_BASE_URL, l
 from modules.ai_answer import infer_answer_with_ai, should_use_ai, is_placeholder_answer
 from modules.js_bridge import ExtractorBridge
 from modules.exporter import export_to_markdown, export_to_txt
+from modules.extraction_state import ExtractionRunState
+from modules.wallet_api import get_wallet
 from modules.question_parser import parse_active_question
 from ui.settings_dialog import SettingsDialog
 from ui.admin_dialog import AdminDialog
@@ -69,6 +71,22 @@ class AiFillThread(QThread):
             self.completed.emit(self.session_id, self.question_index, result)
         except Exception as exc:
             self.failed.emit(self.session_id, self.question_index, str(exc))
+
+
+class WalletLoadThread(QThread):
+    completed = Signal(dict)
+    failed = Signal(str)
+
+    def __init__(self, jwt_token):
+        super().__init__()
+        self.jwt_token = jwt_token
+
+    def run(self):
+        try:
+            self.completed.emit(get_wallet(self.jwt_token))
+        except Exception as exc:
+            self.failed.emit(str(exc))
+
 
 # ==========================================
 # 1. 油猴脚本风格的悬浮操作窗 (Overlay Widget)
@@ -168,6 +186,12 @@ class TampermonkeyFloatingWindow(QFrame):
         util_layout.addWidget(self.btn_settings)
         self.content_layout.addLayout(util_layout)
 
+        self.lbl_wallet = QLabel("官方余额: 加载中...")
+        self.lbl_wallet.setStyleSheet(
+            "font-size: 12px; color: #DAA520; font-weight: bold;"
+        )
+        self.content_layout.addWidget(self.lbl_wallet)
+
         # 进度面板
         self.lbl_progress = QLabel("当前进度: ⌛ 等待进入练习页面...")
         self.lbl_progress.setStyleSheet("font-size: 12px; color: #A7A7A7;")
@@ -198,12 +222,12 @@ class TampermonkeyFloatingWindow(QFrame):
         self.content_layout.addLayout(btn_layout)
 
         self.main_layout.addWidget(self.content_widget)
-        self.setFixedSize(280, 185)
+        self.setFixedSize(280, 205)
 
     def toggle_minimize(self):
         if self.is_minimized:
             self.content_widget.show()
-            self.setFixedSize(280, 185)
+            self.setFixedSize(280, 205)
             self.btn_min.setText("－")
             self.is_minimized = False
             self.setWindowOpacity(1.0)
@@ -218,6 +242,7 @@ class TampermonkeyFloatingWindow(QFrame):
         dialog.config_updated.connect(self.main_app.update_config)
         dialog.logout_requested.connect(self.main_app.do_logout)
         dialog.open_admin_panel.connect(self.main_app.open_admin_panel)
+        dialog.wallet_balance_updated.connect(self.main_app._on_recharge_balance_updated)
         # 检查管理员权限
         user_data = self.main_app.user_data or {}
         is_admin = user_data.get("role") in ("admin", "super_admin")
@@ -225,21 +250,10 @@ class TampermonkeyFloatingWindow(QFrame):
         dialog.exec()
 
     def toggle_extraction(self):
-        if not self.is_extracting:
-            self.is_extracting = True
-            self.btn_toggle.setText("⏹ 停止提取")
-            self.btn_toggle.setStyleSheet("background-color: #D83B01;")
-            self.set_mini_status("🟢 自动运行中...", "#D83B01")
-            self.main_app.refresh_export_button()
-            
-            # 立即触发第一次提取
-            self.main_app.trigger_extraction()
+        if not self.main_app.extraction_state.is_active:
+            self.main_app.start_extraction()
         else:
-            self.is_extracting = False
-            self.btn_toggle.setText("▶ 开始自动提取")
-            self.btn_toggle.setStyleSheet("")
-            self.set_mini_status("⏸️ 提取已暂停.", "#6A9955")
-            self.main_app.refresh_export_button()
+            self.main_app.stop_extraction(status_text="⏸️ 提取已暂停.")
 
     def clear_questions(self):
         self.main_app.clear_extracted_questions()
@@ -286,8 +300,11 @@ class YunKaoExtractorApp(QMainWindow):
         self.extracted_questions = []
         self.seen_question_keys = set()
         self.pending_ai_workers = {}
+        self.wallet_worker = None
+        self.wallet_balance_cents = None
         self.ai_session_id = 0
         self.last_question_marker = ""
+        self.extraction_state = ExtractionRunState()
         self.config = load_config()
 
         nickname = user_data.get('nickname', current_user)
@@ -315,6 +332,7 @@ class YunKaoExtractorApp(QMainWindow):
         self.browser.load(QUrl("https://www.cctrcloud.net/practice/login.html"))
 
         self.check_vip_status()
+        QTimer.singleShot(0, self.refresh_wallet_balance)
 
     def refresh_export_button(self):
         if not hasattr(self, "overlay"):
@@ -322,6 +340,70 @@ class YunKaoExtractorApp(QMainWindow):
         pending_jobs = len(self.pending_ai_workers)
         can_export = bool(self.extracted_questions) and not self.overlay.is_extracting and pending_jobs == 0
         self.overlay.btn_export.setEnabled(can_export)
+
+    def refresh_wallet_balance(self):
+        if not self.jwt_token:
+            self.overlay.lbl_wallet.setText("官方余额: 未登录")
+            return
+        if self.wallet_worker and self.wallet_worker.isRunning():
+            return
+
+        self.overlay.lbl_wallet.setText("官方余额: 加载中...")
+        worker = WalletLoadThread(self.jwt_token)
+        self.wallet_worker = worker
+        worker.completed.connect(self._on_wallet_loaded)
+        worker.failed.connect(self._on_wallet_failed)
+        worker.finished.connect(self._cleanup_wallet_worker)
+        worker.start()
+
+    def _on_wallet_loaded(self, data):
+        wallet = data.get("wallet") or {}
+        self.wallet_balance_cents = int(wallet.get("balance_cents", 0) or 0)
+        self.overlay.lbl_wallet.setText(
+            f"官方余额: ¥{self.wallet_balance_cents / 100:.2f}"
+        )
+
+    def _on_wallet_failed(self, _error_text):
+        self.overlay.lbl_wallet.setText("官方余额: 获取失败")
+
+    def _on_recharge_balance_updated(self, balance_cents):
+        self.wallet_balance_cents = int(balance_cents)
+        self.overlay.lbl_wallet.setText(
+            f"官方余额: ¥{self.wallet_balance_cents / 100:.2f}"
+        )
+
+    def _cleanup_wallet_worker(self):
+        self.wallet_worker = None
+
+    def _set_extraction_ui(self, active):
+        self.overlay.is_extracting = active
+        if active:
+            self.overlay.btn_toggle.setText("⏹ 停止提取")
+            self.overlay.btn_toggle.setStyleSheet("background-color: #D83B01;")
+        else:
+            self.overlay.btn_toggle.setText("▶ 开始自动提取")
+            self.overlay.btn_toggle.setStyleSheet("")
+        self.refresh_export_button()
+
+    def start_extraction(self):
+        run_id = self.extraction_state.start()
+        self._parse_retry_count = 0
+        self._set_extraction_ui(True)
+        self.overlay.set_mini_status("🟢 自动运行中...", "#D83B01")
+        self.trigger_extraction(run_id)
+        return run_id
+
+    def stop_extraction(self, run_id=None, status_text=None, color="#6A9955"):
+        if not self.extraction_state.stop(run_id):
+            return False
+        self._parse_retry_count = 0
+        self._set_extraction_ui(False)
+        if status_text:
+            self.overlay.set_mini_status(status_text, color)
+        return True
+
+    def _schedule_extraction(self, run_id, delay_ms):
+        QTimer.singleShot(delay_ms, lambda: self.trigger_extraction(run_id))
 
     def clear_extracted_questions(self):
         self.ai_session_id += 1
@@ -401,6 +483,12 @@ class YunKaoExtractorApp(QMainWindow):
         balance_after_cents = int(billing.get("balance_after_cents", 0) or 0)
         cache_hit = billing.get("cache_hit", False)
 
+        if source != "direct":
+            self.wallet_balance_cents = balance_after_cents
+            self.overlay.lbl_wallet.setText(
+                f"官方余额: ¥{balance_after_cents / 100:.2f}"
+            )
+
         model_name = model_info.get("model_name", "")
         if source == "cache":
             route_text = f"缓存命中({model_name})" if model_name else "缓存命中"
@@ -429,10 +517,12 @@ class YunKaoExtractorApp(QMainWindow):
 
     def update_config(self, new_config):
         self.config = new_config
+        self.refresh_wallet_balance()
 
     def open_admin_panel(self):
         dialog = AdminDialog(self, jwt_token=self.jwt_token)
         dialog.exec()
+        self.refresh_wallet_balance()
         
     def on_url_changed(self, url):
         self.overlay.btn_back.setEnabled(self.browser.page().history().canGoBack())
@@ -534,12 +624,16 @@ class YunKaoExtractorApp(QMainWindow):
         
         self.browser.page().runJavaScript(js_code, 0, on_fill)
 
-    def trigger_extraction(self):
+    def trigger_extraction(self, run_id=None):
+        if run_id is None:
+            run_id = self.extraction_state.active_run_id
+        if not self.extraction_state.matches(run_id):
+            return
         self.overlay.set_mini_status("⏳ 正在提取题目...", "#D83B01")
-        js_cmd = """
-        if (window.pybridge) {
-            window.pybridge.receiveRawHtml(document.body.innerHTML);
-        }
+        js_cmd = f"""
+        if (window.pybridge) {{
+            window.pybridge.receiveRawHtmlForRun(document.body.innerHTML, {run_id});
+        }}
         """
         self.browser.page().runJavaScript(js_cmd)
 
@@ -604,7 +698,7 @@ class YunKaoExtractorApp(QMainWindow):
             file_path = result
             self.overlay.set_mini_status("✅ 导出成功", "#6A9955")
             QMessageBox.information(self, "导出成功", f"成功导出 {len(self.extracted_questions)} 道题目！\n{file_path}")
-            if os.name == 'nt':
+            if os.name == 'nt' and self.config.get("auto_open_after_export", True):
                 os.startfile(file_path)
         else:
             QMessageBox.critical(self, "导出失败", f"导出过程中出错：{result}")
@@ -669,7 +763,12 @@ class YunKaoExtractorApp(QMainWindow):
                     text += "\n"
         return text
 
-    def process_html_with_bs4(self, html_content):
+    def process_html_with_bs4(self, html_content, run_id=None):
+        if run_id is None:
+            run_id = self.extraction_state.active_run_id
+        if not self.extraction_state.matches(run_id):
+            return
+
         if self.config.get("debug_save_dom"):
             try:
                 with open(r"e:\AI\yunkao\debug_dom.html", "w", encoding="utf-8") as f:
@@ -678,11 +777,11 @@ class YunKaoExtractorApp(QMainWindow):
                 print("Failed to save debug DOM:", e)
 
         if not html_content or html_content == "ERROR_NOT_FOUND":
-            self.overlay.set_mini_status("⚠️ 未找到题目内容，已自动停止", "#D83B01")
-            self.overlay.is_extracting = False
-            self.overlay.btn_toggle.setText("▶ 开始自动提取")
-            self.overlay.btn_toggle.setStyleSheet("")
-            self.refresh_export_button()
+            self.stop_extraction(
+                run_id,
+                "⚠️ 未找到题目内容，已自动停止",
+                "#D83B01",
+            )
             return
 
         parsed_question = parse_active_question(html_content)
@@ -691,7 +790,7 @@ class YunKaoExtractorApp(QMainWindow):
             if getattr(self, '_parse_retry_count', 0) < 1:
                 self._parse_retry_count = getattr(self, '_parse_retry_count', 0) + 1
                 self.overlay.set_mini_status("⏳ 题目内容未就绪，等待重试...", "#D83B01")
-                QTimer.singleShot(800, self.trigger_extraction)
+                self._schedule_extraction(run_id, 800)
                 return
             self._parse_retry_count = 0
             self.overlay.set_mini_status("⚠️ 题目解析失败，尝试跳到下一题...", "#D83B01")
@@ -708,10 +807,16 @@ class YunKaoExtractorApp(QMainWindow):
                 })();
                 """
                 def on_next_fallback(result):
+                    if not self.extraction_state.matches(run_id):
+                        return
                     if result:
-                        QTimer.singleShot(800, self.trigger_extraction)
+                        self._schedule_extraction(run_id, 800)
                     else:
-                        self.overlay.set_mini_status("⚠️ 无法翻页，请手动检查", "#D83B01")
+                        self.stop_extraction(
+                            run_id,
+                            "⚠️ 无法翻页，已自动停止，请手动检查",
+                            "#D83B01",
+                        )
                 self.browser.page().runJavaScript(js_next, 0, on_next_fallback)
             return
         self._parse_retry_count = 0
@@ -767,9 +872,11 @@ class YunKaoExtractorApp(QMainWindow):
             })();
             """
             def on_next_result(result):
+                if not self.extraction_state.matches(run_id):
+                    return
                 if result:
                     # 点击成功，等待 800ms 让 swiper 动画完成后再提取下一题
-                    QTimer.singleShot(800, self.trigger_extraction)
+                    self._schedule_extraction(run_id, 800)
                 else:
                     # 按钮不可点，检查是否真的到了最后一题
                     if 0 < current_page < total_page:
@@ -778,11 +885,13 @@ class YunKaoExtractorApp(QMainWindow):
                             f"⚠️ 页面加载卡顿，等待重试 ({current_page}/{total_page})...",
                             "#D83B01",
                         )
-                        QTimer.singleShot(2000, self.trigger_extraction)
+                        self._schedule_extraction(run_id, 2000)
                     else:
                         # 到了最后一题
-                        self.overlay.set_mini_status("🛑 已到达最后一题，提取完毕", "#6A9955")
-                        self.overlay.toggle_extraction()
+                        self.stop_extraction(
+                            run_id,
+                            "🛑 已到达最后一题，提取完毕",
+                        )
 
             self.browser.page().runJavaScript(js_next, 0, on_next_result)
 

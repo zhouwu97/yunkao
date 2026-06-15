@@ -1,5 +1,34 @@
 import re
 
+
+MAX_IMAGE_WIDTH_PT = 420.0
+MAX_IMAGE_HEIGHT_PT = 620.0
+
+
+def calculate_contained_image_size(width_px, height_px, requested_width_pt=None,
+                                   requested_height_pt=None):
+    """Returns a page-safe image size while preserving the source aspect ratio."""
+    if width_px <= 0 or height_px <= 0:
+        return None, None
+
+    source_width_pt = width_px * 0.75
+    source_height_pt = height_px * 0.75
+    width_pt = requested_width_pt or source_width_pt
+    height_pt = requested_height_pt or source_height_pt
+
+    if requested_width_pt is not None and requested_height_pt is None:
+        height_pt = requested_width_pt * height_px / width_px
+    elif requested_height_pt is not None and requested_width_pt is None:
+        width_pt = requested_height_pt * width_px / height_px
+
+    scale = min(
+        1.0,
+        MAX_IMAGE_WIDTH_PT / width_pt,
+        MAX_IMAGE_HEIGHT_PT / height_pt,
+    )
+    return width_pt * scale, height_pt * scale
+
+
 def export_to_markdown(questions, file_path):
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write("# 题库导出\n\n")
@@ -60,15 +89,23 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
     import re
     import requests
     from io import BytesIO
+    from docx.text.paragraph import Paragraph
+    from docx.oxml import OxmlElement
+
+    def insert_paragraph_after(paragraph):
+        new_element = OxmlElement("w:p")
+        paragraph._p.addnext(new_element)
+        return Paragraph(new_element, paragraph._parent)
 
     def add_rich_text_to_paragraph(p, text):
         """将包含 ![img](url) 的富文本添加到段落中，自动下载并嵌入图片"""
+        current_p = p
         last_end = 0
         for match in re.finditer(r'!\[[^\]]*\]<([^>]+)>', text):
             # 添加图片前面的文本
             text_before = text[last_end:match.start()]
             if text_before:
-                p.add_run(text_before)
+                current_p.add_run(text_before)
             
             # 尝试下载并嵌入图片
             raw_url = match.group(1)
@@ -86,6 +123,28 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
 
             h_match = re.search(r'\|h:([-0-9.]+)(px|ex|em|pt|%)', raw_url)
             if h_match: explicit_h_val, explicit_h_unit = float(h_match.group(1)), h_match.group(2)
+
+            def to_points(value, unit, maximum):
+                if value is None:
+                    return None
+                if unit == 'px':
+                    return value * 0.75
+                if unit == 'pt':
+                    return value
+                if unit == 'ex':
+                    return value * 8.0
+                if unit == 'em':
+                    return value * 16.0
+                if unit == '%':
+                    return maximum * value / 100.0
+                return None
+
+            explicit_width_pt = to_points(
+                explicit_w_val, explicit_w_unit, MAX_IMAGE_WIDTH_PT
+            )
+            explicit_height_pt = to_points(
+                explicit_h_val, explicit_h_unit, MAX_IMAGE_HEIGHT_PT
+            )
                     
             def apply_w_position(run_obj, a_val, a_unit):
                 if a_val is None: return
@@ -155,7 +214,7 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
                         # 高清渲染 (300dpi)
                         pix = doc[0].get_pixmap(alpha=True, dpi=300)
                         image_stream = BytesIO(pix.tobytes("png"))
-                        run = p.add_run()
+                        run = current_p.add_run()
                         # 在 Word 中以原始物理宽度插入，确保排版完美且高清
                         run.add_picture(image_stream, width=Pt(svg_width_pt))
                         
@@ -183,7 +242,7 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
                             
                     except Exception as e:
                         print(f"PyMuPDF failed to render SVG: {e}")
-                        p.add_run("[图片加载失败]")
+                        current_p.add_run("[图片加载失败]")
                     
                     last_end = match.end()
                     continue
@@ -195,16 +254,24 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
                     data += '=' * (-len(data) % 4)  # 修复 Incorrect padding
                     image_data = base64.b64decode(data)
                     image_stream = BytesIO(image_data)
-                    run = p.add_run()
-                    if explicit_width_pt is not None and explicit_height_pt is not None:
-                        run.add_picture(image_stream, width=Pt(explicit_width_pt), height=Pt(explicit_height_pt))
-                    elif explicit_width_pt is not None:
-                        run.add_picture(image_stream, width=Pt(explicit_width_pt))
-                    elif explicit_height_pt is not None:
-                        run.add_picture(image_stream, height=Pt(explicit_height_pt))
-                    else:
-                        run.add_picture(image_stream)
+                    from PIL import Image
+                    img = Image.open(BytesIO(image_data))
+                    width, height = img.size
+                    block_image = align_val is None and (width > 150 or height > 100)
+                    if block_image:
+                        current_p = insert_paragraph_after(current_p)
+                    run = current_p.add_run()
+                    image_width, image_height = calculate_contained_image_size(
+                        width, height, explicit_width_pt, explicit_height_pt
+                    )
+                    run.add_picture(
+                        image_stream,
+                        width=Pt(image_width),
+                        height=Pt(image_height),
+                    )
                     if align_val is not None: apply_w_position(run, align_val, align_unit)
+                    if block_image:
+                        current_p = insert_paragraph_after(current_p)
                     last_end = match.end()
                     continue
 
@@ -220,51 +287,38 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
                         
                         is_large = width > 150 or height > 100
                         if is_large and align_val is None:
-                            if len(p.text) > 0 and not p.text.endswith('\n'):
-                                p.add_run('\n')
+                            current_p = insert_paragraph_after(current_p)
                                 
-                        run = p.add_run()
+                        run = current_p.add_run()
                         
-                        explicit_width_pt, explicit_height_pt = None, None
-                        if explicit_w_val is not None:
-                            if explicit_w_unit == 'px': explicit_width_pt = explicit_w_val * 0.75
-                            elif explicit_w_unit == 'pt': explicit_width_pt = explicit_w_val
-                            elif explicit_w_unit == 'ex': explicit_width_pt = explicit_w_val * 8.0
-                            elif explicit_w_unit == 'em': explicit_width_pt = explicit_w_val * 16.0
-                        if explicit_h_val is not None:
-                            if explicit_h_unit == 'px': explicit_height_pt = explicit_h_val * 0.75
-                            elif explicit_h_unit == 'pt': explicit_height_pt = explicit_h_val
-                            elif explicit_h_unit == 'ex': explicit_height_pt = explicit_h_val * 8.0
-                            elif explicit_h_unit == 'em': explicit_height_pt = explicit_h_val * 16.0
-                            
-                        if explicit_width_pt is not None and explicit_height_pt is not None:
-                            run.add_picture(image_stream, width=Pt(explicit_width_pt), height=Pt(explicit_height_pt))
-                        elif explicit_width_pt is not None:
-                            run.add_picture(image_stream, width=Pt(explicit_width_pt))
-                        elif explicit_height_pt is not None:
-                            run.add_picture(image_stream, height=Pt(explicit_height_pt))
-                        elif width > 500:
-                            run.add_picture(image_stream, width=Inches(5.0))
-                        else:
-                            run.add_picture(image_stream)
+                        image_width, image_height = calculate_contained_image_size(
+                            width, height, explicit_width_pt, explicit_height_pt
+                        )
+                        run.add_picture(
+                            image_stream,
+                            width=Pt(image_width),
+                            height=Pt(image_height),
+                        )
                             
                         if align_val is not None: apply_w_position(run, align_val, align_unit)
+                        if is_large and align_val is None:
+                            current_p = insert_paragraph_after(current_p)
                     except Exception:
-                        run = p.add_run()
+                        run = current_p.add_run()
                         run.add_picture(image_stream)
                         if align_val is not None: apply_w_position(run, align_val, align_unit)
                 else:
-                    p.add_run("[图片加载失败]")
+                    current_p.add_run("[图片加载失败]")
             except Exception as e:
                 print(f"Failed to load image: {url}, Error: {e}")
-                p.add_run("[图片加载失败]")
+                current_p.add_run("[图片加载失败]")
                 
             last_end = match.end()
             
         # 添加最后剩余的文本
         text_after = text[last_end:]
         if text_after:
-            p.add_run(text_after)
+            current_p.add_run(text_after)
 
     doc = Document()
     
@@ -368,11 +422,19 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
 
 def export_to_pdf(questions, file_path, progress_callback=None):
     import os
-    
-    # 强制将临时 Word 放在最终导出的同级目录下，防止存放在 Temp 目录触发 WPS/Office 的“受保护的视图”而导致导出失败
-    file_dir = os.path.dirname(os.path.abspath(file_path))
-    temp_docx = os.path.join(file_dir, f"~yunkao_temp_{os.getpid()}.docx")
-    temp_pdf = os.path.join(file_dir, f"~yunkao_temp_{os.getpid()}.pdf")
+    import shutil
+    import tempfile
+
+    temp_dir = tempfile.mkdtemp(prefix="yunkao_pdf_")
+    temp_docx = os.path.join(temp_dir, "source.docx")
+    temp_pdf = os.path.join(temp_dir, "converted.pdf")
+
+    if os.name == "nt":
+        try:
+            import ctypes
+            ctypes.windll.kernel32.SetFileAttributesW(temp_dir, 0x02)
+        except Exception:
+            pass
     
     try:
         export_to_docx(questions, temp_docx, progress_callback, watermark=False)
@@ -398,7 +460,24 @@ def export_to_pdf(questions, file_path, progress_callback=None):
                 
             word.Visible = False
             word.DisplayAlerts = 0
-            doc = word.Documents.Open(os.path.abspath(temp_docx))
+            try:
+                word.ScreenUpdating = False
+            except Exception:
+                pass
+
+            try:
+                doc = word.Documents.Open(
+                    os.path.abspath(temp_docx),
+                    False,
+                    True,
+                    False,
+                )
+            except Exception:
+                doc = word.Documents.Open(os.path.abspath(temp_docx))
+            try:
+                doc.Windows(1).Visible = False
+            except Exception:
+                pass
             try:
                 # 导出到临时 PDF，避免 WPS 云同步功能干扰或增量保存导致文件丢失
                 if os.path.exists(temp_pdf):
@@ -413,8 +492,10 @@ def export_to_pdf(questions, file_path, progress_callback=None):
                     except:
                         raise save_err
             finally:
-                doc.Close(0)
-                word.Quit()
+                try:
+                    doc.Close(0)
+                finally:
+                    word.Quit()
         except Exception as e_com:
             raise RuntimeError(f"调用 Office 组件失败，请确保没有打开同名 PDF 文件，且 WPS 处于正常状态: {str(e_com)}")
         finally:
@@ -495,13 +576,4 @@ def export_to_pdf(questions, file_path, progress_callback=None):
     except Exception as e:
         raise RuntimeError(f"PDF 转换失败: {str(e)}")
     finally:
-        if os.path.exists(temp_docx):
-            try:
-                os.remove(temp_docx)
-            except:
-                pass
-        if os.path.exists(temp_pdf):
-            try:
-                os.remove(temp_pdf)
-            except:
-                pass
+        shutil.rmtree(temp_dir, ignore_errors=True)

@@ -3,11 +3,39 @@
 """
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                                 QLineEdit, QPushButton, QTabWidget, QTableWidget,
-                                QTableWidgetItem, QHeaderView, QMessageBox, QComboBox,
+                                QTableWidgetItem, QHeaderView, QMessageBox,
                                 QGroupBox, QFormLayout, QSpinBox, QDoubleSpinBox,
-                                QTextEdit, QWidget, QCheckBox, QInputDialog)
-from PySide6.QtCore import Qt
+                                QTextEdit, QWidget, QCheckBox, QInputDialog,
+                                QListWidget, QListWidgetItem, QSplitter, QMenu,
+                                QAbstractItemView)
+from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from modules.admin_api import AdminAPI
+from ui.widgets import NoWheelComboBox
+
+
+class AdminLoadWorker(QThread):
+    succeeded = Signal(object)
+    failed = Signal(str)
+
+    def __init__(self, loader, parent=None):
+        super().__init__(parent)
+        self.loader = loader
+
+    def run(self):
+        try:
+            self.succeeded.emit(self.loader())
+        except Exception as exc:
+            self.failed.emit(str(exc))
+
+
+class RemoteModelComboBox(NoWheelComboBox):
+    popup_requested = Signal()
+
+    def showPopup(self):
+        if self.count() == 0:
+            self.popup_requested.emit()
+            return
+        super().showPopup()
 
 
 class AdminDialog(QDialog):
@@ -18,49 +46,100 @@ class AdminDialog(QDialog):
         self.resize(900, 650)
 
         self.api = AdminAPI(jwt_token)
+        self._load_workers = {}
+        self._loaded_tabs = set()
 
         self.init_ui()
-        self._load_providers()
+        QTimer.singleShot(0, self._load_current_tab)
 
     def init_ui(self):
         layout = QVBoxLayout(self)
 
-        tabs = QTabWidget()
+        self.tabs = QTabWidget()
+        self.tabs.currentChanged.connect(self._load_current_tab)
 
         # Tab 1: 提供商管理
         self.tab_providers = QWidget()
-        tabs.addTab(self.tab_providers, "🔌 提供商")
+        self.tabs.addTab(self.tab_providers, "🔌 提供商")
         self._init_provider_tab()
 
         # Tab 2: 模型管理
         self.tab_models = QWidget()
-        tabs.addTab(self.tab_models, "🧠 模型管理")
+        self.tabs.addTab(self.tab_models, "🧠 模型管理")
         self._init_model_tab()
 
         # Tab 3: 余额管理
         self.tab_wallets = QWidget()
-        tabs.addTab(self.tab_wallets, "💰 余额管理")
+        self.tabs.addTab(self.tab_wallets, "💰 余额管理")
         self._init_wallet_tab()
 
         # Tab 4: 错题审核
         self.tab_reports = QWidget()
-        tabs.addTab(self.tab_reports, "📋 错题审核")
+        self.tabs.addTab(self.tab_reports, "📋 错题审核")
         self._init_report_tab()
 
         # Tab 5: 使用日志
         self.tab_logs = QWidget()
-        tabs.addTab(self.tab_logs, "📊 使用日志")
+        self.tabs.addTab(self.tab_logs, "📊 使用日志")
         self._init_log_tab()
 
-        layout.addWidget(tabs)
+        # Tab 6: 支付配置
+        self.tab_pay = QWidget()
+        self.tabs.addTab(self.tab_pay, "💳 支付配置")
+        self._init_pay_tab()
+
+        layout.addWidget(self.tabs)
 
         close_btn = QPushButton("关闭")
         close_btn.clicked.connect(self.accept)
         layout.addWidget(close_btn)
 
+    def _load_current_tab(self, index=None):
+        if index is None:
+            index = self.tabs.currentIndex()
+        if index in self._loaded_tabs:
+            return
+        loaders = {
+            0: self._load_providers,
+            1: self._load_model_providers,
+            2: self._load_wallets,
+            3: self._load_reports,
+            4: self._load_logs,
+            5: self._load_pay_config,
+        }
+        loader = loaders.get(index)
+        if loader:
+            self._loaded_tabs.add(index)
+            loader()
+
+    def _start_load(self, key, loader, apply_result, error_title, on_error=None):
+        current = self._load_workers.get(key)
+        if current and current.isRunning():
+            return
+
+        worker = AdminLoadWorker(loader, self)
+        self._load_workers[key] = worker
+        worker.succeeded.connect(apply_result)
+        def handle_error(error):
+            QMessageBox.warning(self, "错误", f"{error_title}: {error}")
+            if on_error:
+                on_error()
+
+        worker.failed.connect(handle_error)
+        worker.finished.connect(lambda: self._load_workers.pop(key, None))
+        worker.finished.connect(worker.deleteLater)
+        worker.start()
+
     # ============ Tab 1: 提供商管理 ============
     def _init_provider_tab(self):
         layout = QVBoxLayout(self.tab_providers)
+
+        provider_tip = QLabel(
+            "提供商只管理接口地址、密钥和启用状态。不同模型的价格请在“模型管理”中分别设置。"
+        )
+        provider_tip.setWordWrap(True)
+        provider_tip.setStyleSheet("color: #666; padding: 4px 2px;")
+        layout.addWidget(provider_tip)
 
         # 操作按钮
         btn_layout = QHBoxLayout()
@@ -75,27 +154,34 @@ class AdminDialog(QDialog):
 
         # 表格
         self.provider_table = QTableWidget()
-        self.provider_table.setColumnCount(6)
-        self.provider_table.setHorizontalHeaderLabels(["ID", "标识", "名称", "Base URL", "启用", "优先级"])
+        self.provider_table.setColumnCount(5)
+        self.provider_table.setHorizontalHeaderLabels(["标识", "名称", "Base URL", "启用", "API Key"])
         self.provider_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.provider_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.provider_table.doubleClicked.connect(self._edit_provider)
         layout.addWidget(self.provider_table)
 
     def _load_providers(self):
-        try:
-            data = self.api.get_providers()
-            providers = data.get("providers", [])
-            self.provider_table.setRowCount(len(providers))
-            for row, p in enumerate(providers):
-                self.provider_table.setItem(row, 0, QTableWidgetItem(str(p.get("id", ""))))
-                self.provider_table.setItem(row, 1, QTableWidgetItem(p.get("provider_key", "")))
-                self.provider_table.setItem(row, 2, QTableWidgetItem(p.get("label", "")))
-                self.provider_table.setItem(row, 3, QTableWidgetItem(p.get("base_url", "")))
-                self.provider_table.setItem(row, 4, QTableWidgetItem("✅" if p.get("enabled") else "❌"))
-                self.provider_table.setItem(row, 5, QTableWidgetItem(str(p.get("priority", 0))))
-        except Exception as e:
-            QMessageBox.warning(self, "错误", f"加载提供商失败: {e}")
+        self._start_load(
+            "providers", self.api.get_providers,
+            self._apply_providers, "加载提供商失败"
+        )
+
+    def _apply_providers(self, data):
+        providers = data.get("providers") or []
+        self.provider_table.setRowCount(len(providers))
+        for row, p in enumerate(providers):
+            # 标识（存储 provider_id 为隐藏数据）
+            key_item = QTableWidgetItem(p.get("provider_key", ""))
+            key_item.setData(Qt.UserRole, p.get("id", 0))
+            self.provider_table.setItem(row, 0, key_item)
+            self.provider_table.setItem(row, 1, QTableWidgetItem(p.get("label", "")))
+            self.provider_table.setItem(row, 2, QTableWidgetItem(p.get("base_url", "")))
+            self.provider_table.setItem(row, 3, QTableWidgetItem("✅" if p.get("enabled") else "❌"))
+            # API Key 脱敏显示
+            api_key = p.get("api_key", "") or ""
+            masked = api_key[:4] + "****" + api_key[-4:] if len(api_key) > 8 else ("****" if api_key else "")
+            self.provider_table.setItem(row, 4, QTableWidgetItem(masked))
 
     def _add_provider(self):
         dialog = ProviderEditDialog(self)
@@ -108,8 +194,22 @@ class AdminDialog(QDialog):
 
     def _edit_provider(self, index):
         row = index.row()
-        provider_id = int(self.provider_table.item(row, 0).text())
-        # 简单编辑：切换启用状态和修改 API Key
+        col = index.column()
+        key_item = self.provider_table.item(row, 0)
+        provider_id = key_item.data(Qt.UserRole)
+
+        # 双击 API Key 列：直接编辑
+        if col == 4:
+            key, ok = QInputDialog.getText(self, "API Key", "请输入 API Key:")
+            if ok:
+                try:
+                    self.api.update_provider(provider_id, {"api_key": key})
+                    self._load_providers()
+                except Exception as e:
+                    QMessageBox.warning(self, "错误", f"操作失败: {e}")
+            return
+
+        # 其他列：弹出操作菜单
         action, ok = QInputDialog.getItem(
             self, "操作", "选择操作:",
             ["启用/禁用切换", "设置 API Key", "删除"], 0, False
@@ -118,7 +218,7 @@ class AdminDialog(QDialog):
             return
         try:
             if action == "启用/禁用切换":
-                current = self.provider_table.item(row, 4).text()
+                current = self.provider_table.item(row, 3).text()
                 new_enabled = current != "✅"
                 self.api.update_provider(provider_id, {"enabled": new_enabled})
                 self._load_providers()
@@ -140,48 +240,224 @@ class AdminDialog(QDialog):
     def _init_model_tab(self):
         layout = QVBoxLayout(self.tab_models)
 
+        model_tip = QLabel(
+            "左侧选择提供商，右侧显示它的模型。双击单元格直接编辑；"
+            "右键提供商可新增模型或从接口读取模型列表。"
+        )
+        model_tip.setWordWrap(True)
+        model_tip.setFixedHeight(40)
+        model_tip.setAlignment(Qt.AlignTop)
+        model_tip.setStyleSheet("color: #666; padding: 4px 2px;")
+        layout.addWidget(model_tip)
+
         btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(6)
         btn_add = QPushButton("➕ 新增模型")
         btn_add.clicked.connect(self._add_model)
+        btn_fetch = QPushButton("🔎 获取模型")
+        btn_fetch.clicked.connect(self._fetch_remote_models)
         btn_refresh = QPushButton("🔄 刷新")
         btn_refresh.clicked.connect(self._load_models)
         btn_layout.addWidget(btn_add)
+        btn_layout.addWidget(btn_fetch)
         btn_layout.addWidget(btn_refresh)
         btn_layout.addStretch()
         layout.addLayout(btn_layout)
 
+        splitter = QSplitter(Qt.Horizontal)
+        provider_panel = QWidget()
+        provider_layout = QVBoxLayout(provider_panel)
+        provider_layout.setContentsMargins(0, 0, 0, 0)
+        provider_layout.addWidget(QLabel("提供商"))
+        self.model_provider_list = QListWidget()
+        self.model_provider_list.setFixedWidth(180)
+        self.model_provider_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.model_provider_list.customContextMenuRequested.connect(
+            self._show_model_provider_menu
+        )
+        self.model_provider_list.currentItemChanged.connect(
+            self._on_model_provider_selected
+        )
+        provider_layout.addWidget(self.model_provider_list)
+        splitter.addWidget(provider_panel)
+
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(4)
+
         self.model_table = QTableWidget()
-        self.model_table.setColumnCount(8)
+        self.model_table.setColumnCount(9)
         self.model_table.setHorizontalHeaderLabels([
-            "ID", "提供商", "模型名", "标签", "视觉", "输入(命中)", "输入(未命中)", "输出"
+            "ID", "模型名", "标签", "视觉", "默认", "启用",
+            "缓存输入(元/百万t)", "实时输入(元/百万t)", "输出(元/百万t)"
         ])
-        self.model_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.model_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.model_table.doubleClicked.connect(self._edit_model)
-        layout.addWidget(self.model_table)
+        header = self.model_table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Stretch)
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        # 模型名和标签列加宽（Interactive 允许手动调宽，初始占较多空间）
+        header.setSectionResizeMode(1, QHeaderView.Interactive)
+        header.setSectionResizeMode(2, QHeaderView.Interactive)
+        header.resizeSection(1, 140)
+        header.resizeSection(2, 100)
+        for column in (3, 4, 5):
+            header.setSectionResizeMode(column, QHeaderView.ResizeToContents)
+        self.model_table.setEditTriggers(
+            QAbstractItemView.DoubleClicked | QAbstractItemView.EditKeyPressed
+        )
+        self.model_table.setSelectionBehavior(QAbstractItemView.SelectItems)
+        self.model_table.itemChanged.connect(self._on_model_item_changed)
+        self.model_table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.model_table.customContextMenuRequested.connect(self._show_model_menu)
+        right_layout.addWidget(self.model_table)
+
+        # 空状态 / 加载状态提示标签
+        self.model_status_label = QLabel("")
+        self.model_status_label.setAlignment(Qt.AlignCenter)
+        self.model_status_label.setStyleSheet(
+            "color: #999; font-size: 13px; padding: 20px;"
+        )
+        self.model_status_label.hide()
+        right_layout.addWidget(self.model_status_label)
+
+        splitter.addWidget(right_panel)
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        layout.addWidget(splitter)
+
+        self.model_providers = []
+        self.models = []
+        self._updating_model_table = False
+
+    def _load_model_providers(self):
+        self._start_load(
+            "model_providers",
+            self.api.get_providers,
+            self._apply_model_providers,
+            "加载提供商失败",
+        )
+
+    def _apply_model_providers(self, data):
+        selected = self._selected_model_provider()
+        selected_key = selected.get("provider_key") if selected else ""
+        self.model_providers = data.get("providers") or []
+        self.model_provider_list.blockSignals(True)
+        self.model_provider_list.clear()
+        selected_row = 0
+        for row, provider in enumerate(self.model_providers):
+            label = provider.get("label") or provider.get("provider_key", "")
+            item = QListWidgetItem(label)
+            item.setData(Qt.UserRole, provider)
+            if not provider.get("enabled", True):
+                item.setForeground(Qt.gray)
+            self.model_provider_list.addItem(item)
+            if provider.get("provider_key") == selected_key:
+                selected_row = row
+        self.model_provider_list.blockSignals(False)
+        if self.model_provider_list.count():
+            self.model_provider_list.setCurrentRow(selected_row)
+
+    def _selected_model_provider(self):
+        item = self.model_provider_list.currentItem()
+        return item.data(Qt.UserRole) if item else None
+
+    def _on_model_provider_selected(self, current, previous):
+        if current:
+            self._load_models()
 
     def _load_models(self):
-        try:
-            data = self.api.get_models()
-            models = data.get("models", [])
-            self.model_table.setRowCount(len(models))
+        provider = self._selected_model_provider()
+        if not provider:
+            if not self.model_providers:
+                self._load_model_providers()
+            return
+        provider_key = provider.get("provider_key", "")
+        # 显示加载状态
+        self.model_status_label.setText("加载中...")
+        self.model_status_label.show()
+        self.model_table.hide()
+        self._start_load(
+            f"models_{provider_key}",
+            lambda: self.api.get_models(provider_key),
+            self._apply_models, "加载模型失败",
+            on_error=lambda: self._show_model_empty(),
+        )
+
+    def _apply_models(self, data):
+        models = data.get("models") or []
+        self.models = models
+        self._updating_model_table = True
+        self.model_table.setRowCount(len(models))
+        if models:
+            self.model_status_label.hide()
+            self.model_table.show()
             for row, m in enumerate(models):
-                self.model_table.setItem(row, 0, QTableWidgetItem(str(m.get("id", ""))))
-                self.model_table.setItem(row, 1, QTableWidgetItem(m.get("provider_key", "")))
-                self.model_table.setItem(row, 2, QTableWidgetItem(m.get("model_name", "")))
-                self.model_table.setItem(row, 3, QTableWidgetItem(m.get("label", "")))
-                self.model_table.setItem(row, 4, QTableWidgetItem("✅" if m.get("supports_vision") else "❌"))
-                self.model_table.setItem(row, 5, QTableWidgetItem(
-                    f"¥{m.get('cache_hit_input_price_1m_cents', 0) / 100:.2f}"))
-                self.model_table.setItem(row, 6, QTableWidgetItem(
-                    f"¥{m.get('live_input_price_1m_cents', 0) / 100:.2f}"))
-                self.model_table.setItem(row, 7, QTableWidgetItem(
-                    f"¥{m.get('output_price_1m_cents', 0) / 100:.2f}"))
-        except Exception as e:
-            QMessageBox.warning(self, "错误", f"加载模型失败: {e}")
+                id_item = QTableWidgetItem(str(m.get("id", "")))
+                id_item.setFlags(id_item.flags() & ~Qt.ItemIsEditable)
+                self.model_table.setItem(row, 0, id_item)
+                self.model_table.setItem(row, 1, self._editable_model_item(
+                    m.get("model_name", ""), "model_name"
+                ))
+                self.model_table.setItem(row, 2, self._editable_model_item(
+                    m.get("label", ""), "label"
+                ))
+                self.model_table.setItem(row, 3, self._checkable_model_item(
+                    m.get("supports_vision", False), "supports_vision"
+                ))
+                self.model_table.setItem(row, 4, self._checkable_model_item(
+                    m.get("is_default", False), "is_default"
+                ))
+                self.model_table.setItem(row, 5, self._checkable_model_item(
+                    m.get("enabled", True), "enabled"
+                ))
+                self.model_table.setItem(row, 6, self._editable_model_item(
+                    f"{m.get('cache_hit_input_price_1m_cents', 0) / 100:.2f}",
+                    "cache_hit_input_price_1m_cents",
+                ))
+                self.model_table.setItem(row, 7, self._editable_model_item(
+                    f"{m.get('live_input_price_1m_cents', 0) / 100:.2f}",
+                    "live_input_price_1m_cents",
+                ))
+                self.model_table.setItem(row, 8, self._editable_model_item(
+                    f"{m.get('output_price_1m_cents', 0) / 100:.2f}",
+                    "output_price_1m_cents",
+                ))
+        else:
+            self._show_model_empty()
+        self._updating_model_table = False
+
+    def _show_model_empty(self):
+        """显示无模型提示"""
+        self.model_table.setRowCount(0)
+        self.model_table.hide()
+        self.model_status_label.setText("当前提供商暂无模型")
+        self.model_status_label.show()
+
+    def _editable_model_item(self, value, field):
+        item = QTableWidgetItem(str(value))
+        item.setData(Qt.UserRole, field)
+        return item
+
+    def _checkable_model_item(self, checked, field):
+        item = QTableWidgetItem()
+        item.setData(Qt.UserRole, field)
+        item.setFlags(
+            (item.flags() | Qt.ItemIsUserCheckable) & ~Qt.ItemIsEditable
+        )
+        item.setCheckState(Qt.Checked if checked else Qt.Unchecked)
+        item.setTextAlignment(Qt.AlignCenter)
+        return item
 
     def _add_model(self):
-        dialog = ModelEditDialog(self)
+        provider = self._selected_model_provider()
+        if not provider:
+            QMessageBox.information(self, "新增模型", "请先在左侧选择提供商")
+            return
+        dialog = ModelEditDialog(
+            self,
+            provider=provider,
+            remote_loader=lambda: self.api.get_remote_models(provider["id"]),
+        )
         if dialog.exec() == QDialog.Accepted:
             try:
                 self.api.create_model(dialog.get_data())
@@ -189,45 +465,119 @@ class AdminDialog(QDialog):
             except Exception as e:
                 QMessageBox.warning(self, "错误", f"创建失败: {e}")
 
-    def _edit_model(self, index):
-        row = index.row()
-        model_id = int(self.model_table.item(row, 0).text())
-        action, ok = QInputDialog.getItem(
-            self, "操作", "选择操作:",
-            ["修改价格", "设为默认", "启用/禁用", "删除"], 0, False
+    def _on_model_item_changed(self, item):
+        if self._updating_model_table:
+            return
+        id_item = self.model_table.item(item.row(), 0)
+        if not id_item:
+            return
+        model_id = int(id_item.text())
+        field = item.data(Qt.UserRole)
+        if not field:
+            return
+        try:
+            if field in {"supports_vision", "is_default", "enabled"}:
+                value = item.checkState() == Qt.Checked
+            elif field.endswith("_cents"):
+                value = int(round(float(item.text().replace("¥", "").strip()) * 100))
+                if value < 0:
+                    raise ValueError
+            else:
+                value = item.text().strip()
+                if field == "model_name" and not value:
+                    raise ValueError
+        except (TypeError, ValueError):
+            QMessageBox.warning(
+                self, "格式错误", "模型名不能为空，价格必须是大于等于 0 的数字"
+            )
+            self._load_models()
+            return
+
+        self._start_load(
+            f"update_model_{model_id}_{field}",
+            lambda: self.api.update_model(model_id, {field: value}),
+            lambda data: None,
+            "保存模型失败",
+            on_error=self._load_models,
+        )
+
+    def _show_model_provider_menu(self, position):
+        item = self.model_provider_list.itemAt(position)
+        if item:
+            self.model_provider_list.setCurrentItem(item)
+        if not self._selected_model_provider():
+            return
+        menu = QMenu(self)
+        add_action = menu.addAction("新增该提供商的模型")
+        fetch_action = menu.addAction("从接口获取模型列表")
+        chosen = menu.exec(self.model_provider_list.mapToGlobal(position))
+        if chosen == add_action:
+            self._add_model()
+        elif chosen == fetch_action:
+            self._fetch_remote_models()
+
+    def _show_model_menu(self, position):
+        item = self.model_table.itemAt(position)
+        if item:
+            self.model_table.setCurrentItem(item)
+        menu = QMenu(self)
+        fetch_action = menu.addAction("从接口选择模型名")
+        delete_action = menu.addAction("删除模型")
+        chosen = menu.exec(self.model_table.viewport().mapToGlobal(position))
+        if chosen == fetch_action:
+            self._fetch_remote_models(update_current=True)
+        elif chosen == delete_action:
+            self._delete_current_model()
+
+    def _fetch_remote_models(self, update_current=False):
+        provider = self._selected_model_provider()
+        if not provider:
+            QMessageBox.information(self, "获取模型", "请先选择提供商")
+            return
+        self._start_load(
+            f"remote_models_{provider['id']}",
+            lambda: self.api.get_remote_models(provider["id"]),
+            lambda data: self._choose_remote_model(data, update_current),
+            "获取远端模型失败",
+        )
+
+    def _choose_remote_model(self, data, update_current):
+        names = data.get("models") or []
+        if not names:
+            QMessageBox.information(self, "获取模型", "接口没有返回可用模型")
+            return
+        name, ok = QInputDialog.getItem(
+            self, "选择模型", "模型名（也可取消后手工填写）:", names, 0, False
         )
         if not ok:
             return
-        try:
-            if action == "修改价格":
-                cache_hit, ok1 = QInputDialog.getDouble(self, "缓存命中输入价", "¥/百万tokens:", 0.10, 0, 1000, 2)
-                if not ok1: return
-                live_in, ok2 = QInputDialog.getDouble(self, "实时输入价", "¥/百万tokens:", 2.00, 0, 1000, 2)
-                if not ok2: return
-                live_out, ok3 = QInputDialog.getDouble(self, "输出价", "¥/百万tokens:", 6.00, 0, 1000, 2)
-                if not ok3: return
-                self.api.update_model(model_id, {
-                    "cache_hit_input_price_1m_cents": int(cache_hit * 100),
-                    "live_input_price_1m_cents": int(live_in * 100),
-                    "output_price_1m_cents": int(live_out * 100),
-                })
+        if update_current and self.model_table.currentRow() >= 0:
+            self.model_table.item(self.model_table.currentRow(), 1).setText(name)
+            return
+        provider = self._selected_model_provider()
+        dialog = ModelEditDialog(self, provider=provider, initial_model=name)
+        if dialog.exec() == QDialog.Accepted:
+            try:
+                self.api.create_model(dialog.get_data())
                 self._load_models()
-            elif action == "设为默认":
-                self.api.update_model(model_id, {"is_default": True})
+            except Exception as exc:
+                QMessageBox.warning(self, "错误", f"创建失败: {exc}")
+
+    def _delete_current_model(self):
+        row = self.model_table.currentRow()
+        if row < 0:
+            return
+        model_id = int(self.model_table.item(row, 0).text())
+        reply = QMessageBox.question(
+            self, "确认", "确定删除此模型？",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if reply == QMessageBox.Yes:
+            try:
+                self.api.delete_model(model_id)
                 self._load_models()
-            elif action == "启用/禁用":
-                current = self.model_table.item(row, 1).text()
-                # 这里简化：toggle enabled
-                self.api.update_model(model_id, {"enabled": True})  # 可扩展
-                self._load_models()
-            elif action == "删除":
-                reply = QMessageBox.question(self, "确认", "确定删除此模型？",
-                                             QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
-                if reply == QMessageBox.Yes:
-                    self.api.delete_model(model_id)
-                    self._load_models()
-        except Exception as e:
-            QMessageBox.warning(self, "错误", f"操作失败: {e}")
+            except Exception as exc:
+                QMessageBox.warning(self, "错误", f"删除失败: {exc}")
 
     # ============ Tab 3: 余额管理 ============
     def _init_wallet_tab(self):
@@ -248,33 +598,47 @@ class AdminDialog(QDialog):
         self.wallet_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         layout.addWidget(self.wallet_table)
 
-        self._load_wallets()
-
     def _load_wallets(self):
-        try:
-            search = self.wallet_search.text().strip()
-            data = self.api.get_user_wallets(search=search)
-            wallets = data.get("wallets", [])
-            self.wallet_table.setRowCount(len(wallets))
-            for row, w in enumerate(wallets):
-                self.wallet_table.setItem(row, 0, QTableWidgetItem(str(w.get("user_id", ""))))
-                self.wallet_table.setItem(row, 1, QTableWidgetItem(w.get("student_id", "")))
-                self.wallet_table.setItem(row, 2, QTableWidgetItem(w.get("nickname", "")))
-                self.wallet_table.setItem(row, 3, QTableWidgetItem(
-                    f"¥{w.get('balance_cents', 0) / 100:.2f}"))
+        search = self.wallet_search.text().strip()
+        self._start_load(
+            "wallets",
+            lambda: self.api.get_user_wallets(search=search),
+            self._apply_wallets,
+            "加载钱包失败",
+        )
 
-                op_widget = QWidget()
-                op_layout = QHBoxLayout(op_widget)
-                op_layout.setContentsMargins(0, 0, 0, 0)
-                btn_recharge = QPushButton("充值")
-                btn_recharge.clicked.connect(lambda checked, r=row: self._recharge_user(r))
-                btn_deduct = QPushButton("扣减")
-                btn_deduct.clicked.connect(lambda checked, r=row: self._deduct_user(r))
-                op_layout.addWidget(btn_recharge)
-                op_layout.addWidget(btn_deduct)
-                self.wallet_table.setCellWidget(row, 4, op_widget)
-        except Exception as e:
-            QMessageBox.warning(self, "错误", f"加载钱包失败: {e}")
+    def _apply_wallets(self, data):
+        wallets = data.get("wallets") or []
+        self.wallet_table.setRowCount(len(wallets))
+        for row, wallet in enumerate(wallets):
+            self.wallet_table.setItem(
+                row, 0, QTableWidgetItem(str(wallet.get("user_id", "")))
+            )
+            self.wallet_table.setItem(
+                row, 1, QTableWidgetItem(wallet.get("student_id", ""))
+            )
+            self.wallet_table.setItem(
+                row, 2, QTableWidgetItem(wallet.get("nickname", ""))
+            )
+            self.wallet_table.setItem(
+                row, 3,
+                QTableWidgetItem(f"¥{wallet.get('balance_cents', 0) / 100:.2f}"),
+            )
+
+            op_widget = QWidget()
+            op_layout = QHBoxLayout(op_widget)
+            op_layout.setContentsMargins(0, 0, 0, 0)
+            btn_recharge = QPushButton("充值")
+            btn_recharge.clicked.connect(
+                lambda checked, r=row: self._recharge_user(r)
+            )
+            btn_deduct = QPushButton("扣减")
+            btn_deduct.clicked.connect(
+                lambda checked, r=row: self._deduct_user(r)
+            )
+            op_layout.addWidget(btn_recharge)
+            op_layout.addWidget(btn_deduct)
+            self.wallet_table.setCellWidget(row, 4, op_widget)
 
     def _recharge_user(self, row):
         user_id = int(self.wallet_table.item(row, 0).text())
@@ -302,7 +666,7 @@ class AdminDialog(QDialog):
         layout = QVBoxLayout(self.tab_reports)
 
         filter_layout = QHBoxLayout()
-        self.report_filter = QComboBox()
+        self.report_filter = NoWheelComboBox()
         self.report_filter.addItem("待审核", "pending")
         self.report_filter.addItem("全部", "all")
         self.report_filter.addItem("已通过", "approved")
@@ -321,39 +685,41 @@ class AdminDialog(QDialog):
         self.report_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         layout.addWidget(self.report_table)
 
-        self._load_reports()
-
     def _load_reports(self):
-        try:
-            status = self.report_filter.currentData()
-            data = self.api.get_wrong_reports(status=status)
-            reports = data.get("reports", [])
-            self.report_table.setRowCount(len(reports))
-            for row, r in enumerate(reports):
-                self.report_table.setItem(row, 0, QTableWidgetItem(str(r.get("id", ""))))
-                self.report_table.setItem(row, 1, QTableWidgetItem(str(r.get("user_id", ""))))
-                self.report_table.setItem(row, 2, QTableWidgetItem(
-                    (r.get("question_hash", "") or "")[:16]))
-                self.report_table.setItem(row, 3, QTableWidgetItem(
-                    (r.get("report_reason", "") or "")[:30]))
-                status_text = r.get("status", "pending")
-                self.report_table.setItem(row, 4, QTableWidgetItem(status_text))
+        status = self.report_filter.currentData()
+        self._start_load(
+            "reports",
+            lambda: self.api.get_wrong_reports(status=status),
+            self._apply_reports,
+            "加载错题报告失败",
+        )
 
-                if status_text == "pending":
-                    op_widget = QWidget()
-                    op_layout = QHBoxLayout(op_widget)
-                    op_layout.setContentsMargins(0, 0, 0, 0)
-                    btn_approve = QPushButton("通过")
-                    btn_approve.setStyleSheet("background-color: #4CAF50; color: white;")
-                    btn_approve.clicked.connect(lambda checked, r=row: self._approve_report(r))
-                    btn_reject = QPushButton("拒绝")
-                    btn_reject.setStyleSheet("background-color: #D83B01; color: white;")
-                    btn_reject.clicked.connect(lambda checked, r=row: self._reject_report(r))
-                    op_layout.addWidget(btn_approve)
-                    op_layout.addWidget(btn_reject)
-                    self.report_table.setCellWidget(row, 5, op_widget)
-        except Exception as e:
-            QMessageBox.warning(self, "错误", f"加载错题报告失败: {e}")
+    def _apply_reports(self, data):
+        reports = data.get("reports") or []
+        self.report_table.setRowCount(len(reports))
+        for row, report in enumerate(reports):
+            self.report_table.setItem(row, 0, QTableWidgetItem(str(report.get("id", ""))))
+            self.report_table.setItem(row, 1, QTableWidgetItem(str(report.get("user_id", ""))))
+            self.report_table.setItem(row, 2, QTableWidgetItem(
+                (report.get("question_hash", "") or "")[:16]))
+            self.report_table.setItem(row, 3, QTableWidgetItem(
+                (report.get("report_reason", "") or "")[:30]))
+            status_text = report.get("status", "pending")
+            self.report_table.setItem(row, 4, QTableWidgetItem(status_text))
+
+            if status_text == "pending":
+                op_widget = QWidget()
+                op_layout = QHBoxLayout(op_widget)
+                op_layout.setContentsMargins(0, 0, 0, 0)
+                btn_approve = QPushButton("通过")
+                btn_approve.setStyleSheet("background-color: #4CAF50; color: white;")
+                btn_approve.clicked.connect(lambda checked, r=row: self._approve_report(r))
+                btn_reject = QPushButton("拒绝")
+                btn_reject.setStyleSheet("background-color: #D83B01; color: white;")
+                btn_reject.clicked.connect(lambda checked, r=row: self._reject_report(r))
+                op_layout.addWidget(btn_approve)
+                op_layout.addWidget(btn_reject)
+                self.report_table.setCellWidget(row, 5, op_widget)
 
     def _approve_report(self, row):
         report_id = int(self.report_table.item(row, 0).text())
@@ -395,29 +761,121 @@ class AdminDialog(QDialog):
         self.log_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         layout.addWidget(self.log_table)
 
-        self._load_logs()
-
     def _load_logs(self):
+        search = self.log_search.text().strip()
+        self._start_load(
+            "logs",
+            lambda: self.api.get_usage_logs(search=search),
+            self._apply_logs,
+            "加载日志失败",
+        )
+
+    def _apply_logs(self, data):
+        logs = data.get("logs") or []
+        self.log_table.setRowCount(len(logs))
+        for row, log in enumerate(logs):
+            self.log_table.setItem(row, 0, QTableWidgetItem(str(log.get("id", ""))))
+            self.log_table.setItem(row, 1, QTableWidgetItem(
+                log.get("student_id", str(log.get("user_id", "")))))
+            self.log_table.setItem(row, 2, QTableWidgetItem(log.get("model_name", "")))
+            self.log_table.setItem(row, 3, QTableWidgetItem(str(log.get("prompt_tokens", 0))))
+            self.log_table.setItem(row, 4, QTableWidgetItem(str(log.get("completion_tokens", 0))))
+            self.log_table.setItem(row, 5, QTableWidgetItem(
+                f"¥{log.get('billed_amount_cents', 0) / 100:.4f}"))
+            self.log_table.setItem(row, 6, QTableWidgetItem(
+                "✅" if log.get("cache_hit") else "❌"))
+            self.log_table.setItem(row, 7, QTableWidgetItem(
+                str(log.get("created_at", ""))[:19]))
+
+    # ============ Tab 6: 支付配置 ============
+    def _init_pay_tab(self):
+        layout = QVBoxLayout(self.tab_pay)
+
+        tip = QLabel(
+            "客户端充值会先打开融智云考收银台，再展示付款二维码。"
+            "易支付需要填写商户号、商户密钥和网关地址。"
+        )
+        tip.setWordWrap(True)
+        tip.setStyleSheet("color: #666; padding: 6px 2px;")
+        layout.addWidget(tip)
+
+        form = QFormLayout()
+        form.addRow("支付网关:", QLabel("易支付"))
+
+        self.pay_enabled = QCheckBox("启用在线支付")
+        form.addRow("", self.pay_enabled)
+
+        self.pay_app_id = QLineEdit()
+        self.pay_app_id.setPlaceholderText("易支付商户号 PID")
+        form.addRow("商户号:", self.pay_app_id)
+
+        self.pay_app_secret = QLineEdit()
+        self.pay_app_secret.setEchoMode(QLineEdit.Password)
+        self.pay_app_secret.setPlaceholderText("留空表示不修改现有密钥")
+        form.addRow("商户密钥:", self.pay_app_secret)
+
+        self.pay_api_url = QLineEdit()
+        self.pay_api_url.setPlaceholderText("例如 https://pay.example.com")
+        form.addRow("网关地址:", self.pay_api_url)
+
+        self.pay_notify_base = QLineEdit()
+        self.pay_notify_base.setPlaceholderText("例如 https://sylu.zhouwu.ccwu.cc")
+        form.addRow("回调基地址:", self.pay_notify_base)
+
+        self.pay_min_amount = QSpinBox()
+        self.pay_min_amount.setRange(1, 1000000)
+        self.pay_min_amount.setSuffix(" 分")
+        form.addRow("最低充值:", self.pay_min_amount)
+        layout.addLayout(form)
+
+        buttons = QHBoxLayout()
+        btn_load = QPushButton("刷新配置")
+        btn_load.clicked.connect(self._load_pay_config)
+        btn_save = QPushButton("保存支付配置")
+        btn_save.clicked.connect(self._save_pay_config)
+        buttons.addWidget(btn_load)
+        buttons.addStretch()
+        buttons.addWidget(btn_save)
+        layout.addLayout(buttons)
+        layout.addStretch()
+
+    def _load_pay_config(self):
+        self._start_load(
+            "pay_config", self.api.get_pay_config,
+            self._apply_pay_config, "加载支付配置失败"
+        )
+
+    def _apply_pay_config(self, data):
+        self.pay_enabled.setChecked(str(data.get("enabled", "")).lower() == "true")
+        self.pay_app_id.setText(data.get("app_id", ""))
+        self.pay_api_url.setText(data.get("api_url", ""))
+        self.pay_notify_base.setText(data.get("notify_base", ""))
         try:
-            search = self.log_search.text().strip()
-            data = self.api.get_usage_logs(search=search)
-            logs = data.get("logs", [])
-            self.log_table.setRowCount(len(logs))
-            for row, l in enumerate(logs):
-                self.log_table.setItem(row, 0, QTableWidgetItem(str(l.get("id", ""))))
-                self.log_table.setItem(row, 1, QTableWidgetItem(
-                    l.get("student_id", str(l.get("user_id", "")))))
-                self.log_table.setItem(row, 2, QTableWidgetItem(l.get("model_name", "")))
-                self.log_table.setItem(row, 3, QTableWidgetItem(str(l.get("prompt_tokens", 0))))
-                self.log_table.setItem(row, 4, QTableWidgetItem(str(l.get("completion_tokens", 0))))
-                self.log_table.setItem(row, 5, QTableWidgetItem(
-                    f"¥{l.get('billed_amount_cents', 0) / 100:.4f}"))
-                self.log_table.setItem(row, 6, QTableWidgetItem(
-                    "✅" if l.get("cache_hit") else "❌"))
-                self.log_table.setItem(row, 7, QTableWidgetItem(
-                    str(l.get("created_at", ""))[:19]))
+            self.pay_min_amount.setValue(int(data.get("min_amount") or 100))
+        except (TypeError, ValueError):
+            self.pay_min_amount.setValue(100)
+
+    def _save_pay_config(self):
+        payload = {
+            "gateway_type": "epay",
+            "enabled": "true" if self.pay_enabled.isChecked() else "false",
+            "api_url": self.pay_api_url.text().strip(),
+            "notify_base": self.pay_notify_base.text().strip(),
+            "min_amount": str(self.pay_min_amount.value()),
+        }
+        app_id = self.pay_app_id.text().strip()
+        if app_id and "*" not in app_id:
+            payload["app_id"] = app_id
+        if self.pay_app_secret.text().strip():
+            payload["app_secret"] = self.pay_app_secret.text().strip()
+
+        try:
+            self.api.update_pay_config(payload)
+            self.pay_app_secret.clear()
+            QMessageBox.information(self, "成功", "支付配置已保存")
+            self._load_pay_config()
         except Exception as e:
-            QMessageBox.warning(self, "错误", f"加载日志失败: {e}")
+            QMessageBox.warning(self, "错误", f"保存支付配置失败: {e}")
 
 
 # ============ 辅助对话框 ============
@@ -458,19 +916,39 @@ class ProviderEditDialog(QDialog):
 
 
 class ModelEditDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(
+        self, parent=None, provider=None, remote_loader=None, initial_model=""
+    ):
         super().__init__(parent)
         self.setWindowTitle("新增模型")
         self.setMinimumWidth(400)
+        self.provider = provider or {}
+        self.remote_loader = remote_loader
+        self.remote_worker = None
         layout = QFormLayout(self)
 
-        self.txt_provider = QLineEdit()
-        self.txt_provider.setPlaceholderText("例如: deepseek")
-        layout.addRow("提供商标识:", self.txt_provider)
+        provider_label = self.provider.get("label") or self.provider.get(
+            "provider_key", ""
+        )
+        self.txt_provider = QLineEdit(provider_label)
+        self.txt_provider.setReadOnly(True)
+        layout.addRow("提供商:", self.txt_provider)
 
-        self.txt_model = QLineEdit()
-        self.txt_model.setPlaceholderText("例如: deepseek-v4-flash")
-        layout.addRow("模型名:", self.txt_model)
+        model_row = QHBoxLayout()
+        self.cmb_model = RemoteModelComboBox()
+        self.cmb_model.setEditable(True)
+        self.cmb_model.setMinimumWidth(220)
+        self.cmb_model.setCurrentText(initial_model)
+        self.cmb_model.lineEdit().setPlaceholderText(
+            "可手工填写，或点击下拉获取"
+        )
+        self.cmb_model.popup_requested.connect(self._fetch_remote_models)
+        btn_fetch = QPushButton("获取")
+        btn_fetch.setEnabled(bool(remote_loader))
+        btn_fetch.clicked.connect(self._fetch_remote_models)
+        model_row.addWidget(self.cmb_model)
+        model_row.addWidget(btn_fetch)
+        layout.addRow("模型名:", model_row)
 
         self.txt_label = QLineEdit()
         self.txt_label.setPlaceholderText("展示标签")
@@ -504,10 +982,40 @@ class ModelEditDialog(QDialog):
         btn_save.clicked.connect(self.accept)
         layout.addRow(btn_save)
 
+    def _fetch_remote_models(self):
+        if not self.remote_loader:
+            return
+        if self.remote_worker and self.remote_worker.isRunning():
+            return
+        self.remote_worker = AdminLoadWorker(self.remote_loader, self)
+        self.remote_worker.succeeded.connect(self._apply_remote_models)
+        self.remote_worker.failed.connect(
+            lambda error: QMessageBox.warning(
+                self, "获取模型失败",
+                f"{error}\n\n仍可在模型名输入框中手工填写。"
+            )
+        )
+        self.remote_worker.finished.connect(self.remote_worker.deleteLater)
+        self.remote_worker.start()
+
+    def _apply_remote_models(self, data):
+        names = data.get("models") or []
+        current = self.cmb_model.currentText()
+        self.cmb_model.clear()
+        self.cmb_model.addItems(names)
+        if current:
+            self.cmb_model.setCurrentText(current)
+        if names:
+            self.cmb_model.setToolTip(f"已获取 {len(names)} 个模型，点击下拉选择")
+        else:
+            QMessageBox.information(
+                self, "获取模型", "接口未返回模型，仍可手工填写。"
+            )
+
     def get_data(self):
         return {
-            "provider_key": self.txt_provider.text().strip(),
-            "model_name": self.txt_model.text().strip(),
+            "provider_key": self.provider.get("provider_key", ""),
+            "model_name": self.cmb_model.currentText().strip(),
             "label": self.txt_label.text().strip(),
             "supports_vision": self.chk_vision.isChecked(),
             "cache_hit_input_price_1m_cents": int(self.spin_cache_hit.value() * 100),

@@ -3,6 +3,13 @@ import re
 from bs4 import BeautifulSoup
 
 
+DEBUG = False  # 设为 True 开启判断题诊断日志
+
+
+def _debug_enabled():
+    return DEBUG
+
+
 PLACEHOLDER_ANSWERS = {"", "略", "暂无", "未知", "未提供", "无"}
 
 
@@ -333,6 +340,15 @@ def parse_active_question(html_content):
     elif _is_judgment_type(question_type):
         seed_answer = "".join(correct_labels) if correct_labels else raw_answer
         answer_text = _normalize_judgment_answer(seed_answer, option_records)
+        if _debug_enabled():
+            try:
+                with open(r"e:\AI\yunkao\debug_judgment.html", "w", encoding="utf-8") as f:
+                    f.write(str(target))
+                print(f"[判断题] title={title_text[:40]}")
+                print(f"  option_records={[(r['label'], r['text'][:30], r['is_correct']) for r in option_records]}")
+                print(f"  raw_answer='{raw_answer}' final='{answer_text}'")
+            except Exception:
+                pass
     elif _is_fill_type(question_type):
         answer_text = _extract_fill_answer(target, raw_answer)
     elif _is_subjective_type(question_type):
