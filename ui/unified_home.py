@@ -33,6 +33,20 @@ def resolve_oneclass_root() -> Path:
 ONECLASS_ROOT = resolve_oneclass_root()
 
 
+def resolve_bundled_oneclass_exe() -> Path | None:
+    if not getattr(sys, "frozen", False):
+        return None
+    exe_dir = Path(sys.executable).resolve().parent
+    candidates = [
+        exe_dir / "oneclass" / "oneclass.exe",
+        exe_dir / "oneclass.exe",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
 class UnifiedHomePage(QWidget):
     def __init__(self, current_user, jwt_token, user_data):
         super().__init__()
@@ -173,18 +187,22 @@ class UnifiedHomePage(QWidget):
             self.wallet_label.setText(f"云考余额：获取失败（{exc}）")
 
     def _oneclass_command(self, *args):
+        bundled_exe = resolve_bundled_oneclass_exe()
+        if bundled_exe is not None:
+            return [str(bundled_exe), *args]
         python = sys.executable
         main_py = ONECLASS_ROOT / "main.py"
         return [python, str(main_py), *args]
 
     def refresh_oneclass(self):
-        if not ONECLASS_ROOT.exists():
-            self.oneclass_label.setText("OneClass 授权：未找到本地项目目录")
+        bundled_exe = resolve_bundled_oneclass_exe()
+        if bundled_exe is None and not ONECLASS_ROOT.exists():
+            self.oneclass_label.setText("OneClass 授权：未找到运行时（源码目录或打包 oneclass.exe）")
             return
         try:
             result = subprocess.run(
                 self._oneclass_command("status-json"),
-                cwd=str(ONECLASS_ROOT),
+                cwd=str(ONECLASS_ROOT if ONECLASS_ROOT.exists() else Path(sys.executable).resolve().parent),
                 capture_output=True,
                 text=True,
                 timeout=12,
@@ -223,7 +241,7 @@ class UnifiedHomePage(QWidget):
         try:
             self.oneclass_process = subprocess.Popen(
                 self._oneclass_command(),
-                cwd=str(ONECLASS_ROOT),
+                cwd=str(ONECLASS_ROOT if ONECLASS_ROOT.exists() else Path(sys.executable).resolve().parent),
                 env=env,
             )
         except Exception as exc:
@@ -235,7 +253,7 @@ class UnifiedHomePage(QWidget):
         try:
             subprocess.Popen(
                 self._oneclass_command("purchase", "--jwt-token", self.jwt_token),
-                cwd=str(ONECLASS_ROOT),
+                cwd=str(ONECLASS_ROOT if ONECLASS_ROOT.exists() else Path(sys.executable).resolve().parent),
                 env=env,
             )
         except Exception as exc:
