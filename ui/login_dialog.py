@@ -1,12 +1,24 @@
 import webbrowser
 import keyring
 import requests
+from pathlib import Path
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QFormLayout, 
                                QLineEdit, QCheckBox, QLabel, QPushButton, 
                                QApplication, QFrame, QGraphicsDropShadowEffect)
 from PySide6.QtGui import QColor, QFont, QCursor
 from PySide6.QtCore import Qt
 from config.settings import load_config, save_config, SERVICE_NAME, HARDCODED_SCHOOL_CODE, API_BASE_URL
+
+LOGIN_DEBUG_LOG = Path("login_debug.log")
+
+
+def _append_login_debug(message: str) -> None:
+    try:
+        with LOGIN_DEBUG_LOG.open("a", encoding="utf-8") as fh:
+            fh.write(message.rstrip() + "\n")
+    except Exception:
+        pass
+
 
 class SoftwareLoginDialog(QDialog):
     def __init__(self):
@@ -262,24 +274,47 @@ class SoftwareLoginDialog(QDialog):
 
         # ========== 真实后端 API 调用 ==========
         try:
+            _append_login_debug(f"[login] POST {API_BASE_URL}/api/login user={user}")
             resp = requests.post(
                 f"{API_BASE_URL}/api/login",
                 json={"student_id": user, "password": main_pwd},
                 timeout=10
             )
+            _append_login_debug(f"[login] status={resp.status_code}")
         except requests.exceptions.ConnectionError:
             self.status_label.setText("❌ 无法连接到服务器，请检查网络。")
             self.status_label.setStyleSheet("color: #cc0000; font-size: 11px;")
             self.btn_login.setEnabled(True)
+            _append_login_debug("[login] ConnectionError")
             return
         except requests.exceptions.Timeout:
             self.status_label.setText("❌ 服务器响应超时，请稍后再试。")
             self.status_label.setStyleSheet("color: #cc0000; font-size: 11px;")
             self.btn_login.setEnabled(True)
+            _append_login_debug("[login] Timeout")
+            return
+        except requests.RequestException as exc:
+            self.status_label.setText(f"❌ 网络请求失败：{exc.__class__.__name__}")
+            self.status_label.setStyleSheet("color: #cc0000; font-size: 11px;")
+            self.btn_login.setEnabled(True)
+            _append_login_debug(f"[login] RequestException: {exc!r}")
+            return
+        except Exception as exc:
+            self.status_label.setText("❌ 登录过程出现异常，请重试。")
+            self.status_label.setStyleSheet("color: #cc0000; font-size: 11px;")
+            self.btn_login.setEnabled(True)
+            _append_login_debug(f"[login] UnexpectedException: {exc!r}")
             return
 
         if resp.status_code == 200:
-            data = resp.json()
+            try:
+                data = resp.json()
+            except Exception as exc:
+                self.status_label.setText("❌ 服务器返回异常数据，请稍后再试。")
+                self.status_label.setStyleSheet("color: #cc0000; font-size: 11px;")
+                self.btn_login.setEnabled(True)
+                _append_login_debug(f"[login] JSON decode failed: {exc!r}; body={resp.text[:500]!r}")
+                return
             self.jwt_token = data.get("token")
             self.user_data = data.get("user", {})
             self.current_user = user
