@@ -70,7 +70,7 @@ class UnifiedHomePage(QWidget):
         root.addWidget(self.account_label)
 
         notice = QLabel(
-            "提示：融智云考余额仅用于云考 AI 服务；OneClass 授权仅用于当前机器的 OneClass 自动化，两者权益和支付入口互不通用。"
+            "统一入口只保留当前这个首页：左侧是融智云考余额与云考功能，右侧是 OneClass 授权购买与同步。两边权益、支付入口和使用范围完全分开，不互通。"
         )
         notice.setWordWrap(True)
         notice.setStyleSheet("background:#fff7ed;color:#9a3412;border-radius:10px;padding:10px;")
@@ -84,7 +84,7 @@ class UnifiedHomePage(QWidget):
         cards.addWidget(
             self._build_card(
                 "融智云考",
-                "题库导出、AI 补全与云考钱包充值。",
+                "题库导出、AI 补全，以及云考余额充值与消耗。",
                 self.wallet_label,
                 "打开云考",
                 self.open_yunkao,
@@ -94,12 +94,12 @@ class UnifiedHomePage(QWidget):
         self.oneclass_label = QLabel("OneClass 授权：检查中...")
         cards.addWidget(
             self._build_card(
-                "OneClass",
-                "自动刷词授权独立购买，授权绑定当前机器。",
+                "OneClass 授权",
+                "OneClass 单独购买，付款后授权绑定当前机器，不会增加云考余额。",
                 self.oneclass_label,
                 "启动 OneClass",
                 self.open_oneclass,
-                secondary_text="购买/同步授权",
+                secondary_text="购买 OneClass / 同步授权",
                 secondary_callback=self.purchase_oneclass,
             )
         )
