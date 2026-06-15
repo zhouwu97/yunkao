@@ -9,6 +9,7 @@ class AdminAPI:
     def __init__(self, jwt_token):
         self.jwt_token = jwt_token
         self.base = f"{API_BASE_URL}/api/yunkao/admin"
+        self.oneclass_base = f"{API_BASE_URL}/api/oneclass/admin"
         self.headers = {"Authorization": f"Bearer {jwt_token}"}
 
     def _get(self, path, params=None):
@@ -28,6 +29,21 @@ class AdminAPI:
 
     def _delete(self, path):
         resp = requests.delete(f"{self.base}{path}", headers=self.headers, timeout=10)
+        resp.raise_for_status()
+        return resp.json()
+
+    def _oneclass_get(self, path, params=None):
+        resp = requests.get(f"{self.oneclass_base}{path}", headers=self.headers, params=params, timeout=10)
+        resp.raise_for_status()
+        return resp.json()
+
+    def _oneclass_post(self, path, json_data=None):
+        resp = requests.post(f"{self.oneclass_base}{path}", headers=self.headers, json=json_data, timeout=10)
+        resp.raise_for_status()
+        return resp.json()
+
+    def _oneclass_put(self, path, json_data=None):
+        resp = requests.put(f"{self.oneclass_base}{path}", headers=self.headers, json=json_data, timeout=10)
         resp.raise_for_status()
         return resp.json()
 
@@ -105,3 +121,13 @@ class AdminAPI:
 
     def update_pay_config(self, data):
         return self._put("/pay/config", data)
+
+    # ============ OneClass 更新通知 ============
+    def get_oneclass_updates(self):
+        return self._oneclass_get("/updates")
+
+    def create_oneclass_update(self, data):
+        return self._oneclass_post("/updates", data)
+
+    def update_oneclass_update(self, update_id, data):
+        return self._oneclass_put(f"/updates/{update_id}", data)

@@ -88,6 +88,11 @@ class AdminDialog(QDialog):
         self.tabs.addTab(self.tab_pay, "💳 支付配置")
         self._init_pay_tab()
 
+        # Tab 7: OneClass 更新
+        self.tab_oneclass_updates = QWidget()
+        self.tabs.addTab(self.tab_oneclass_updates, "📣 OneClass更新")
+        self._init_oneclass_update_tab()
+
         layout.addWidget(self.tabs)
 
         close_btn = QPushButton("关闭")
@@ -106,6 +111,7 @@ class AdminDialog(QDialog):
             3: self._load_reports,
             4: self._load_logs,
             5: self._load_pay_config,
+            6: self._load_oneclass_updates,
         }
         loader = loaders.get(index)
         if loader:
@@ -877,6 +883,90 @@ class AdminDialog(QDialog):
         except Exception as e:
             QMessageBox.warning(self, "错误", f"保存支付配置失败: {e}")
 
+    # ============ Tab 7: OneClass 更新 ============
+    def _init_oneclass_update_tab(self):
+        layout = QVBoxLayout(self.tab_oneclass_updates)
+
+        tip = QLabel(
+            "这里发布的更新通知只会下发给已购买 OneClass 长期更新/补差升级的用户。"
+            "客户端启动时会自动拉取新通知；如果勾选强制更新，客户端会阻止继续运行。"
+        )
+        tip.setWordWrap(True)
+        tip.setStyleSheet("color: #666; padding: 6px 2px;")
+        layout.addWidget(tip)
+
+        buttons = QHBoxLayout()
+        btn_add = QPushButton("➕ 发布通知")
+        btn_add.clicked.connect(self._add_oneclass_update)
+        btn_refresh = QPushButton("🔄 刷新")
+        btn_refresh.clicked.connect(self._load_oneclass_updates)
+        buttons.addWidget(btn_add)
+        buttons.addWidget(btn_refresh)
+        buttons.addStretch()
+        layout.addLayout(buttons)
+
+        self.oneclass_update_table = QTableWidget()
+        self.oneclass_update_table.setColumnCount(7)
+        self.oneclass_update_table.setHorizontalHeaderLabels(
+            ["ID", "标题", "版本", "目标用户", "强制更新", "启用", "下载链接"]
+        )
+        self.oneclass_update_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.oneclass_update_table.doubleClicked.connect(self._edit_oneclass_update)
+        layout.addWidget(self.oneclass_update_table)
+
+    def _load_oneclass_updates(self):
+        self._start_load(
+            "oneclass_updates",
+            self.api.get_oneclass_updates,
+            self._apply_oneclass_updates,
+            "加载 OneClass 更新通知失败",
+        )
+
+    def _apply_oneclass_updates(self, data):
+        updates = data.get("updates") or []
+        self.oneclass_update_table.setRowCount(len(updates))
+        scope_labels = {
+            "all": "全部已授权",
+            "lifetime_plus": "长期更新 + 补差升级",
+            "lifetime_updates": "仅长期更新",
+            "upgrade_updates": "仅补差升级",
+        }
+        for row, item in enumerate(updates):
+            id_item = QTableWidgetItem(str(item.get("id", "")))
+            id_item.setData(Qt.UserRole, item)
+            self.oneclass_update_table.setItem(row, 0, id_item)
+            self.oneclass_update_table.setItem(row, 1, QTableWidgetItem(item.get("title", "")))
+            self.oneclass_update_table.setItem(row, 2, QTableWidgetItem(item.get("version", "")))
+            self.oneclass_update_table.setItem(
+                row, 3, QTableWidgetItem(scope_labels.get(item.get("target_scope", ""), item.get("target_scope", "")))
+            )
+            self.oneclass_update_table.setItem(row, 4, QTableWidgetItem("✅" if item.get("force_update") else "❌"))
+            self.oneclass_update_table.setItem(row, 5, QTableWidgetItem("✅" if item.get("is_active", True) else "❌"))
+            self.oneclass_update_table.setItem(row, 6, QTableWidgetItem(item.get("download_url", "")))
+
+    def _add_oneclass_update(self):
+        dialog = OneClassUpdateDialog(self)
+        if dialog.exec() == QDialog.Accepted:
+            try:
+                self.api.create_oneclass_update(dialog.get_data())
+                self._load_oneclass_updates()
+            except Exception as exc:
+                QMessageBox.warning(self, "错误", f"发布失败: {exc}")
+
+    def _edit_oneclass_update(self, index):
+        row = index.row()
+        id_item = self.oneclass_update_table.item(row, 0)
+        if not id_item:
+            return
+        payload = id_item.data(Qt.UserRole) or {}
+        dialog = OneClassUpdateDialog(self, initial=payload)
+        if dialog.exec() == QDialog.Accepted:
+            try:
+                self.api.update_oneclass_update(payload.get("id"), dialog.get_data())
+                self._load_oneclass_updates()
+            except Exception as exc:
+                QMessageBox.warning(self, "错误", f"保存失败: {exc}")
+
 
 # ============ 辅助对话框 ============
 
@@ -1022,4 +1112,63 @@ class ModelEditDialog(QDialog):
             "live_input_price_1m_cents": int(self.spin_live_in.value() * 100),
             "output_price_1m_cents": int(self.spin_live_out.value() * 100),
             "is_default": self.chk_default.isChecked(),
+        }
+
+
+class OneClassUpdateDialog(QDialog):
+    def __init__(self, parent=None, initial=None):
+        super().__init__(parent)
+        self.setWindowTitle("OneClass 更新通知")
+        self.setMinimumWidth(460)
+        initial = initial or {}
+
+        layout = QFormLayout(self)
+
+        self.txt_title = QLineEdit(str(initial.get("title", "") or ""))
+        layout.addRow("标题:", self.txt_title)
+
+        self.txt_version = QLineEdit(str(initial.get("version", "") or ""))
+        self.txt_version.setPlaceholderText("例如 1.0.1")
+        layout.addRow("版本:", self.txt_version)
+
+        self.txt_download = QLineEdit(str(initial.get("download_url", "") or ""))
+        self.txt_download.setPlaceholderText("https://example.com/oneclass.zip")
+        layout.addRow("下载链接:", self.txt_download)
+
+        self.cmb_scope = NoWheelComboBox()
+        self.cmb_scope.addItem("长期更新 + 补差升级（推荐）", "lifetime_plus")
+        self.cmb_scope.addItem("仅长期更新", "lifetime_updates")
+        self.cmb_scope.addItem("仅补差升级", "upgrade_updates")
+        self.cmb_scope.addItem("全部已授权用户", "all")
+        scope = str(initial.get("target_scope", "") or "lifetime_plus")
+        idx = max(self.cmb_scope.findData(scope), 0)
+        self.cmb_scope.setCurrentIndex(idx)
+        layout.addRow("目标用户:", self.cmb_scope)
+
+        self.chk_force = QCheckBox("强制更新")
+        self.chk_force.setChecked(bool(initial.get("force_update")))
+        layout.addRow("", self.chk_force)
+
+        self.chk_active = QCheckBox("启用")
+        self.chk_active.setChecked(bool(initial.get("is_active", True)))
+        layout.addRow("", self.chk_active)
+
+        self.txt_content = QTextEdit(str(initial.get("content", "") or ""))
+        self.txt_content.setPlaceholderText("填写版本说明、修复内容或下载提示")
+        self.txt_content.setMinimumHeight(140)
+        layout.addRow("通知内容:", self.txt_content)
+
+        btn_save = QPushButton("保存")
+        btn_save.clicked.connect(self.accept)
+        layout.addRow(btn_save)
+
+    def get_data(self):
+        return {
+            "title": self.txt_title.text().strip(),
+            "version": self.txt_version.text().strip(),
+            "download_url": self.txt_download.text().strip(),
+            "target_scope": self.cmb_scope.currentData(),
+            "force_update": self.chk_force.isChecked(),
+            "is_active": self.chk_active.isChecked(),
+            "content": self.txt_content.toPlainText().strip(),
         }
