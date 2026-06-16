@@ -2,6 +2,7 @@ import sys
 import os
 import ctypes
 
+
 def _quote_windows_arg(value):
     value = str(value)
     if not value or any(char in value for char in ' \t"'):
@@ -11,6 +12,8 @@ def _quote_windows_arg(value):
 
 def ensure_windows_admin():
     if sys.platform != "win32":
+        return True
+    if os.environ.get("YUNKAO_REQUIRE_ADMIN", "").strip() != "1":
         return True
 
     try:
@@ -33,7 +36,7 @@ def ensure_windows_admin():
         if result <= 32:
             ctypes.windll.user32.MessageBoxW(
                 None,
-                "程序需要管理员权限才能运行。",
+                "当前环境配置为需要管理员权限才能运行。",
                 "融智云考助手",
                 0x10,
             )
@@ -42,8 +45,8 @@ def ensure_windows_admin():
         return False
 
 
-def silence_native_console():
-    """Hide the console and redirect native Chromium output before Qt starts."""
+def hide_native_console():
+    """Hide the console window without discarding stdout/stderr."""
     if sys.platform != "win32":
         return
 
@@ -54,20 +57,11 @@ def silence_native_console():
     except Exception:
         pass
 
-    try:
-        null_out = open(os.devnull, "w", encoding="utf-8")
-        os.dup2(null_out.fileno(), 1)
-        os.dup2(null_out.fileno(), 2)
-        sys.stdout = null_out
-        sys.stderr = null_out
-    except Exception:
-        pass
-
 
 if not ensure_windows_admin():
     sys.exit(0)
 
-silence_native_console()
+hide_native_console()
 
 # Must be configured before importing QtWebEngine.
 os.environ["QT_OPENGL"] = "software"

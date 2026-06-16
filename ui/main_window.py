@@ -585,12 +585,21 @@ class YunKaoExtractorApp(QMainWindow):
             self.trigger_auto_fill()
 
     def trigger_auto_fill(self):
+        host = self.browser.url().host().lower()
+        if host not in {"www.cctrcloud.net", "cctrcloud.net"}:
+            self.overlay.lbl_key_status.setStyleSheet("color: #888888;")
+            self.overlay.lbl_key_status.setToolTip("当前页面不是可信的融智云考域名，已跳过自动填充")
+            return
+
         pwd = keyring.get_password(SERVICE_NAME, f"{HARDCODED_SCHOOL_CODE}_{self.current_user}")
         if not pwd:
             self.overlay.lbl_key_status.setStyleSheet("color: #888888;") # 置灰
             self.overlay.lbl_key_status.setToolTip("未找到本地存储的密码")
             return
 
+        school_code_js = json.dumps(HARDCODED_SCHOOL_CODE)
+        current_user_js = json.dumps(self.current_user)
+        password_js = json.dumps(pwd)
         js_code = f"""
         (function() {{
             let inputs = document.querySelectorAll('input');
@@ -599,17 +608,17 @@ class YunKaoExtractorApp(QMainWindow):
             inputs.forEach(inp => {{
                 let p = inp.placeholder || '';
                 if (p.includes('学校') || p.includes('机构')) {{
-                    nativeInputValueSetter.call(inp, '{HARDCODED_SCHOOL_CODE}');
+                    nativeInputValueSetter.call(inp, {school_code_js});
                     inp.dispatchEvent(new Event('input', {{ bubbles: true }}));
                     filled++;
                 }}
                 else if (p.includes('学号') || p.includes('账号') || p.includes('用户名')) {{
-                    nativeInputValueSetter.call(inp, '{self.current_user}');
+                    nativeInputValueSetter.call(inp, {current_user_js});
                     inp.dispatchEvent(new Event('input', {{ bubbles: true }}));
                     filled++;
                 }}
                 else if (inp.type === 'password') {{
-                    nativeInputValueSetter.call(inp, '{pwd}');
+                    nativeInputValueSetter.call(inp, {password_js});
                     inp.dispatchEvent(new Event('input', {{ bubbles: true }}));
                     filled++;
                 }}
@@ -644,9 +653,13 @@ class YunKaoExtractorApp(QMainWindow):
         if self.pending_ai_workers:
             QMessageBox.information(self, "请稍候", "仍有题目正在等待 AI 答题完成，请稍后再导出。")
             return
-            
-        with open('e:/AI/yunkao/questions_dump.json', 'w', encoding='utf-8') as f:
-            json.dump(self.extracted_questions, f, ensure_ascii=False, indent=2)
+
+        if os.environ.get("YUNKAO_DEBUG_DUMP", "").strip() == "1":
+            dump_dir = os.path.join(os.environ.get("LOCALAPPDATA", os.getcwd()), "YunKao", "debug")
+            os.makedirs(dump_dir, exist_ok=True)
+            dump_path = os.path.join(dump_dir, "questions_dump.json")
+            with open(dump_path, 'w', encoding='utf-8') as f:
+                json.dump(self.extracted_questions, f, ensure_ascii=False, indent=2)
             
         # 默认保存到桌面，方便检测重名文件
         desktop_dir = os.path.join(os.path.expanduser("~"), "Desktop")

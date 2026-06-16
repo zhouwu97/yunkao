@@ -209,6 +209,24 @@ tempCodeRunnerFile.py
 # PyPI configuration file
 .pypirc
 
+# Local app secrets and runtime state
+config.json
+login_debug.log
+crash.log
+error.log
+stderr.log
+stdout.log
+*.db
+*.local.json
+debug_*.html
+debug_*.txt
+crawl_output/
+questions_dump.json
+main_window_backup.py
+page_dump.html
+buttons.txt
+out.txt
+
 # Marimo
 marimo/_static/
 marimo/_lsp/

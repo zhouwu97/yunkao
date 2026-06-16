@@ -1,4 +1,5 @@
 import webbrowser
+import os
 import keyring
 import requests
 from pathlib import Path
@@ -9,15 +10,30 @@ from PySide6.QtGui import QColor, QFont, QCursor
 from PySide6.QtCore import Qt
 from config.settings import load_config, save_config, SERVICE_NAME, HARDCODED_SCHOOL_CODE, API_BASE_URL
 
-LOGIN_DEBUG_LOG = Path("login_debug.log")
+LOGIN_DEBUG_ENABLED = os.environ.get("YUNKAO_LOGIN_DEBUG", "").strip() == "1"
+LOGIN_DEBUG_LOG = (
+    Path(os.environ.get("LOCALAPPDATA", "."))
+    / "YunKao"
+    / "logs"
+    / "login_debug.log"
+)
 
 
 def _append_login_debug(message: str) -> None:
+    if not LOGIN_DEBUG_ENABLED:
+        return
     try:
+        LOGIN_DEBUG_LOG.parent.mkdir(parents=True, exist_ok=True)
         with LOGIN_DEBUG_LOG.open("a", encoding="utf-8") as fh:
             fh.write(message.rstrip() + "\n")
     except Exception:
         pass
+
+
+def _masked_user(user: str) -> str:
+    if len(user) <= 4:
+        return "***"
+    return f"***{user[-4:]}"
 
 
 class SoftwareLoginDialog(QDialog):
@@ -274,7 +290,7 @@ class SoftwareLoginDialog(QDialog):
 
         # ========== 真实后端 API 调用 ==========
         try:
-            _append_login_debug(f"[login] POST {API_BASE_URL}/api/login user={user}")
+            _append_login_debug(f"[login] POST {API_BASE_URL}/api/login user={_masked_user(user)}")
             resp = requests.post(
                 f"{API_BASE_URL}/api/login",
                 json={"student_id": user, "password": main_pwd},

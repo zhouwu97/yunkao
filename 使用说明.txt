@@ -1,0 +1,12 @@
+听写输入增强修复 v2
+
+适用于当前 wechat_word_bot_final 项目。
+
+安装：
+1. 停止正在运行的程序。
+2. 将本压缩包内所有文件解压到项目根目录，与 main.py 同级。
+3. 在项目目录运行：
+   .venv\Scripts\python.exe APPLY_TYPING_FIX_V2.py
+4. 再双击 RUN.bat。
+
+不会修改 vocab.json、校准区域、音频设备或“再来一组”坐标。

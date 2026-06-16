@@ -6,8 +6,8 @@ SERVICE_NAME = "YunKaoDesktop"
 HARDCODED_SCHOOL_CODE = "u101441"
 CONFIG_VERSION = 1
 
-# 后端 API 基础地址（生产环境部署后替换为真实域名）
-API_BASE_URL = "https://sylu.zhouwu.ccwu.cc"
+# 后端 API 基础地址，可用环境变量覆盖，避免在多环境构建里改源码。
+API_BASE_URL = os.environ.get("YUNKAO_API_BASE_URL", "https://sylu.zhouwu.ccwu.cc").rstrip("/")
 
 DEFAULT_CONFIG = {
     "extract_answer": False,
