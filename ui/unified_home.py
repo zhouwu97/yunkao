@@ -5,7 +5,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QObject, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -69,6 +69,72 @@ def resolve_oneclass_python() -> Path:
     return Path(sys.executable)
 
 
+class StatusRefreshWorker(QObject):
+    finished = Signal(dict)
+
+    def __init__(
+        self,
+        jwt_token: str,
+        oneclass_base_command: list[str],
+        oneclass_workdir: str,
+        oneclass_available: bool,
+    ):
+        super().__init__()
+        self.jwt_token = jwt_token
+        self.oneclass_base_command = oneclass_base_command
+        self.oneclass_workdir = oneclass_workdir
+        self.oneclass_available = oneclass_available
+
+    def run(self) -> None:
+        result: dict[str, object] = {
+            "wallet": None,
+            "wallet_error": "",
+            "oneclass": None,
+            "oneclass_error": "",
+            "sync_warning": "",
+            "oneclass_available": self.oneclass_available,
+        }
+
+        try:
+            result["wallet"] = get_wallet(self.jwt_token)
+        except Exception as exc:
+            result["wallet_error"] = str(exc)
+
+        if not self.oneclass_available:
+            self.finished.emit(result)
+            return
+
+        try:
+            if self.jwt_token:
+                sync = subprocess.run(
+                    [*self.oneclass_base_command, "sync-license", "--jwt-token", self.jwt_token],
+                    cwd=self.oneclass_workdir,
+                    capture_output=True,
+                    text=True,
+                    timeout=18,
+                )
+                if sync.returncode != 0:
+                    result["sync_warning"] = (
+                        (sync.stderr or sync.stdout or "").strip() or "服务端授权同步失败"
+                    )
+
+            status = subprocess.run(
+                [*self.oneclass_base_command, "status-json"],
+                cwd=self.oneclass_workdir,
+                capture_output=True,
+                text=True,
+                timeout=12,
+            )
+            if status.returncode != 0:
+                detail = (status.stderr or status.stdout or "").strip()
+                raise RuntimeError(detail or "OneClass 状态读取失败")
+            result["oneclass"] = json.loads((status.stdout or "{}").strip() or "{}")
+        except Exception as exc:
+            result["oneclass_error"] = str(exc)
+
+        self.finished.emit(result)
+
+
 class UnifiedHomePage(QWidget):
     def __init__(self, current_user, jwt_token, user_data):
         super().__init__()
@@ -89,6 +155,8 @@ class UnifiedHomePage(QWidget):
         self.refresh_button = None
         self.locate_oneclass_button = None
         self.stop_oneclass_button = None
+        self.refresh_thread = None
+        self.refresh_worker = None
         self.needs_relogin = False
 
         nickname = self.user_data.get("nickname") or current_user
@@ -262,21 +330,75 @@ class UnifiedHomePage(QWidget):
         return card
 
     def refresh_status(self):
-        self.refresh_wallet()
-        self.refresh_oneclass()
-        self._update_oneclass_runtime_state()
+        if self.refresh_thread is not None and self.refresh_thread.isRunning():
+            return
+        self._set_oneclass_progress("正在同步 OneClass 授权状态...", active=True)
+        self._start_refresh_worker()
 
     def handle_refresh_click(self):
+        if self.refresh_thread is not None and self.refresh_thread.isRunning():
+            return
         if self.refresh_button is not None:
             self.refresh_button.setEnabled(False)
-            self.refresh_button.setText("正在刷新...")
-        QTimer.singleShot(120, self.refresh_status)
-        QTimer.singleShot(1200, self._restore_refresh_button)
+            self.refresh_button.setText("正在同步...")
+        self._set_oneclass_progress("正在向服务端同步 OneClass 授权状态...", active=True)
+        QTimer.singleShot(0, self._start_refresh_worker)
 
     def _restore_refresh_button(self):
         if self.refresh_button is not None:
             self.refresh_button.setText("刷新状态")
             self.refresh_button.setEnabled(True)
+
+    def _start_refresh_worker(self):
+        if self.refresh_thread is not None and self.refresh_thread.isRunning():
+            return
+        bundled_exe = resolve_bundled_oneclass_exe()
+        oneclass_available = not (bundled_exe is None and not ONECLASS_ROOT.exists())
+        self.refresh_thread = QThread(self)
+        self.refresh_worker = StatusRefreshWorker(
+            self.jwt_token,
+            self._oneclass_command(),
+            str(self._oneclass_workdir()),
+            oneclass_available,
+        )
+        self.refresh_worker.moveToThread(self.refresh_thread)
+        self.refresh_thread.started.connect(self.refresh_worker.run)
+        self.refresh_worker.finished.connect(self._apply_refresh_result)
+        self.refresh_worker.finished.connect(self.refresh_thread.quit)
+        self.refresh_worker.finished.connect(self.refresh_worker.deleteLater)
+        self.refresh_thread.finished.connect(self.refresh_thread.deleteLater)
+        self.refresh_thread.finished.connect(self._clear_refresh_worker)
+        self.refresh_thread.start()
+
+    def _clear_refresh_worker(self):
+        self.refresh_thread = None
+        self.refresh_worker = None
+
+    def _apply_refresh_result(self, result: dict):
+        wallet_error = str(result.get("wallet_error") or "")
+        wallet_data = result.get("wallet")
+        if wallet_error:
+            self.wallet_label.setText(f"云考余额：获取失败（{wallet_error}）")
+        elif isinstance(wallet_data, dict):
+            wallet = wallet_data.get("wallet") or {}
+            self.wallet_label.setText(f"云考余额：¥{float(wallet.get('balance_yuan', 0) or 0):.2f}")
+
+        if not result.get("oneclass_available"):
+            self.oneclass_label.setText("OneClass 授权：未找到运行时（源码目录或打包 oneclass.exe）")
+        else:
+            oneclass_error = str(result.get("oneclass_error") or "")
+            oneclass_data = result.get("oneclass")
+            sync_warning = str(result.get("sync_warning") or "")
+            if oneclass_error:
+                self.oneclass_label.setText("OneClass 授权：检查失败")
+                self.oneclass_label.setToolTip(oneclass_error)
+                if not self.oneclass_sync_timer.isActive():
+                    self._set_oneclass_progress("点击“刷新状态”可重试读取 OneClass 授权。", active=False)
+            elif isinstance(oneclass_data, dict):
+                self._apply_oneclass_status(oneclass_data, sync_warning)
+
+        self._update_oneclass_runtime_state()
+        self._restore_refresh_button()
 
     def _update_oneclass_runtime_state(self):
         running = bool(self.oneclass_process and self.oneclass_process.poll() is None)
@@ -333,28 +455,51 @@ class UnifiedHomePage(QWidget):
             raise RuntimeError(detail or "OneClass 状态读取失败")
         return json.loads((result.stdout or "{}").strip() or "{}")
 
+    def _sync_oneclass_license(self) -> str:
+        if not self.jwt_token:
+            return ""
+        result = subprocess.run(
+            self._oneclass_command("sync-license", "--jwt-token", self.jwt_token),
+            cwd=str(self._oneclass_workdir()),
+            capture_output=True,
+            text=True,
+            timeout=18,
+        )
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout or "").strip()
+            if detail:
+                return detail
+            return "服务端授权同步失败"
+        return ""
+
+    def _apply_oneclass_status(self, data: dict, sync_warning: str = "") -> None:
+        if data.get("active"):
+            tier = str(data.get("tier") or "unknown")
+            tier_label = ONECLASS_TIER_LABELS.get(tier, tier)
+            order_no = data.get("order_no") or "-"
+            updates_until = data.get("updates_until") or "长期更新"
+            self.oneclass_label.setText(f"OneClass 授权：已激活（{tier_label}）")
+            self.oneclass_label.setToolTip(f"订单：{order_no}\n更新截止：{updates_until}")
+            if not self.oneclass_sync_timer.isActive():
+                self._set_oneclass_progress("", active=False)
+            return
+
+        reason = data.get("reason") or "未激活"
+        self.oneclass_label.setText(f"OneClass 授权：{reason}")
+        self.oneclass_label.setToolTip(sync_warning)
+        if not self.oneclass_sync_timer.isActive():
+            message = sync_warning or "未购买时会提示购买；付款后会自动同步授权。"
+            self._set_oneclass_progress(message, active=False)
+
     def refresh_oneclass(self):
         bundled_exe = resolve_bundled_oneclass_exe()
         if bundled_exe is None and not ONECLASS_ROOT.exists():
             self.oneclass_label.setText("OneClass 授权：未找到运行时（源码目录或打包 oneclass.exe）")
             return
         try:
+            sync_warning = self._sync_oneclass_license()
             data = self._read_oneclass_status()
-            if data.get("active"):
-                tier = str(data.get("tier") or "unknown")
-                tier_label = ONECLASS_TIER_LABELS.get(tier, tier)
-                order_no = data.get("order_no") or "-"
-                updates_until = data.get("updates_until") or "长期更新"
-                self.oneclass_label.setText(f"OneClass 授权：已激活（{tier_label}）")
-                self.oneclass_label.setToolTip(f"订单：{order_no}\n更新截止：{updates_until}")
-                if not self.oneclass_sync_timer.isActive():
-                    self._set_oneclass_progress("", active=False)
-            else:
-                reason = data.get("reason") or "未激活"
-                self.oneclass_label.setText(f"OneClass 授权：{reason}")
-                self.oneclass_label.setToolTip("")
-                if not self.oneclass_sync_timer.isActive():
-                    self._set_oneclass_progress("未购买时会提示购买；付款后会自动同步授权。", active=False)
+            self._apply_oneclass_status(data, sync_warning)
         except Exception as exc:
             self.oneclass_label.setText("OneClass 授权：检查失败")
             self.oneclass_label.setToolTip(str(exc))
@@ -380,7 +525,7 @@ class UnifiedHomePage(QWidget):
 
         if data.get("active"):
             self.oneclass_sync_timer.stop()
-            self.refresh_oneclass()
+            self._apply_oneclass_status(data)
             self._set_oneclass_progress("付款已同步完成，首页授权状态已自动刷新。", active=False)
             if not self.oneclass_sync_notified:
                 self.oneclass_sync_notified = True

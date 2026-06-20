@@ -23,8 +23,12 @@ if (-not (Test-Path $smallWhisperCacheRoot)) {
 Push-Location $yunkaoRoot
 try {
     $yunkaoDistDir = Join-Path $yunkaoRoot "dist\yunkao"
+    $yunkaoBuildDir = Join-Path $yunkaoRoot "build\yunkao_dev"
     if (Test-Path $yunkaoDistDir) {
         Remove-Item $yunkaoDistDir -Recurse -Force
+    }
+    if (Test-Path $yunkaoBuildDir) {
+        Remove-Item $yunkaoBuildDir -Recurse -Force
     }
 
     & $yunkaoPython -m PyInstaller --noconfirm --clean yunkao_dev.spec
@@ -41,6 +45,15 @@ try {
 
     Push-Location $oneclassRoot
     try {
+        $oneclassDistDir = Join-Path $oneclassRoot "dist\oneclass"
+        $oneclassBuildDir = Join-Path $oneclassRoot "build\oneclass"
+        if (Test-Path $oneclassDistDir) {
+            Remove-Item $oneclassDistDir -Recurse -Force
+        }
+        if (Test-Path $oneclassBuildDir) {
+            Remove-Item $oneclassBuildDir -Recurse -Force
+        }
+
         $modelSnapshot = Get-ChildItem $smallWhisperCacheRoot -Directory | Select-Object -First 1
         if (-not $modelSnapshot) {
             throw "未找到可用的 small.en 模型快照目录：$smallWhisperCacheRoot"
