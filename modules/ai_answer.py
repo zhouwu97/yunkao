@@ -1,9 +1,6 @@
 import json
 import re
-
 import requests
-from config.settings import API_BASE_URL
-
 
 PLACEHOLDER_ANSWERS = {"", "略", "暂无", "未知", "未提供", "无"}
 
@@ -85,10 +82,6 @@ def should_use_ai(question, config):
         return False
     if not is_placeholder_answer(question.get("answer")):
         return False
-    ai_mode = config.get("ai_mode", "custom")
-    if ai_mode == "official":
-        # 官方接口不需要检查本地 api_key，直接可调
-        return True
     if not config.get("ai_api_key", "").strip():
         return False
     if not config.get("ai_model", "").strip():
@@ -159,15 +152,6 @@ def _normalize_usage(data):
     }
 
 
-def _normalize_billing(data):
-    billing = data or {}
-    return {
-        "billed_amount_cents": int(billing.get("billed_amount_cents", 0) or 0),
-        "reserved_amount_cents": int(billing.get("reserved_amount_cents", 0) or 0),
-        "balance_after_cents": int(billing.get("balance_after_cents", 0) or 0),
-    }
-
-
 def _extract_image_urls(question):
     image_urls = []
     seen = set()
@@ -216,101 +200,7 @@ def _build_direct_request_payload(question, config):
     }
 
 
-def _call_official_service(question, config, jwt_token=None):
-    if not jwt_token:
-        raise ValueError("当前登录态缺失，无法调用官方接口")
-
-    model_id = config.get("official_model_id", 0)
-    supports_images = bool(config.get("official_supports_images", True))
-    image_urls = _extract_image_urls(question)
-
-    # 构建 export_job_id（基于时间戳）
-    import time
-    export_job_id = f"export_{int(time.time() * 1000)}"
-
-    response = requests.post(
-        f"{API_BASE_URL}/api/yunkao/solve",
-        headers={
-            "Authorization": f"Bearer {jwt_token}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "question_type": question.get("question_type", ""),
-            "raw_content": question,
-            "content_text": "\n".join(
-                [question.get("title", "")] + list(question.get("options", []) or [])
-            ),
-            "model_id": model_id,
-            "export_job_id": export_job_id,
-            "has_image": supports_images and bool(image_urls),
-        },
-        timeout=45,
-    )
-    response.raise_for_status()
-    data = response.json()
-    answer = str(data.get("answer", "")).strip()
-    source = str(data.get("source", "ai")).strip() or "ai"
-    confidence = 1.0 if source == "cache" else 0.85
-    usage = _normalize_usage(data.get("usage"))
-    billing = _normalize_billing(data.get("billing"))
-    model_info = data.get("model", {})
-    return {
-        "answer": answer,
-        "analysis": "",
-        "confidence": confidence,
-        "source": source,
-        "usage": usage,
-        "billing": billing,
-        "model": model_info,
-        "raw": data,
-    }
-
-
-def _call_legacy_official_service(question, config, jwt_token=None):
-    """旧版 /api/v1/question/solve 接口（保留兼容）"""
-    if not jwt_token:
-        raise ValueError("当前登录态缺失，无法调用官方接口")
-
-    response = requests.post(
-        f"{API_BASE_URL}/api/v1/question/solve",
-        headers={
-            "Authorization": f"Bearer {jwt_token}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "question_type": question.get("question_type", ""),
-            "raw_content": question,
-            "content_text": "\n".join(
-                [question.get("title", "")] + list(question.get("options", []) or [])
-            ),
-        },
-        timeout=45,
-    )
-    response.raise_for_status()
-    data = response.json()
-    answer = str(data.get("answer", "")).strip()
-    source = str(data.get("source", "ai")).strip() or "ai"
-    confidence = 1.0 if source == "cache" else 0.85
-    usage = _normalize_usage(data.get("usage"))
-    billing = _normalize_billing(data.get("billing"))
-    return {
-        "answer": answer,
-        "analysis": "",
-        "confidence": confidence,
-        "source": source,
-        "usage": usage,
-        "billing": billing,
-        "model": {},
-        "raw": data,
-    }
-
-
 def infer_answer_with_ai(question, config, jwt_token=None):
-    ai_mode = config.get("ai_mode", "custom")
-    if ai_mode == "official":
-        # 使用新的融智云考助手独立接口（支持多模型三段式计费）
-        return _call_official_service(question, config, jwt_token=jwt_token)
-
     base_url = config.get("ai_base_url", "https://api.openai.com/v1").rstrip("/")
     api_key = config.get("ai_api_key", "").strip()
     model = config.get("ai_model", "").strip()
@@ -362,26 +252,3 @@ def infer_answer_with_ai(question, config, jwt_token=None):
         },
         "raw": result,
     }
-
-
-def report_wrong_answer(question_hash, usage_log_id, export_job_id, question_snapshot,
-                        current_answer, report_reason, jwt_token):
-    """向服务端报告错题"""
-    response = requests.post(
-        f"{API_BASE_URL}/api/yunkao/report-wrong",
-        headers={
-            "Authorization": f"Bearer {jwt_token}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "question_hash": question_hash,
-            "usage_log_id": usage_log_id,
-            "export_job_id": export_job_id,
-            "question_snapshot": question_snapshot,
-            "current_answer": current_answer,
-            "report_reason": report_reason,
-        },
-        timeout=10,
-    )
-    response.raise_for_status()
-    return response.json()

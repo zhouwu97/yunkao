@@ -9,16 +9,17 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import QUrl, Qt, QFile, QTimer, QPoint, QThread, Signal
+from PySide6.QtWebEngineWidgets import QWebEngineView
+from PySide6.QtWebChannel import QWebChannel
+from PySide6.QtCore import QUrl, Qt, QFile, QTimer, QPoint, QThread, Signal
 
-from config.settings import SERVICE_NAME, HARDCODED_SCHOOL_CODE, API_BASE_URL, load_config
+from config.settings import SERVICE_NAME, HARDCODED_SCHOOL_CODE, load_config
 from modules.ai_answer import infer_answer_with_ai, should_use_ai, is_placeholder_answer
 from modules.js_bridge import ExtractorBridge
 from modules.exporter import export_to_markdown, export_to_txt
 from modules.extraction_state import ExtractionRunState
-from modules.wallet_api import get_wallet
 from modules.question_parser import parse_active_question
 from ui.settings_dialog import SettingsDialog
-from ui.admin_dialog import AdminDialog
 import json
 
 class ExportThread(QThread):
@@ -73,19 +74,7 @@ class AiFillThread(QThread):
             self.failed.emit(self.session_id, self.question_index, str(exc))
 
 
-class WalletLoadThread(QThread):
-    completed = Signal(dict)
-    failed = Signal(str)
 
-    def __init__(self, jwt_token):
-        super().__init__()
-        self.jwt_token = jwt_token
-
-    def run(self):
-        try:
-            self.completed.emit(get_wallet(self.jwt_token))
-        except Exception as exc:
-            self.failed.emit(str(exc))
 
 
 # ==========================================
@@ -141,7 +130,7 @@ class TampermonkeyFloatingWindow(QFrame):
         # 顶部标题区
         title_layout = QHBoxLayout()
         title_layout.setSpacing(5)
-        self.lbl_title = QLabel("🧙 融智云考助手 (油猴版)")
+        self.lbl_title = QLabel("🧙 融智云考助手 (免费版 · 严禁倒卖)")
         self.lbl_title.setStyleSheet("font-weight: bold; color: #569CD6; font-size: 13px;")
         
         self.lbl_key_status = QLabel("🔑")
@@ -186,11 +175,6 @@ class TampermonkeyFloatingWindow(QFrame):
         util_layout.addWidget(self.btn_settings)
         self.content_layout.addLayout(util_layout)
 
-        self.lbl_wallet = QLabel("官方余额: 加载中...")
-        self.lbl_wallet.setStyleSheet(
-            "font-size: 12px; color: #DAA520; font-weight: bold;"
-        )
-        self.content_layout.addWidget(self.lbl_wallet)
 
         # 进度面板
         self.lbl_progress = QLabel("当前进度: ⌛ 等待进入练习页面...")
@@ -222,12 +206,12 @@ class TampermonkeyFloatingWindow(QFrame):
         self.content_layout.addLayout(btn_layout)
 
         self.main_layout.addWidget(self.content_widget)
-        self.setFixedSize(280, 205)
+        self.setFixedSize(280, 180)
 
     def toggle_minimize(self):
         if self.is_minimized:
             self.content_widget.show()
-            self.setFixedSize(280, 205)
+            self.setFixedSize(280, 180)
             self.btn_min.setText("－")
             self.is_minimized = False
             self.setWindowOpacity(1.0)
@@ -241,12 +225,6 @@ class TampermonkeyFloatingWindow(QFrame):
         dialog = SettingsDialog(self.main_app, jwt_token=self.main_app.jwt_token)
         dialog.config_updated.connect(self.main_app.update_config)
         dialog.logout_requested.connect(self.main_app.do_logout)
-        dialog.open_admin_panel.connect(self.main_app.open_admin_panel)
-        dialog.wallet_balance_updated.connect(self.main_app._on_recharge_balance_updated)
-        # 检查管理员权限
-        user_data = self.main_app.user_data or {}
-        is_admin = user_data.get("role") in ("admin", "super_admin")
-        dialog.set_admin_visible(is_admin)
         dialog.exec()
 
     def toggle_extraction(self):
@@ -300,80 +278,20 @@ class YunKaoExtractorApp(QMainWindow):
         self.extracted_questions = []
         self.seen_question_keys = set()
         self.pending_ai_workers = {}
-        self.wallet_worker = None
-        self.wallet_balance_cents = None
         self.ai_session_id = 0
         self.last_question_marker = ""
         self.extraction_state = ExtractionRunState()
         self.config = load_config()
 
         nickname = user_data.get('nickname', current_user)
-        self.setWindowTitle(f"融智云考题库导出助手 - {nickname}")
+        self.setWindowTitle(f"融智云考题库导出助手 - 免费使用 · 禁止倒卖 - {nickname}")
         self.resize(1300, 850)
 
         # 100% 铺满的浏览器组件
         self.browser = QWebEngineView(self)
         
         self.setCentralWidget(self.browser)
-        self.browser.page().urlChanged.connect(self.on_url_changed)
-
-        # 实例化悬浮窗
-        self.overlay = TampermonkeyFloatingWindow(self.browser, main_app=self)
-        self.overlay.move(30, 30)
-        self.overlay.raise_()
-
-        # JS 桥接配置
-        self.channel = QWebChannel()
-        self.bridge = ExtractorBridge(self)
-        self.channel.registerObject("pybridge", self.bridge)
-        self.browser.page().setWebChannel(self.channel)
-
-        self.browser.page().loadFinished.connect(self.on_page_loaded)
         self.browser.load(QUrl("https://www.cctrcloud.net/practice/login.html"))
-
-        self.check_vip_status()
-        QTimer.singleShot(0, self.refresh_wallet_balance)
-
-    def refresh_export_button(self):
-        if not hasattr(self, "overlay"):
-            return
-        pending_jobs = len(self.pending_ai_workers)
-        can_export = bool(self.extracted_questions) and not self.overlay.is_extracting and pending_jobs == 0
-        self.overlay.btn_export.setEnabled(can_export)
-
-    def refresh_wallet_balance(self):
-        if not self.jwt_token:
-            self.overlay.lbl_wallet.setText("官方余额: 未登录")
-            return
-        if self.wallet_worker and self.wallet_worker.isRunning():
-            return
-
-        self.overlay.lbl_wallet.setText("官方余额: 加载中...")
-        worker = WalletLoadThread(self.jwt_token)
-        self.wallet_worker = worker
-        worker.completed.connect(self._on_wallet_loaded)
-        worker.failed.connect(self._on_wallet_failed)
-        worker.finished.connect(self._cleanup_wallet_worker)
-        worker.start()
-
-    def _on_wallet_loaded(self, data):
-        wallet = data.get("wallet") or {}
-        self.wallet_balance_cents = int(wallet.get("balance_cents", 0) or 0)
-        self.overlay.lbl_wallet.setText(
-            f"官方余额: ¥{self.wallet_balance_cents / 100:.2f}"
-        )
-
-    def _on_wallet_failed(self, _error_text):
-        self.overlay.lbl_wallet.setText("官方余额: 获取失败")
-
-    def _on_recharge_balance_updated(self, balance_cents):
-        self.wallet_balance_cents = int(balance_cents)
-        self.overlay.lbl_wallet.setText(
-            f"官方余额: ¥{self.wallet_balance_cents / 100:.2f}"
-        )
-
-    def _cleanup_wallet_worker(self):
-        self.wallet_worker = None
 
     def _set_extraction_ui(self, active):
         self.overlay.is_extracting = active
@@ -429,7 +347,7 @@ class YunKaoExtractorApp(QMainWindow):
             question_index,
             question,
             self.config,
-            self.jwt_token,
+            "",
         )
         key = (self.ai_session_id, question_index)
         self.pending_ai_workers[key] = worker
@@ -475,19 +393,10 @@ class YunKaoExtractorApp(QMainWindow):
                 question["analysis_source"] = "ai"
 
         usage = ai_result.get("usage", {}) or {}
-        billing = ai_result.get("billing", {}) or {}
         model_info = ai_result.get("model", {}) or {}
         total_tokens = int(usage.get("total_tokens", 0) or 0)
         cache_ref_tokens = int(usage.get("cache_reference_tokens", 0) or 0)
-        billed_amount_cents = int(billing.get("billed_amount_cents", 0) or 0)
-        balance_after_cents = int(billing.get("balance_after_cents", 0) or 0)
-        cache_hit = billing.get("cache_hit", False)
-
-        if source != "direct":
-            self.wallet_balance_cents = balance_after_cents
-            self.overlay.lbl_wallet.setText(
-                f"官方余额: ¥{balance_after_cents / 100:.2f}"
-            )
+        cache_hit = ai_result.get("billing", {}).get("cache_hit", False)
 
         model_name = model_info.get("model_name", "")
         if source == "cache":
@@ -503,10 +412,8 @@ class YunKaoExtractorApp(QMainWindow):
         if not cache_hit and source != "direct":
             usage_text = f"输入 {usage.get('prompt_tokens', 0)}t / 输出 {usage.get('completion_tokens', 0)}t"
 
-        price_text = f"¥{billed_amount_cents / 100:.2f}"
-        balance_text = f" / 余额 ¥{balance_after_cents / 100:.2f}" if balance_after_cents > 0 else ""
         self.overlay.set_mini_status(
-            f"🤖 {route_text}: {usage_text} / {price_text}{balance_text}",
+            f"🤖 {route_text}: {usage_text}",
             "#6A9955" if cache_hit else "#DAA520",
         )
 
@@ -517,54 +424,11 @@ class YunKaoExtractorApp(QMainWindow):
 
     def update_config(self, new_config):
         self.config = new_config
-        self.refresh_wallet_balance()
 
-    def open_admin_panel(self):
-        dialog = AdminDialog(self, jwt_token=self.jwt_token)
-        dialog.exec()
-        self.refresh_wallet_balance()
-        
     def on_url_changed(self, url):
         self.overlay.btn_back.setEnabled(self.browser.page().history().canGoBack())
         
         current_url = url.toString()
-        # 如果进入了某个具体的练习页面，或者是完全不同的大页面，自动清空题库
-        if "subject_practice.html" in current_url or "myself_practice.html" in current_url:
-            if hasattr(self, 'last_practice_url') and self.last_practice_url != current_url:
-                if self.extracted_questions:
-                    self.overlay.clear_questions()
-                    self.overlay.set_mini_status("🔄 换科啦！旧题库已自动清空", "#D83B01")
-            self.last_practice_url = current_url
-
-    def do_logout(self):
-        # 处理退出登录逻辑
-        try:
-            keyring.delete_password(SERVICE_NAME, f"{HARDCODED_SCHOOL_CODE}_{self.current_user}")
-        except:
-            pass
-        self.config['jwt_token'] = ""
-        self.config['user'] = ""
-        from config.settings import save_config
-        save_config(self.config)
-        
-        self.needs_relogin = True
-        self.close()
-
-    def check_vip_status(self):
-        try:
-            resp = requests.get(
-                f"{API_BASE_URL}/api/vip/status",
-                headers={"Authorization": f"Bearer {self.jwt_token}"},
-                timeout=5
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                self.is_vip = data.get("is_vip", False)
-                if self.is_vip:
-                    self.overlay.lbl_title.setText("🧙 融智云考助手 (👑 VIP)")
-                    self.overlay.lbl_title.setStyleSheet("font-weight: bold; color: #DAA520; font-size: 13px;")
-        except Exception:
-            pass # 忽略报错，保持普通形态
 
     def on_page_loaded(self, ok):
         self.overlay.btn_back.setEnabled(self.browser.page().history().canGoBack())

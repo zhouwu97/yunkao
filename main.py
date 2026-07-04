@@ -64,6 +64,8 @@ if not ensure_windows_admin():
 hide_native_console()
 
 # Must be configured before importing QtWebEngine.
+
+# Must be configured before importing QtWebEngine.
 os.environ["QT_OPENGL"] = "software"
 os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
     "--disable-gpu --disable-gpu-compositing --log-level=3 "
@@ -76,59 +78,30 @@ if getattr(sys, 'frozen', False):
     exe_dir = os.path.dirname(sys.executable)
     os.chdir(exe_dir)
 
-from PySide6.QtWidgets import QApplication, QDialog
-from config.settings import load_config, API_BASE_URL
-from ui.login_dialog import SoftwareLoginDialog
-from ui.unified_home import UnifiedHomePage
-
-def check_token_validity(token):
-    try:
-        resp = requests.get(
-            f"{API_BASE_URL}/api/vip/status",
-            headers={"Authorization": f"Bearer {token}"},
-            timeout=3
-        )
-        return resp.status_code == 200
-    except Exception:
-        return False
+from PySide6.QtWidgets import QApplication
+from config.settings import load_config, save_config
+from ui.main_window import YunKaoExtractorApp
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     
-    while True:
-        # 每次循环重新读取配置，确保退出登录后 token 已清除
-        cfg = load_config()
-        saved_token = cfg.get('jwt_token')
-        saved_user = cfg.get('user')
-        saved_user_data = cfg.get('user_data', {})
-        
-        # 如果有令牌且验证依然有效，直接进入主界面
-        if saved_token and saved_user and check_token_validity(saved_token):
-            window = UnifiedHomePage(
-                current_user=saved_user,
-                jwt_token=saved_token,
-                user_data=saved_user_data
-            )
-            window.show()
-            app.exec()
-            if getattr(window, 'needs_relogin', False):
-                continue  # 退出登录 -> 重新显示登录弹窗
-            break
-        else:
-            # 显示登录弹窗
-            login_dialog = SoftwareLoginDialog()
-            if login_dialog.exec() == QDialog.Accepted:
-                window = UnifiedHomePage(
-                    current_user=login_dialog.current_user,
-                    jwt_token=login_dialog.jwt_token,
-                    user_data=login_dialog.user_data
-                )
-                window.show()
-                app.exec()
-                if getattr(window, 'needs_relogin', False):
-                    continue  # 退出登录 -> 重新显示登录弹窗
-                break
-            else:
-                break
+    cfg = load_config()
+    current_user = cfg.get("yunkao_user") or cfg.get("user") or "local_user"
+    user_data = {
+        "nickname": cfg.get("nickname") or "本地用户",
+        "role": "local",
+    }
     
-    sys.exit(0)
+    cfg["jwt_token"] = ""
+    cfg["user"] = current_user
+    cfg["user_data"] = user_data
+    save_config(cfg)
+    
+    window = YunKaoExtractorApp(
+        current_user=current_user,
+        jwt_token="",
+        user_data=user_data,
+    )
+    window.show()
+    
+    sys.exit(app.exec())

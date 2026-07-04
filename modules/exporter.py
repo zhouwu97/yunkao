@@ -3,39 +3,12 @@ import re
 
 MAX_IMAGE_WIDTH_PT = 420.0
 MAX_IMAGE_HEIGHT_PT = 620.0
-ANTI_RESALE_TEXT = "此文档禁止倒卖，鼓励免费分享。"
-PDF_FLATTEN_DPI = 180
+ANTI_RESALE_TEXT = "本资料由云考助手免费生成，禁止倒卖。\n如果你是付费购买所得，请立即退款。\n官方免费获取：GitHub zhouwu97 / SYLUlive"
+PDF_PROTECTION_MODE = "normal"  # normal / flatten
+PDF_FLATTEN_DPI = 130
+
 SCORE_MARKER_PATTERN = re.compile(r"[ \t\u00a0]{2,}([（(]?\d+\s*分[）)]?)")
 
-
-def _save_flattened_pdf_with_watermark(pdf_doc, target_pdf, watermark_bytes, owner_pw, permissions):
-    """Rasterize each page after watermarking so the watermark is baked into pixels."""
-    import fitz
-
-    flattened = fitz.open()
-    matrix = fitz.Matrix(PDF_FLATTEN_DPI / 72, PDF_FLATTEN_DPI / 72)
-    try:
-        for source_page in pdf_doc:
-            rect = source_page.rect
-            watermark_rect = fitz.Rect(
-                (rect.width - 360) / 2,
-                (rect.height - 360) / 2 + 20,
-                (rect.width + 360) / 2,
-                (rect.height + 360) / 2 + 20,
-            )
-            source_page.insert_image(watermark_rect, stream=watermark_bytes, overlay=True)
-            pix = source_page.get_pixmap(matrix=matrix, alpha=False)
-            page = flattened.new_page(width=rect.width, height=rect.height)
-            page.insert_image(page.rect, stream=pix.tobytes("png"))
-
-        flattened.save(
-            target_pdf,
-            encryption=fitz.PDF_ENCRYPT_AES_256,
-            owner_pw=owner_pw,
-            permissions=permissions,
-        )
-    finally:
-        flattened.close()
 
 
 def normalize_export_text_run(text):
@@ -474,10 +447,10 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
                     <v:textpath on="t" fitshape="t"/>
                 </v:shapetype>
                 <v:shape id="WordWaterMark1" type="#_x0000_t136" style="position:absolute;left:0;margin-left:0;margin-top:-100pt;width:600pt;height:150pt;rotation:315;z-index:-251658240;mso-position-horizontal:center;mso-position-horizontal-relative:margin;mso-position-vertical:center;mso-position-vertical-relative:margin" fillcolor="#E0E0E0" stroked="f">
-                    <v:textpath on="t" style="font-family:'SimHei';font-size:50pt" string="此题库免费，注意防诈。"/>
+                    <v:textpath on="t" style="font-family:'SimHei';font-size:50pt" string="免费题库，请勿购买"/>
                 </v:shape>
                 <v:shape id="WordWaterMark2" type="#_x0000_t136" style="position:absolute;left:0;margin-left:0;margin-top:100pt;width:600pt;height:100pt;rotation:315;z-index:-251658240;mso-position-horizontal:center;mso-position-horizontal-relative:margin;mso-position-vertical:center;mso-position-vertical-relative:margin" fillcolor="#E0E0E0" stroked="f">
-                    <v:textpath on="t" style="font-family:'Arial';font-size:40pt" string="GitHub SYLUlive"/>
+                    <v:textpath on="t" style="font-family:'Arial';font-size:40pt" string="GitHub zhouwu97 / SYLUlive"/>
                 </v:shape>
             </w:pict>'''
             run_watermark._element.append(parse_xml(xml))
@@ -581,8 +554,8 @@ def export_to_pdf(questions, file_path, progress_callback=None):
             font = ImageFont.load_default()
             font_small = ImageFont.load_default()
             
-        text1 = "此题库免费，注意防诈。"
-        text2 = "GitHub SYLUlive"
+        text1 = "免费题库，请勿购买"
+        text2 = "官方免费获取：GitHub zhouwu97 / SYLUlive"
         
         def draw_centered_text(draw, txt, y_offset, fnt):
             try:
@@ -614,9 +587,63 @@ def export_to_pdf(questions, file_path, progress_callback=None):
         owner_pw = secrets.token_hex(20)
         # 允许打印、复制、高质量打印和辅助功能。禁止：修改、批注、组装、表单填写
         perm = int(fitz.PDF_PERM_PRINT | fitz.PDF_PERM_COPY | fitz.PDF_PERM_ACCESSIBILITY | fitz.PDF_PERM_PRINT_HQ)
+        def _save_text_pdf_with_watermark(pdf_doc, target_pdf, watermark_bytes, owner_pw, permissions):
+            import fitz
+            for page in pdf_doc:
+                rect = page.rect
+                watermark_rect = fitz.Rect(
+                    (rect.width - 360) / 2,
+                    (rect.height - 360) / 2 + 20,
+                    (rect.width + 360) / 2,
+                    (rect.height + 360) / 2 + 20,
+                )
+                page.insert_image(watermark_rect, stream=watermark_bytes, overlay=True)
+
+            pdf_doc.save(
+                target_pdf,
+                encryption=fitz.PDF_ENCRYPT_AES_256,
+                owner_pw=owner_pw,
+                permissions=permissions,
+                garbage=4,
+                deflate=True,
+                clean=True,
+            )
+
+        def _save_flattened_pdf_with_watermark(pdf_doc, target_pdf, watermark_bytes, owner_pw, permissions):
+            import fitz
+            for page in pdf_doc:
+                rect = page.rect
+                watermark_rect = fitz.Rect(
+                    (rect.width - 360) / 2,
+                    (rect.height - 360) / 2 + 20,
+                    (rect.width + 360) / 2,
+                    (rect.height + 360) / 2 + 20,
+                )
+                page.insert_image(watermark_rect, stream=watermark_bytes, overlay=True)
+
+            img_pdf = fitz.open()
+            for page in pdf_doc:
+                pix = page.get_pixmap(dpi=PDF_FLATTEN_DPI, alpha=False)
+                new_page = img_pdf.new_page(width=page.rect.width, height=page.rect.height)
+                new_page.insert_image(new_page.rect, stream=pix.tobytes("png"))
+                
+            img_pdf.save(
+                target_pdf,
+                encryption=fitz.PDF_ENCRYPT_AES_256,
+                owner_pw=owner_pw,
+                permissions=permissions,
+                garbage=4,
+                deflate=True,
+                clean=True,
+            )
+            img_pdf.close()
+
         pdf_doc = fitz.open(temp_pdf)
         try:
-            _save_flattened_pdf_with_watermark(pdf_doc, target_pdf, img_bytes, owner_pw, perm)
+            if PDF_PROTECTION_MODE == "flatten":
+                _save_flattened_pdf_with_watermark(pdf_doc, target_pdf, img_bytes, owner_pw, perm)
+            else:
+                _save_text_pdf_with_watermark(pdf_doc, target_pdf, img_bytes, owner_pw, perm)
         finally:
             pdf_doc.close()
             

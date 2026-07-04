@@ -6,9 +6,6 @@ SERVICE_NAME = "YunKaoDesktop"
 HARDCODED_SCHOOL_CODE = "u101441"
 CONFIG_VERSION = 1
 
-# 后端 API 基础地址，可用环境变量覆盖，避免在多环境构建里改源码。
-API_BASE_URL = os.environ.get("YUNKAO_API_BASE_URL", "https://sylu.zhouwu.ccwu.cc").rstrip("/")
-
 DEFAULT_CONFIG = {
     "extract_answer": False,
     "export_prefix": "基础题库导出",
@@ -21,9 +18,9 @@ DEFAULT_CONFIG = {
     "ai_api_key": "",
     "ai_model": "gpt-4o-mini",
     "ai_supports_images": True,
-    # 融智云考助手独立配置
-    "official_model_id": 0,
-    "official_supports_images": True,
+    # 本地云考账号配置
+    "yunkao_user": "",
+    "yunkao_remember_password": True,
     "config_version": CONFIG_VERSION,
 }
 
