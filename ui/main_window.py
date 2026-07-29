@@ -5,32 +5,37 @@ import keyring
 import requests
 from bs4 import BeautifulSoup
 from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-                               QPushButton, QLabel, QFileDialog, QMessageBox, QFrame, QProgressDialog)
+                               QPushButton, QLabel, QFileDialog, QMessageBox, QFrame,
+                               QProgressDialog, QCheckBox, QGraphicsDropShadowEffect)
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import QUrl, Qt, QFile, QTimer, QPoint, QThread, Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import QUrl, Qt, QFile, QTimer, QPoint, QThread, Signal
 
-from config.settings import SERVICE_NAME, HARDCODED_SCHOOL_CODE, load_config
+from config.settings import SERVICE_NAME, HARDCODED_SCHOOL_CODE, load_config, save_config
 from modules.ai_answer import infer_answer_with_ai, should_use_ai, is_placeholder_answer
 from modules.js_bridge import ExtractorBridge
 from modules.exporter import export_to_markdown, export_to_txt
 from modules.extraction_state import ExtractionRunState
 from modules.question_parser import parse_active_question
 from ui.settings_dialog import SettingsDialog
+from ui.theme import OVERLAY_STYLE
+from ui.widgets import ToggleSwitch
 import json
 
 class ExportThread(QThread):
     finished = Signal(bool, str)
     progress = Signal(int, int, str)
     
-    def __init__(self, questions, file_path, filter_type):
+    def __init__(self, questions, file_path, filter_type, include_answers=True):
         super().__init__()
         self.questions = questions
         self.file_path = file_path
         self.filter_type = filter_type
+        self.include_answers = include_answers
         
     def run(self):
         def report_progress(current, total, message):
@@ -39,16 +44,34 @@ class ExportThread(QThread):
         try:
             if self.filter_type.startswith("Word"):
                 from modules.exporter import export_to_docx
-                export_to_docx(self.questions, self.file_path, progress_callback=report_progress)
+                export_to_docx(
+                    self.questions,
+                    self.file_path,
+                    progress_callback=report_progress,
+                    include_answers=self.include_answers,
+                )
             elif self.filter_type.startswith("PDF"):
                 from modules.exporter import export_to_pdf
-                export_to_pdf(self.questions, self.file_path, progress_callback=report_progress)
+                export_to_pdf(
+                    self.questions,
+                    self.file_path,
+                    progress_callback=report_progress,
+                    include_answers=self.include_answers,
+                )
             elif self.filter_type.startswith("Markdown"):
                 from modules.exporter import export_to_markdown
-                export_to_markdown(self.questions, self.file_path)
+                export_to_markdown(
+                    self.questions,
+                    self.file_path,
+                    include_answers=self.include_answers,
+                )
             else:
                 from modules.exporter import export_to_txt
-                export_to_txt(self.questions, self.file_path)
+                export_to_txt(
+                    self.questions,
+                    self.file_path,
+                    include_answers=self.include_answers,
+                )
             self.finished.emit(True, self.file_path)
         except Exception as e:
             self.finished.emit(False, str(e))
@@ -81,6 +104,11 @@ class AiFillThread(QThread):
 # 1. 油猴脚本风格的悬浮操作窗 (Overlay Widget)
 # ==========================================
 class TampermonkeyFloatingWindow(QFrame):
+    EXPANDED_WIDTH = 320
+    MIN_EXPANDED_HEIGHT = 248
+    COLLAPSED_WIDTH = 238
+    COLLAPSED_HEIGHT = 42
+
     def __init__(self, parent=None, main_app=None):
         super().__init__(parent)
         self.main_app = main_app
@@ -92,48 +120,27 @@ class TampermonkeyFloatingWindow(QFrame):
         self.init_ui()
 
     def init_ui(self):
-        # 悬浮窗视觉：高斯模糊/半透明玻璃质感、圆角与精致阴影
-        self.setStyleSheet("""
-            TampermonkeyFloatingWindow {
-                background-color: rgba(30, 30, 30, 0.85);
-                border: 1px solid rgba(255, 255, 255, 0.15);
-                border-radius: 12px;
-            }
-            QLabel {
-                color: #E0E0E0;
-                font-family: 'Segoe UI', 'Microsoft YaHei';
-            }
-            QPushButton {
-                background-color: #0078D4;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                padding: 6px 12px;
-                font-weight: bold;
-                font-size: 13px;
-            }
-            QPushButton:hover { background-color: #106EBE; }
-            QPushButton:pressed { background-color: #005A9E; }
-            QPushButton:disabled { background-color: #555555; color: #AAAAAA; }
-            #btn_export { background-color: #243A5E; border: 1px solid #0078D4; }
-            #btn_export:hover { background-color: #106EBE; }
-            #btn_util { background-color: transparent; border: 1px solid rgba(255,255,255,0.2); font-size: 11px; padding: 4px 8px; color: #CCCCCC;}
-            #btn_util:hover { background-color: rgba(255,255,255,0.1); color: white;}
-            #btn_min { background-color: transparent; color: #888888; font-size: 14px; font-weight: bold; padding: 0 4px; }
-            #btn_min:hover { color: white; }
-        """)
+        self.setStyleSheet(OVERLAY_STYLE)
+
+        # 阴影让悬浮面板与网页内容形成清晰层级，不影响透明背景。
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(28)
+        shadow.setOffset(0, 7)
+        shadow.setColor(QColor(15, 23, 42, 90))
+        self.setGraphicsEffect(shadow)
 
         self.main_layout = QVBoxLayout(self)
-        self.main_layout.setContentsMargins(12, 10, 12, 12)
-        self.main_layout.setSpacing(8)
+        self.main_layout.setContentsMargins(14, 11, 14, 13)
+        self.main_layout.setSpacing(7)
 
         # 顶部标题区
         title_layout = QHBoxLayout()
         title_layout.setSpacing(5)
-        self.lbl_title = QLabel("🧙 融智云考助手 (免费版 · 严禁倒卖)")
-        self.lbl_title.setStyleSheet("font-weight: bold; color: #569CD6; font-size: 13px;")
+        self.lbl_title = QLabel("融智云考助手")
+        self.lbl_title.setObjectName("overlayTitle")
         
-        self.lbl_key_status = QLabel("🔑")
+        self.lbl_key_status = QLabel("●")
+        self.lbl_key_status.setObjectName("credentialStatus")
         self.lbl_key_status.setToolTip("本地凭证已就绪 - 页面加载后将自动静默填充")
         
         self.btn_min = QPushButton("－")
@@ -142,7 +149,7 @@ class TampermonkeyFloatingWindow(QFrame):
         self.btn_min.clicked.connect(self.toggle_minimize)
         
         title_layout.addWidget(self.lbl_title)
-        title_layout.addStretch()
+        title_layout.addStretch(1)
         title_layout.addWidget(self.lbl_key_status)
         title_layout.addWidget(self.btn_min)
         self.main_layout.addLayout(title_layout)
@@ -155,18 +162,17 @@ class TampermonkeyFloatingWindow(QFrame):
         
         # 分割线
         line = QFrame()
-        line.setFrameShape(QFrame.HLine)
-        line.setStyleSheet("background-color: rgba(255,255,255,0.1); max-height: 1px;")
+        line.setObjectName("overlayDivider")
         self.content_layout.addWidget(line)
 
         # 实用工具栏 (返回与设置)
         util_layout = QHBoxLayout()
-        self.btn_back = QPushButton("⬅️ 返回")
+        self.btn_back = QPushButton("返回")
         self.btn_back.setObjectName("btn_util")
         self.btn_back.clicked.connect(lambda: self.main_app.browser.back())
         self.btn_back.setEnabled(False) # 默认禁用，等待状态更新
         
-        self.btn_settings = QPushButton("⚙️ 设置")
+        self.btn_settings = QPushButton("设置")
         self.btn_settings.setObjectName("btn_util")
         self.btn_settings.clicked.connect(self.open_settings)
         
@@ -177,25 +183,52 @@ class TampermonkeyFloatingWindow(QFrame):
 
 
         # 进度面板
-        self.lbl_progress = QLabel("当前进度: ⌛ 等待进入练习页面...")
-        self.lbl_progress.setStyleSheet("font-size: 12px; color: #A7A7A7;")
+        self.lbl_progress = QLabel("等待进入练习页面")
+        self.lbl_progress.setObjectName("progressLabel")
+        self.lbl_progress.setWordWrap(True)
         self.content_layout.addWidget(self.lbl_progress)
 
         # 迷你状态栏
-        self.lbl_status_mini = QLabel("系统就绪.")
-        self.lbl_status_mini.setStyleSheet("font-size: 11px; color: #6A9955;")
+        self.lbl_status_mini = QLabel("系统就绪")
+        self.lbl_status_mini.setObjectName("statusLabel")
+        self.lbl_status_mini.setWordWrap(True)
         self.content_layout.addWidget(self.lbl_status_mini)
+
+        # 练习版使用轻量开关行，避免整块高饱和边框抢占注意力。
+        practice_row = QFrame()
+        practice_row.setObjectName("practiceRow")
+        practice_layout = QHBoxLayout(practice_row)
+        practice_layout.setContentsMargins(9, 5, 8, 5)
+        practice_layout.setSpacing(8)
+        practice_label = QLabel("练习版 · 隐藏答案与解析")
+        practice_label.setObjectName("practiceLabel")
+        self.chk_practice_export = ToggleSwitch()
+        self.chk_practice_export.setChecked(
+            self.main_app.config.get("export_without_answers", False)
+        )
+        self.chk_practice_export.setToolTip(
+            "选择、判断、填空题保留紧凑作答位；主观题保留三行手写空间"
+        )
+        self.chk_practice_export.toggled.connect(
+            self.main_app.update_practice_export_mode
+        )
+        practice_layout.addWidget(practice_label)
+        practice_layout.addStretch(1)
+        practice_layout.addWidget(self.chk_practice_export)
+        self.content_layout.addWidget(practice_row)
 
         # 按钮组
         btn_layout = QHBoxLayout()
-        self.btn_toggle = QPushButton("▶ 开始自动提取")
+        self.btn_toggle = QPushButton("开始提取")
+        self.btn_toggle.setObjectName("btn_primary")
         self.btn_toggle.clicked.connect(self.toggle_extraction)
         
-        self.btn_clear = QPushButton("🗑️ 清空")
+        self.btn_clear = QPushButton("清空")
+        self.btn_clear.setObjectName("btn_secondary")
         self.btn_clear.setToolTip("清空内存中已提取的题目，换科目时使用")
         self.btn_clear.clicked.connect(self.clear_questions)
 
-        self.btn_export = QPushButton("💾 导出")
+        self.btn_export = QPushButton("导出")
         self.btn_export.setObjectName("btn_export")
         self.btn_export.setEnabled(False)
         self.btn_export.clicked.connect(lambda: self.main_app.export_basic_questions())
@@ -206,25 +239,43 @@ class TampermonkeyFloatingWindow(QFrame):
         self.content_layout.addLayout(btn_layout)
 
         self.main_layout.addWidget(self.content_widget)
-        self.setFixedSize(280, 180)
+        self.setFixedWidth(self.EXPANDED_WIDTH)
+        self._refresh_expanded_size()
+        # 首次显示后 Qt 才能得到真实字体与 DPI 度量，再校正一次展开高度。
+        QTimer.singleShot(0, self._refresh_expanded_size)
+
+    def _refresh_expanded_size(self):
+        """按当前文字和系统 DPI 重新计算展开态高度，避免底部控件被裁切。"""
+        if self.is_minimized:
+            return
+        self.setMinimumHeight(0)
+        self.setMaximumHeight(16777215)
+        self.main_layout.activate()
+        required_height = max(
+            self.MIN_EXPANDED_HEIGHT,
+            self.main_layout.sizeHint().height(),
+        )
+        self.resize(self.EXPANDED_WIDTH, required_height)
 
     def toggle_minimize(self):
         if self.is_minimized:
-            self.content_widget.show()
-            self.setFixedSize(280, 180)
-            self.btn_min.setText("－")
             self.is_minimized = False
+            self.setMinimumSize(0, 0)
+            self.setMaximumSize(16777215, 16777215)
+            self.setFixedWidth(self.EXPANDED_WIDTH)
+            self.content_widget.show()
+            self._refresh_expanded_size()
+            self.btn_min.setText("－")
             self.setWindowOpacity(1.0)
         else:
-            self.content_widget.hide()
-            self.setFixedSize(240, 40)
-            self.btn_min.setText("＋")
             self.is_minimized = True
+            self.content_widget.hide()
+            self.setFixedSize(self.COLLAPSED_WIDTH, self.COLLAPSED_HEIGHT)
+            self.btn_min.setText("＋")
 
     def open_settings(self):
-        dialog = SettingsDialog(self.main_app, jwt_token=self.main_app.jwt_token)
+        dialog = SettingsDialog(self.main_app)
         dialog.config_updated.connect(self.main_app.update_config)
-        dialog.logout_requested.connect(self.main_app.do_logout)
         dialog.exec()
 
     def toggle_extraction(self):
@@ -238,7 +289,13 @@ class TampermonkeyFloatingWindow(QFrame):
 
     def set_mini_status(self, text, color="#6A9955"):
         self.lbl_status_mini.setText(text)
-        self.lbl_status_mini.setStyleSheet(f"font-size: 11px; color: {color};")
+        self.lbl_status_mini.setStyleSheet(f"color: {color}; font-size: 10px; padding: 0 2px;")
+        QTimer.singleShot(0, self._refresh_expanded_size)
+
+    def set_progress_text(self, text):
+        """更新进度说明，并在内容换行时同步扩展悬浮窗。"""
+        self.lbl_progress.setText(text)
+        QTimer.singleShot(0, self._refresh_expanded_size)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -289,18 +346,42 @@ class YunKaoExtractorApp(QMainWindow):
 
         # 100% 铺满的浏览器组件
         self.browser = QWebEngineView(self)
-        
         self.setCentralWidget(self.browser)
+
+        # 浏览器事件、悬浮操作区和网页桥接必须一起初始化，缺少任一项都会使提取链路失效。
+        self.browser.page().urlChanged.connect(self.on_url_changed)
+
+        self.overlay = TampermonkeyFloatingWindow(self.browser, main_app=self)
+        self.overlay.move(30, 30)
+        self.overlay.show()
+        self.overlay.raise_()
+
+        self.channel = QWebChannel(self.browser.page())
+        self.bridge = ExtractorBridge(self)
+        self.channel.registerObject("pybridge", self.bridge)
+        self.browser.page().setWebChannel(self.channel)
+
+        self.browser.page().loadFinished.connect(self.on_page_loaded)
         self.browser.load(QUrl("https://www.cctrcloud.net/practice/login.html"))
+
+    def refresh_export_button(self):
+        pending_jobs = len(self.pending_ai_workers)
+        can_export = (
+            bool(self.extracted_questions)
+            and not self.overlay.is_extracting
+            and pending_jobs == 0
+        )
+        self.overlay.btn_export.setEnabled(can_export)
 
     def _set_extraction_ui(self, active):
         self.overlay.is_extracting = active
+        self.overlay.btn_toggle.setProperty("extracting", active)
+        self.overlay.btn_toggle.style().unpolish(self.overlay.btn_toggle)
+        self.overlay.btn_toggle.style().polish(self.overlay.btn_toggle)
         if active:
-            self.overlay.btn_toggle.setText("⏹ 停止提取")
-            self.overlay.btn_toggle.setStyleSheet("background-color: #D83B01;")
+            self.overlay.btn_toggle.setText("停止提取")
         else:
-            self.overlay.btn_toggle.setText("▶ 开始自动提取")
-            self.overlay.btn_toggle.setStyleSheet("")
+            self.overlay.btn_toggle.setText("开始提取")
         self.refresh_export_button()
 
     def start_extraction(self):
@@ -329,7 +410,7 @@ class YunKaoExtractorApp(QMainWindow):
         self.extracted_questions.clear()
         self.seen_question_keys.clear()
         self.last_question_marker = ""
-        self.overlay.lbl_progress.setText("当前进度: 已清空 0 题")
+        self.overlay.set_progress_text("当前进度: 已清空 0 题")
         self.overlay.set_mini_status("🗑️ 题库缓存已清空", "#6A9955")
         self.refresh_export_button()
 
@@ -355,7 +436,7 @@ class YunKaoExtractorApp(QMainWindow):
         worker.failed.connect(self._on_ai_fill_failed)
         worker.finished.connect(lambda key=key: self._cleanup_ai_fill_worker(key))
         self.overlay.set_mini_status("🤖 AI答题中...", "#D83B01")
-        self.overlay.lbl_progress.setText(
+        self.overlay.set_progress_text(
             f"进度: {page_info} (已存 {len(self.extracted_questions)} 题，AI答题中)"
             if page_info else f"进度: 已存 {len(self.extracted_questions)} 题，AI答题中"
         )
@@ -389,7 +470,7 @@ class YunKaoExtractorApp(QMainWindow):
 
             ai_analysis = (ai_result.get("analysis") or "").strip()
             if ai_analysis and not question.get("analysis"):
-                question["analysis"] = f"{ai_analysis}\n（AI生成）"
+                question["analysis"] = ai_analysis
                 question["analysis_source"] = "ai"
 
         usage = ai_result.get("usage", {}) or {}
@@ -424,6 +505,22 @@ class YunKaoExtractorApp(QMainWindow):
 
     def update_config(self, new_config):
         self.config = new_config
+        if hasattr(self.overlay, "chk_practice_export"):
+            self.overlay.chk_practice_export.blockSignals(True)
+            self.overlay.chk_practice_export.setChecked(
+                new_config.get("export_without_answers", False)
+            )
+            self.overlay.chk_practice_export.blockSignals(False)
+        configured_user = str(new_config.get("yunkao_user", "") or "").strip()
+        self.current_user = configured_user
+        self.trigger_auto_fill()
+
+    def update_practice_export_mode(self, enabled):
+        """即时切换练习版导出，并保存到用户配置。"""
+        self.config["export_without_answers"] = bool(enabled)
+        save_config(self.config)
+        mode_text = "练习版（不含答案）" if enabled else "含答案版"
+        self.overlay.set_mini_status(f"📄 已切换为{mode_text}", "#569CD6")
 
     def on_url_changed(self, url):
         self.overlay.btn_back.setEnabled(self.browser.page().history().canGoBack())
@@ -447,6 +544,9 @@ class YunKaoExtractorApp(QMainWindow):
 
             # 静默注入密码
             self.trigger_auto_fill()
+            # 登录表单可能由前端框架延迟挂载，短暂重试可保证字段最终写入。
+            QTimer.singleShot(500, self.trigger_auto_fill)
+            QTimer.singleShot(1500, self.trigger_auto_fill)
 
     def trigger_auto_fill(self):
         host = self.browser.url().host().lower()
@@ -455,36 +555,57 @@ class YunKaoExtractorApp(QMainWindow):
             self.overlay.lbl_key_status.setToolTip("当前页面不是可信的融智云考域名，已跳过自动填充")
             return
 
-        pwd = keyring.get_password(SERVICE_NAME, f"{HARDCODED_SCHOOL_CODE}_{self.current_user}")
+        try:
+            pwd = keyring.get_password(
+                SERVICE_NAME,
+                f"{HARDCODED_SCHOOL_CODE}_{self.current_user}",
+            )
+        except Exception:
+            pwd = None
+
         if not pwd:
             self.overlay.lbl_key_status.setStyleSheet("color: #888888;") # 置灰
-            self.overlay.lbl_key_status.setToolTip("未找到本地存储的密码")
-            return
+            self.overlay.lbl_key_status.setToolTip("学校编码和学号将自动填写；尚未保存密码")
 
         school_code_js = json.dumps(HARDCODED_SCHOOL_CODE)
         current_user_js = json.dumps(self.current_user)
-        password_js = json.dumps(pwd)
+        password_js = json.dumps(pwd if pwd else None)
         js_code = f"""
         (function() {{
-            let inputs = document.querySelectorAll('input');
+            const schoolCode = {school_code_js};
+            const studentNumber = {current_user_js};
+            const password = {password_js};
+            const inputs = document.querySelectorAll('input');
             let filled = 0;
-            let nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+                window.HTMLInputElement.prototype,
+                "value"
+            ).set;
+
+            function fillInput(input, value) {{
+                if (value === null || value === undefined || value === '') return;
+                nativeInputValueSetter.call(input, value);
+                input.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                input.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                filled++;
+            }}
+
             inputs.forEach(inp => {{
-                let p = inp.placeholder || '';
-                if (p.includes('学校') || p.includes('机构')) {{
-                    nativeInputValueSetter.call(inp, {school_code_js});
-                    inp.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                    filled++;
+                const hint = [
+                    inp.placeholder,
+                    inp.name,
+                    inp.id,
+                    inp.autocomplete
+                ].filter(Boolean).join(' ').toLowerCase();
+
+                if (/学校|机构|school|college|org/.test(hint)) {{
+                    fillInput(inp, schoolCode);
                 }}
-                else if (p.includes('学号') || p.includes('账号') || p.includes('用户名')) {{
-                    nativeInputValueSetter.call(inp, {current_user_js});
-                    inp.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                    filled++;
+                else if (/学号|账号|用户名|student|account|username|user/.test(hint)) {{
+                    fillInput(inp, studentNumber);
                 }}
                 else if (inp.type === 'password') {{
-                    nativeInputValueSetter.call(inp, {password_js});
-                    inp.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                    filled++;
+                    fillInput(inp, password);
                 }}
             }});
             return filled;
@@ -492,8 +613,12 @@ class YunKaoExtractorApp(QMainWindow):
         """
         def on_fill(result):
             if result and result > 0:
-                self.overlay.lbl_key_status.setStyleSheet("color: #00FF00;")
-                self.overlay.set_mini_status("✅ 账号静默填充完毕", "#6A9955")
+                if pwd:
+                    self.overlay.lbl_key_status.setStyleSheet("color: #00FF00;")
+                    self.overlay.lbl_key_status.setToolTip("学校编码、学号和密码已自动填写")
+                    self.overlay.set_mini_status("✅ 登录信息自动填写完毕", "#6A9955")
+                else:
+                    self.overlay.set_mini_status("✅ 学校编码和学号已自动填写", "#6A9955")
         
         self.browser.page().runJavaScript(js_code, 0, on_fill)
 
@@ -555,7 +680,13 @@ class YunKaoExtractorApp(QMainWindow):
         self.progress_dialog.show()
         self.overlay.set_mini_status("📄 正在准备导出...", "#D83B01")
         
-        self.export_thread = ExportThread(self.extracted_questions, file_path, filter)
+        include_answers = not self.config.get("export_without_answers", False)
+        self.export_thread = ExportThread(
+            self.extracted_questions,
+            file_path,
+            filter,
+            include_answers=include_answers,
+        )
         self.export_thread.progress.connect(self._on_export_progress)
         self.export_thread.finished.connect(self._on_export_finished)
         self.export_thread.start()
@@ -715,7 +846,7 @@ class YunKaoExtractorApp(QMainWindow):
                     f"进度: {page_info} (已存 {len(self.extracted_questions)} 题)"
                     if page_info else f"进度: 已存 {len(self.extracted_questions)} 题"
                 )
-                self.overlay.lbl_progress.setText(prog_text)
+                self.overlay.set_progress_text(prog_text)
                 self.overlay.set_mini_status(
                     f"✅ 解析成功: {parsed_question.get('title', '')[:10]}...",
                     "#6A9955",
