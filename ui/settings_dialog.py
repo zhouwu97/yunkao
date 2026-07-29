@@ -8,6 +8,7 @@ import json
 import os
 import keyring
 from config.settings import load_config, save_config, SERVICE_NAME, HARDCODED_SCHOOL_CODE
+from config.version import APP_RELEASE
 from ui.widgets import NoWheelComboBox, ToggleSwitch
 from ui.theme import SETTINGS_DIALOG_STYLE
 
@@ -59,7 +60,7 @@ class SettingsDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("融智云考助手 · 设置")
+        self.setWindowTitle(f"融智云考助手 · 设置 · {APP_RELEASE}")
         self.setMinimumSize(760, 560)
         self.resize(860, 620)
         self.setStyleSheet(SETTINGS_DIALOG_STYLE)
@@ -90,10 +91,10 @@ class SettingsDialog(QDialog):
 
         brand_title = QLabel("融智云考助手")
         brand_title.setObjectName("brandTitle")
-        brand_subtitle = QLabel("本地设置")
-        brand_subtitle.setObjectName("brandSubtitle")
+        self.lbl_brand_subtitle = QLabel(f"本地设置 · {APP_RELEASE}")
+        self.lbl_brand_subtitle.setObjectName("brandSubtitle")
         sidebar_layout.addWidget(brand_title, 0, Qt.AlignHCenter)
-        sidebar_layout.addWidget(brand_subtitle, 0, Qt.AlignHCenter)
+        sidebar_layout.addWidget(self.lbl_brand_subtitle, 0, Qt.AlignHCenter)
         sidebar_layout.addSpacing(24)
 
         self.nav_group = QButtonGroup(self)

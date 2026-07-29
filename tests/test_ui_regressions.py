@@ -18,6 +18,7 @@ from PySide6.QtWidgets import QApplication, QLineEdit
 
 from config import settings as config_settings
 from config.settings import HARDCODED_SCHOOL_CODE
+from config.version import APP_RELEASE, APP_VERSION, APP_VERSION_TUPLE
 from modules.ai_answer import infer_answer_with_ai
 from modules.exporter import (
     export_to_docx,
@@ -86,6 +87,8 @@ class UiRegressionTests(unittest.TestCase):
         self.assertFalse(window.overlay.btn_export.isHidden())
         self.assertEqual(window.overlay.btn_toggle.objectName(), "btn_primary")
         self.assertEqual(window.overlay.btn_export.objectName(), "btn_export")
+        self.assertIn(APP_RELEASE, window.windowTitle())
+        self.assertIn(APP_RELEASE, window.overlay.lbl_title.text())
 
         window.extracted_questions.append({"title": "测试题"})
         window.refresh_export_button()
@@ -95,6 +98,21 @@ class UiRegressionTests(unittest.TestCase):
         self.assertFalse(window.overlay.btn_export.isEnabled())
         self.assertTrue(window.overlay.btn_toggle.property("extracting"))
         self.assertEqual(window.overlay.btn_toggle.text(), "停止提取")
+
+    def test_version_marker_is_semantic_and_visible_in_settings(self):
+        self.assertRegex(APP_VERSION, r"^\d+\.\d+\.\d+$")
+        self.assertEqual(len(APP_VERSION_TUPLE), 4)
+        self.assertEqual(APP_VERSION_TUPLE[-1], 0)
+
+        with (
+            patch("ui.settings_dialog.load_config", return_value={}),
+            patch("ui.settings_dialog.keyring.get_password", return_value=None),
+        ):
+            dialog = SettingsDialog()
+            self.addCleanup(dialog.close)
+
+        self.assertIn(APP_RELEASE, dialog.windowTitle())
+        self.assertIn(APP_RELEASE, dialog.lbl_brand_subtitle.text())
 
     def test_overlay_expands_to_show_the_complete_action_row(self):
         window = self.create_window()

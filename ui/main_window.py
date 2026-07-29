@@ -16,6 +16,7 @@ from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtCore import QUrl, Qt, QFile, QTimer, QPoint, QThread, Signal
 
 from config.settings import SERVICE_NAME, HARDCODED_SCHOOL_CODE, load_config, save_config
+from config.version import APP_RELEASE
 from modules.ai_answer import infer_answer_with_ai, should_use_ai, is_placeholder_answer
 from modules.js_bridge import ExtractorBridge
 from modules.exporter import export_to_markdown, export_to_txt
@@ -136,7 +137,7 @@ class TampermonkeyFloatingWindow(QFrame):
         # 顶部标题区
         title_layout = QHBoxLayout()
         title_layout.setSpacing(5)
-        self.lbl_title = QLabel("融智云考助手")
+        self.lbl_title = QLabel(f"融智云考助手 · {APP_RELEASE}")
         self.lbl_title.setObjectName("overlayTitle")
         
         self.lbl_key_status = QLabel("●")
@@ -341,7 +342,9 @@ class YunKaoExtractorApp(QMainWindow):
         self.config = load_config()
 
         nickname = user_data.get('nickname', current_user)
-        self.setWindowTitle(f"融智云考题库导出助手 - 免费使用 · 禁止倒卖 - {nickname}")
+        self.setWindowTitle(
+            f"融智云考题库导出助手 {APP_RELEASE} - 免费使用 · 禁止倒卖 - {nickname}"
+        )
         self.resize(1300, 850)
 
         # 100% 铺满的浏览器组件

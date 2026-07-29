@@ -80,10 +80,15 @@ if getattr(sys, 'frozen', False):
 
 from PySide6.QtWidgets import QApplication
 from config.settings import load_config, save_config
+from config.version import APP_NAME, APP_VERSION
 from ui.main_window import YunKaoExtractorApp
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    app.setApplicationName(APP_NAME)
+    app.setApplicationDisplayName(APP_NAME)
+    app.setApplicationVersion(APP_VERSION)
+    app.setOrganizationName("zhouwu97")
     
     cfg = load_config()
     current_user = cfg.get("yunkao_user") or cfg.get("user") or "local_user"
