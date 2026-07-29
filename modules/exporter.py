@@ -129,7 +129,8 @@ def export_to_markdown(questions, file_path, include_answers=True):
                 analysis = normalize_ai_content(q['analysis'], q.get("analysis_source"))
                 f.write(f"\n**{analysis_title}**\n{analysis}\n")
                 
-            f.write("\n---\n\n")
+            # 练习版依靠作答线和自然留白分隔题目，避免打印出突兀的黑色横线。
+            f.write("\n---\n\n" if include_answers else "\n\n")
 
 def export_to_txt(questions, file_path, include_answers=True):
     with open(file_path, 'w', encoding='utf-8') as f:
@@ -154,7 +155,10 @@ def export_to_txt(questions, file_path, include_answers=True):
                 ana_txt = re.sub(r'!\[[^\]]*\]\((?:[^)(]+|\([^)(]*\))*\)', '[图片]', analysis)
                 f.write(f"  {get_export_label(q, 'analysis')}: {ana_txt}\n")
                 
-            f.write("\n" + "-"*30 + "\n\n")
+            if include_answers:
+                f.write("\n" + "-"*30 + "\n\n")
+            else:
+                f.write("\n\n")
 
 def export_to_docx(questions, file_path, progress_callback=None, watermark=True,
                    include_answers=True):
@@ -420,10 +424,13 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True,
         label_run.font.size = Pt(9)
         label_run.font.color.rgb = RGBColor(80, 96, 112)
 
-        for _ in range(get_practice_line_count(question)):
+        line_count = get_practice_line_count(question)
+        for line_index in range(line_count):
             line = doc.add_paragraph()
             line.paragraph_format.space_before = Pt(0)
-            line.paragraph_format.space_after = Pt(2)
+            line.paragraph_format.space_after = Pt(
+                8 if line_index == line_count - 1 else 2
+            )
             line.paragraph_format.line_spacing_rule = WD_LINE_SPACING.EXACTLY
             line.paragraph_format.line_spacing = Pt(17)
 
@@ -487,7 +494,8 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True,
             analysis = normalize_ai_content(q['analysis'], q.get("analysis_source"))
             add_rich_text_to_paragraph(p_ana, analysis)
             
-        doc.add_paragraph("-" * 40)
+        if include_answers:
+            doc.add_paragraph("-" * 40)
 
     # 正文提示仅在文档开头出现一次；页内保护交给低透明度斜向水印，
     # 避免重复提示挤占题目和手写作答空间。

@@ -293,7 +293,10 @@ class UiRegressionTests(unittest.TestCase):
             export_to_txt(questions, txt_path, include_answers=False)
 
             document = Document(docx_path)
-            docx_text = "\n".join(paragraph.text for paragraph in document.paragraphs)
+            docx_paragraphs = [
+                paragraph.text for paragraph in document.paragraphs
+            ]
+            docx_text = "\n".join(docx_paragraphs)
             with open(markdown_path, "r", encoding="utf-8") as handle:
                 markdown_text = handle.read()
             with open(txt_path, "r", encoding="utf-8") as handle:
@@ -309,6 +312,9 @@ class UiRegressionTests(unittest.TestCase):
         self.assertIn("题库练习版", txt_text)
         self.assertEqual(markdown_text.count("> ___"), 4)
         self.assertEqual(txt_text.count("  ___"), 4)
+        self.assertNotIn("-" * 40, docx_paragraphs)
+        self.assertNotIn("\n---\n", markdown_text)
+        self.assertNotIn("-" * 30, txt_text)
 
     def test_docx_anti_resale_notice_only_appears_once(self):
         from docx import Document
@@ -338,6 +344,10 @@ class UiRegressionTests(unittest.TestCase):
 
     def test_practice_mode_toggle_updates_persisted_config(self):
         window = self.create_window()
+        window.config["export_without_answers"] = False
+        window.overlay.chk_practice_export.blockSignals(True)
+        window.overlay.chk_practice_export.setChecked(False)
+        window.overlay.chk_practice_export.blockSignals(False)
 
         with patch("ui.main_window.save_config") as save_config:
             window.overlay.chk_practice_export.setChecked(True)
