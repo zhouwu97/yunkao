@@ -78,7 +78,8 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         await _startGate.WaitAsync().ConfigureAwait(true);
         try
         {
-            if (_session.Status is ExtractionStatus.Running or ExtractionStatus.Paused) return;
+            if (_session.Status == ExtractionStatus.Running
+                || (_session.Status == ExtractionStatus.Paused && !_restoredSessionPending)) return;
             _extractionCancellation?.Dispose();
             _aiCancellation?.Dispose();
             _extractionCancellation = new CancellationTokenSource();
@@ -136,6 +137,11 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         }
         else if (_session.Status == ExtractionStatus.Paused)
         {
+            if (_restoredSessionPending)
+            {
+                Track(StartAsync());
+                return;
+            }
             _session.Resume();
             _events.Add("已继续：读取当前题");
             QueueCurrentQuestion();

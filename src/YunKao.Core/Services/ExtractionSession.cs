@@ -275,7 +275,7 @@ public sealed class ExtractionSession
                 _seenKeys.Add(QuestionKeyBuilder.Build(clone));
                 LastQuestionMarker = clone.Marker;
             }
-            Status = ExtractionStatus.Idle;
+            Status = ExtractionStatus.Paused;
         }
 
         RaiseChanged();
@@ -286,7 +286,7 @@ public sealed class ExtractionSession
     {
         lock (_gate)
         {
-            if (Status != ExtractionStatus.Idle || SessionId == Guid.Empty || _questions.Count == 0) return false;
+            if (Status != ExtractionStatus.Paused || SessionId == Guid.Empty || _questions.Count == 0) return false;
             Status = ExtractionStatus.Running;
         }
 

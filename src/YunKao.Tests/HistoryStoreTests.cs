@@ -88,4 +88,21 @@ public sealed class HistoryStoreTests
             Directory.Delete(root, recursive: true);
         }
     }
+
+    [Fact]
+    public void Restored_session_starts_paused_without_advancing()
+    {
+        var source = new ExtractionSession();
+        Guid id = source.Start();
+        source.TryAddQuestion(id, new Question { Title = "恢复题", Marker = "marker-1" });
+        source.SetProgress(1, 10, "marker-1");
+        ExtractionSessionSnapshot snapshot = source.Snapshot("恢复课程");
+
+        var restored = new ExtractionSession();
+        Assert.True(restored.Restore(snapshot));
+        Assert.Equal(ExtractionStatus.Paused, restored.Status);
+        Assert.Equal(1, restored.SavedCount);
+        Assert.Equal(1, restored.Current);
+        Assert.Equal("marker-1", restored.LastQuestionMarker);
+    }
 }
