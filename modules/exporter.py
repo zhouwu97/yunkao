@@ -8,6 +8,7 @@ PDF_PROTECTION_MODE = "normal"  # normal / flatten
 PDF_FLATTEN_DPI = 130
 
 SCORE_MARKER_PATTERN = re.compile(r"[ \t\u00a0]{2,}([（(]?\d+\s*分[）)]?)")
+LEGACY_AI_SUFFIX_PATTERN = re.compile(r"\s*[（(]AI\s*生成[）)]\s*$", re.IGNORECASE)
 
 
 
@@ -61,31 +62,79 @@ def calculate_contained_image_size(width_px, height_px, requested_width_pt=None,
     return width_pt * scale, height_pt * scale
 
 
-def export_to_markdown(questions, file_path):
+def get_export_label(question, content_type):
+    """根据内容来源生成统一标签，确保各导出格式能识别 AI 内容。"""
+    if content_type == "answer":
+        label = "答案"
+        source = question.get("answer_source")
+    else:
+        label = "解析"
+        source = question.get("analysis_source")
+
+    if source != "ai":
+        return f"[{label}]"
+
+    confidence = question.get("answer_confidence") if content_type == "answer" else None
+    if isinstance(confidence, (int, float)):
+        return f"[{label} · AI生成 | 置信度 {confidence:.2f}]"
+    return f"[{label} · AI生成]"
+
+
+def normalize_ai_content(text, source):
+    """移除旧数据中的尾注，避免与结构化 AI 标签重复。"""
+    if source == "ai":
+        return LEGACY_AI_SUFFIX_PATTERN.sub("", text)
+    return text
+
+
+def get_practice_line_count(question):
+    """按题型返回紧凑作答行数，避免练习版出现过多空白。"""
+    question_type = str(question.get("question_type", "") or "")
+    compact_keywords = ("选择", "判断", "填空")
+    if any(keyword in question_type for keyword in compact_keywords):
+        return 1
+    if question.get("options"):
+        return 1
+    return 3
+
+
+def _write_markdown_practice_area(file_handle, question):
+    file_handle.write("\n**作答区**\n")
+    for _ in range(get_practice_line_count(question)):
+        file_handle.write("> ________________________________________________\n")
+
+
+def _write_txt_practice_area(file_handle, question):
+    file_handle.write("\n  [作答区]\n")
+    for _ in range(get_practice_line_count(question)):
+        file_handle.write("  ________________________________________________\n")
+
+
+def export_to_markdown(questions, file_path, include_answers=True):
     with open(file_path, 'w', encoding='utf-8') as f:
-        f.write("# 题库导出\n\n")
+        title = "题库导出" if include_answers else "题库练习版"
+        f.write(f"# {title}\n\n")
         for i, q in enumerate(questions, 1):
             f.write(f"### {i}. {q['title']}\n\n")
             for opt in q['options']:
                 f.write(f"- {opt}\n")
             
-            if q.get('answer'):
-                answer_title = "[答案]"
-                if q.get("answer_source") == "ai":
-                    confidence = q.get("answer_confidence")
-                    if isinstance(confidence, (int, float)):
-                        answer_title = f"[AI推测答案 | 置信度 {confidence:.2f}]"
-                    else:
-                        answer_title = "[AI推测答案]"
+            if not include_answers:
+                _write_markdown_practice_area(f, q)
+            elif q.get('answer'):
+                answer_title = get_export_label(q, "answer")
                 f.write(f"\n**{answer_title}**\n{q['answer']}\n")
-            if q.get('analysis'):
-                f.write(f"\n**[解析]**\n{q['analysis']}\n")
+            if include_answers and q.get('analysis'):
+                analysis_title = get_export_label(q, "analysis")
+                analysis = normalize_ai_content(q['analysis'], q.get("analysis_source"))
+                f.write(f"\n**{analysis_title}**\n{analysis}\n")
                 
-            f.write("\n---\n\n")
+            # 练习版依靠作答线和自然留白分隔题目，避免打印出突兀的黑色横线。
+            f.write("\n---\n\n" if include_answers else "\n\n")
 
-def export_to_txt(questions, file_path):
+def export_to_txt(questions, file_path, include_answers=True):
     with open(file_path, 'w', encoding='utf-8') as f:
-        f.write("题库导出\n")
+        f.write("题库导出\n" if include_answers else "题库练习版\n")
         f.write("="*30 + "\n\n")
         for i, q in enumerate(questions, 1):
             # TXT 去除图片 markdown 标记
@@ -95,23 +144,24 @@ def export_to_txt(questions, file_path):
                 opt_txt = re.sub(r'!\[[^\]]*\]\((?:[^)(]+|\([^)(]*\))*\)', '[图片]', opt)
                 f.write(f"  {opt_txt}\n")
                 
-            if q.get('answer'):
+            if not include_answers:
+                _write_txt_practice_area(f, q)
+            elif q.get('answer'):
                 ans_txt = re.sub(r'!\[[^\]]*\]\((?:[^)(]+|\([^)(]*\))*\)', '[图片]', q['answer'])
-                answer_title = "[答案]"
-                if q.get("answer_source") == "ai":
-                    confidence = q.get("answer_confidence")
-                    if isinstance(confidence, (int, float)):
-                        answer_title = f"[AI推测答案|置信度{confidence:.2f}]"
-                    else:
-                        answer_title = "[AI推测答案]"
+                answer_title = get_export_label(q, "answer")
                 f.write(f"\n  {answer_title}: {ans_txt}\n")
-            if q.get('analysis'):
-                ana_txt = re.sub(r'!\[[^\]]*\]\((?:[^)(]+|\([^)(]*\))*\)', '[图片]', q['analysis'])
-                f.write(f"  [解析]: {ana_txt}\n")
+            if include_answers and q.get('analysis'):
+                analysis = normalize_ai_content(q['analysis'], q.get("analysis_source"))
+                ana_txt = re.sub(r'!\[[^\]]*\]\((?:[^)(]+|\([^)(]*\))*\)', '[图片]', analysis)
+                f.write(f"  {get_export_label(q, 'analysis')}: {ana_txt}\n")
                 
-            f.write("\n" + "-"*30 + "\n\n")
+            if include_answers:
+                f.write("\n" + "-"*30 + "\n\n")
+            else:
+                f.write("\n\n")
 
-def export_to_docx(questions, file_path, progress_callback=None, watermark=True):
+def export_to_docx(questions, file_path, progress_callback=None, watermark=True,
+                   include_answers=True):
     try:
         from docx import Document
         from docx.shared import Pt, RGBColor, Inches
@@ -362,6 +412,38 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
         if text_after:
             current_p.add_run(normalize_export_text_run(text_after))
 
+    def add_practice_area(question):
+        """使用浅色书写线生成克制的练习作答区。"""
+        from docx.enum.text import WD_LINE_SPACING
+
+        label = doc.add_paragraph()
+        label.paragraph_format.space_before = Pt(3)
+        label.paragraph_format.space_after = Pt(1)
+        label_run = label.add_run("作答区")
+        label_run.bold = True
+        label_run.font.size = Pt(9)
+        label_run.font.color.rgb = RGBColor(80, 96, 112)
+
+        line_count = get_practice_line_count(question)
+        for line_index in range(line_count):
+            line = doc.add_paragraph()
+            line.paragraph_format.space_before = Pt(0)
+            line.paragraph_format.space_after = Pt(
+                8 if line_index == line_count - 1 else 2
+            )
+            line.paragraph_format.line_spacing_rule = WD_LINE_SPACING.EXACTLY
+            line.paragraph_format.line_spacing = Pt(17)
+
+            paragraph_properties = line._p.get_or_add_pPr()
+            borders = OxmlElement("w:pBdr")
+            bottom = OxmlElement("w:bottom")
+            bottom.set(qn("w:val"), "single")
+            bottom.set(qn("w:sz"), "4")
+            bottom.set(qn("w:space"), "1")
+            bottom.set(qn("w:color"), "C8D2DE")
+            borders.append(bottom)
+            paragraph_properties.append(borders)
+
     doc = Document()
     
     # 强制全局使用宋体，避免 WPS 在包含图片的段落中因为渲染路径不同导致字体发粗（假黑体）的 Bug
@@ -371,7 +453,8 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
     style._element.rPr.rFonts.set(qn('w:eastAsia'), '宋体')
     
     # 设置标题
-    heading = doc.add_heading('融智云考题库导出', 0)
+    document_title = "融智云考题库导出" if include_answers else "融智云考题库练习版"
+    heading = doc.add_heading(document_title, 0)
     heading.alignment = 1 # 居中
     
     # 开头添加防诈骗提示
@@ -382,7 +465,6 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
     run_scam_start.font.color.rgb = RGBColor(255, 0, 0)
     
     total = len(questions)
-    mid_point = total // 2
     for i, q in enumerate(questions, 1):
         if progress_callback:
             progress_callback(i, total, f"正在处理第 {i}/{total} 题，渲染图片公式中...")
@@ -396,42 +478,27 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
             add_rich_text_to_paragraph(p_opt, opt)
             
         # 答案
-        if q.get('answer'):
+        if not include_answers:
+            add_practice_area(q)
+        elif q.get('answer'):
             p_ans = doc.add_paragraph()
-            run = p_ans.add_run("[答案]: ")
+            run = p_ans.add_run(f"{get_export_label(q, 'answer')}: ")
             run.font.color.rgb = RGBColor(0, 112, 192) # 蓝色
             add_rich_text_to_paragraph(p_ans, q['answer'])
             
         # 解析
-        if q.get('analysis'):
+        if include_answers and q.get('analysis'):
             p_ana = doc.add_paragraph()
-            run = p_ana.add_run("[解析]: ")
+            run = p_ana.add_run(f"{get_export_label(q, 'analysis')}: ")
             run.font.color.rgb = RGBColor(237, 125, 49) # 橙色
-            add_rich_text_to_paragraph(p_ana, q['analysis'])
+            analysis = normalize_ai_content(q['analysis'], q.get("analysis_source"))
+            add_rich_text_to_paragraph(p_ana, analysis)
             
-        doc.add_paragraph("-" * 40)
-        
-        import random
-        # 题库中间添加防诈骗提示
-        if i == mid_point and total > 1:
-            p_scam_mid = doc.add_paragraph()
-            p_scam_mid.alignment = 1
-            run_scam_mid = p_scam_mid.add_run(anti_scam_text)
-            run_scam_mid.font.color.rgb = RGBColor(255, 0, 0)
-            doc.add_paragraph("-" * 40)
-        # 随机插入黑色提示防倒卖（约15%概率，避免和首尾以及中间冲突）
-        elif total > 5 and i != total and random.random() < 0.15:
-            p_scam_rand = doc.add_paragraph()
-            p_scam_rand.alignment = 1
-            run_scam_rand = p_scam_rand.add_run(anti_scam_text)
-            run_scam_rand.font.color.rgb = RGBColor(0, 0, 0)
+        if include_answers:
             doc.add_paragraph("-" * 40)
 
-    # 结尾添加防诈骗提示
-    p_scam_end = doc.add_paragraph()
-    p_scam_end.alignment = 1
-    run_scam_end = p_scam_end.add_run(anti_scam_text)
-    run_scam_end.font.color.rgb = RGBColor(255, 0, 0)
+    # 正文提示仅在文档开头出现一次；页内保护交给低透明度斜向水印，
+    # 避免重复提示挤占题目和手写作答空间。
         
     # 添加全页水印
     from docx.oxml import parse_xml
@@ -457,7 +524,7 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True)
         
     doc.save(file_path)
 
-def export_to_pdf(questions, file_path, progress_callback=None):
+def export_to_pdf(questions, file_path, progress_callback=None, include_answers=True):
     import os
     import shutil
     import tempfile
@@ -474,7 +541,13 @@ def export_to_pdf(questions, file_path, progress_callback=None):
             pass
     
     try:
-        export_to_docx(questions, temp_docx, progress_callback, watermark=False)
+        export_to_docx(
+            questions,
+            temp_docx,
+            progress_callback,
+            watermark=False,
+            include_answers=include_answers,
+        )
         if progress_callback:
             progress_callback(len(questions), len(questions), "正在启动 Office 引擎生成 PDF (兼容 WPS)...")
             

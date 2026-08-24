@@ -1,0 +1,922 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>题库助手 · 工作台预览</title>
+  <style>
+    :root {
+      --bg: #f7faff;
+      --surface: rgba(255, 255, 255, .78);
+      --surface-strong: rgba(255, 255, 255, .94);
+      --surface-soft: #fbfdff;
+      --ink: #26344c;
+      --ink-strong: #1d2a40;
+      --muted: #718098;
+      --muted-light: #9aa9bc;
+      --line: #e3ebf5;
+      --line-strong: #d4e1ef;
+      --blue: #2778e6;
+      --blue-dark: #1f65c5;
+      --blue-soft: #eef5ff;
+      --mint: #20aa78;
+      --mint-soft: #edf9f4;
+      --lavender: #816de4;
+      --lavender-soft: #f2f0ff;
+      --orange: #e69a42;
+      --orange-soft: #fff7eb;
+      --danger: #d76969;
+      --radius-lg: 16px;
+      --radius-md: 12px;
+      --radius-sm: 9px;
+      --shadow-soft: 0 12px 34px rgba(45, 85, 125, .08);
+      --shadow-float: 0 18px 48px rgba(34, 65, 102, .16);
+      --font: "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: transparent;
+      font-family: var(--font);
+      font-size: 14px;
+      letter-spacing: .01em;
+      overflow-x: hidden;
+    }
+
+    body::before,
+    body::after {
+      position: fixed;
+      z-index: -1;
+      width: 340px;
+      height: 340px;
+      border-radius: 50%;
+      content: "";
+      filter: blur(72px);
+      opacity: .42;
+      pointer-events: none;
+    }
+    body::before { top: -160px; right: 10%; background: #dcecff; }
+    body::after { bottom: -190px; left: 14%; background: #e4f7ef; }
+
+    button, input { font: inherit; }
+    button { cursor: pointer; }
+    button:focus-visible, input:focus-visible {
+      outline: 3px solid rgba(39, 120, 230, .22);
+      outline-offset: 2px;
+    }
+
+    .background-layer {
+      position: fixed;
+      z-index: -2;
+      inset: 0;
+      overflow: hidden;
+      background: transparent;
+      pointer-events: none;
+    }
+    .background-layer::before,
+    .background-layer::after {
+      position: absolute;
+      width: 420px;
+      height: 420px;
+      border-radius: 50%;
+      content: "";
+      filter: blur(64px);
+      opacity: .26;
+    }
+    .background-layer::before { top: -140px; right: 14%; background: #d9eaff; }
+    .background-layer::after { bottom: -170px; left: 18%; background: #dff5eb; }
+    .background-orb {
+      position: absolute;
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      filter: blur(58px);
+      opacity: .18;
+    }
+    .background-orb.blue { top: 34%; left: 31%; background: #e3efff; }
+    .background-orb.lilac { right: -100px; bottom: 14%; background: #eeeaff; }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: 226px minmax(0, 1fr);
+      min-height: calc(100vh - 32px);
+      margin: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, .66);
+      border-radius: 24px;
+      background: rgba(255, 255, 255, .28);
+      box-shadow: 0 24px 70px rgba(68, 100, 133, .14);
+      backdrop-filter: blur(30px) saturate(125%);
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      padding: 28px 18px 20px;
+      border-right: 1px solid rgba(211, 225, 239, .82);
+      background: rgba(255, 255, 255, .34);
+      backdrop-filter: blur(30px) saturate(125%);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 0 10px;
+      color: var(--ink-strong);
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -.03em;
+    }
+    .brand-mark {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      color: var(--blue);
+      border: 1px solid #cfe0f5;
+      border-radius: 10px;
+      background: linear-gradient(145deg, #f4f9ff, #eaf3ff);
+    }
+    .brand-subtitle {
+      margin: 5px 0 0 56px;
+      color: var(--muted-light);
+      font-size: 11px;
+    }
+
+    .sidebar-search,
+    .command-trigger {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, .72);
+      color: var(--muted);
+      transition: border-color .18s ease, background .18s ease;
+    }
+    .sidebar-search {
+      margin: 28px 0 18px;
+      padding: 9px 10px;
+      text-align: left;
+      font-size: 12px;
+    }
+    .sidebar-search:hover,
+    .command-trigger:hover { border-color: #bcd4ef; background: #fff; }
+    .search-copy { display: flex; align-items: center; gap: 7px; }
+    kbd {
+      padding: 2px 6px;
+      border: 1px solid #dbe6f2;
+      border-radius: 5px;
+      background: #f7faff;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.3;
+    }
+
+    .nav { display: grid; gap: 5px; }
+    .nav-button {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      background: transparent;
+      color: #5f6f86;
+      text-align: left;
+      transition: color .18s ease, background .18s ease, border-color .18s ease;
+    }
+    .nav-button:hover { background: rgba(238, 245, 255, .72); color: var(--blue); }
+    .nav-button.is-active {
+      border-color: #d8e7fb;
+      background: #eef5ff;
+      color: var(--blue);
+      font-weight: 700;
+    }
+    .nav-icon { display: grid; width: 20px; height: 20px; place-items: center; }
+
+    .sidebar-footer { margin-top: auto; }
+    .profile-card {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, .66);
+    }
+    .avatar {
+      display: grid;
+      width: 32px;
+      height: 32px;
+      flex: 0 0 auto;
+      place-items: center;
+      border-radius: 50%;
+      background: #e7f1ff;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .profile-name { color: var(--ink-strong); font-size: 12px; font-weight: 700; }
+    .profile-meta { margin-top: 3px; color: var(--muted-light); font-size: 10px; }
+    .profile-arrow { margin-left: auto; color: var(--muted-light); }
+
+    .main {
+      min-width: 0;
+      padding: 24px 28px 36px;
+    }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      min-height: 30px;
+    }
+    .topbar-button {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      border: 1px solid transparent;
+      border-radius: 10px;
+      background: transparent;
+      color: #6a7b92;
+    }
+    .topbar-button:hover { border-color: var(--line); background: #fff; color: var(--blue); }
+    .page-header {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      margin: 10px 0 24px;
+    }
+    h1, h2, h3, p { margin: 0; }
+    h1 { color: var(--ink-strong); font-size: clamp(24px, 2.2vw, 32px); line-height: 1.2; letter-spacing: -.04em; }
+    .page-description { margin-top: 8px; color: var(--muted); font-size: 13px; }
+    .page-date { color: var(--muted-light); font-size: 12px; white-space: nowrap; }
+
+    .glass-panel {
+      border: 1px solid rgba(216, 229, 242, .94);
+      border-radius: var(--radius-lg);
+      background: rgba(255, 255, 255, .68);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(24px) saturate(130%);
+    }
+
+    .status-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      min-height: 88px;
+      padding: 18px 22px;
+      border-color: #c9eee0;
+      background: rgba(245, 253, 250, .78);
+    }
+    .status-main { display: flex; align-items: center; gap: 13px; }
+    .status-dot {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      background: #e2f8ef;
+      color: var(--mint);
+    }
+    .status-title { color: #178762; font-size: 18px; font-weight: 700; }
+    .status-copy { margin-top: 4px; color: #669986; font-size: 12px; }
+    .text-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 11px;
+      border: 1px solid #cfe5dd;
+      border-radius: 9px;
+      background: rgba(255, 255, 255, .66);
+      color: #408a73;
+      font-size: 12px;
+    }
+    .text-button:hover { border-color: #a6d8c8; background: #fff; }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .metric-card { padding: 17px 17px 15px; }
+    .metric-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .metric-icon {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      border-radius: 11px;
+      background: var(--blue-soft);
+      color: var(--blue);
+    }
+    .metric-card:nth-child(2) .metric-icon { background: var(--mint-soft); color: var(--mint); }
+    .metric-card:nth-child(3) .metric-icon { background: var(--lavender-soft); color: var(--lavender); }
+    .metric-card:nth-child(4) .metric-icon { background: #f0f6ff; color: #4989df; }
+    .metric-label { color: var(--muted); font-size: 12px; }
+    .metric-value { margin-top: 11px; color: var(--ink-strong); font-size: 24px; font-weight: 700; letter-spacing: -.03em; }
+    .metric-value span { margin-left: 3px; color: var(--muted); font-size: 12px; font-weight: 400; }
+    .metric-note { margin-top: 6px; color: var(--muted-light); font-size: 11px; }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 274px;
+      gap: 14px;
+      margin-top: 14px;
+    }
+    .left-stack, .right-stack { display: grid; align-content: start; gap: 14px; min-width: 0; }
+    .panel-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 17px 18px 0;
+    }
+    .panel-heading h2 { color: var(--ink-strong); font-size: 15px; }
+    .panel-meta { color: var(--muted-light); font-size: 11px; }
+
+    .progress-panel { overflow: hidden; }
+    .progress-content {
+      display: grid;
+      grid-template-columns: 120px minmax(0, 1fr);
+      gap: 22px;
+      align-items: center;
+      padding: 20px 20px 21px;
+    }
+    .ring {
+      display: grid;
+      width: 112px;
+      height: 112px;
+      place-items: center;
+      border-radius: 50%;
+      background: conic-gradient(var(--blue) calc(var(--progress) * 1%), #e9eff6 0);
+      position: relative;
+    }
+    .ring::before {
+      position: absolute;
+      inset: 9px;
+      border-radius: 50%;
+      background: #fff;
+      content: "";
+    }
+    .ring-copy { position: relative; text-align: center; }
+    .ring-value { color: var(--ink-strong); font-size: 24px; font-weight: 700; }
+    .ring-label { margin-top: 1px; color: var(--muted); font-size: 11px; }
+    .progress-file { color: var(--ink-strong); font-size: 15px; font-weight: 700; }
+    .progress-caption { margin-top: 6px; color: var(--muted); font-size: 12px; }
+    .progress-track { height: 8px; margin-top: 17px; overflow: hidden; border-radius: 99px; background: #eaf0f6; }
+    .progress-fill { width: 45%; height: 100%; border-radius: inherit; background: var(--blue); transition: width .36s ease; }
+    .progress-meta { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; color: var(--muted-light); font-size: 11px; }
+    .pipeline { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 19px; }
+    .pipeline-item { position: relative; text-align: center; }
+    .pipeline-item:not(:last-child)::after {
+      position: absolute;
+      top: 12px;
+      left: calc(50% + 18px);
+      width: calc(100% - 28px);
+      border-top: 1px dashed #d9e4ef;
+      content: "";
+    }
+    .pipeline-icon {
+      display: grid;
+      width: 26px;
+      height: 26px;
+      margin: 0 auto 6px;
+      place-items: center;
+      border: 1px solid #dce7f1;
+      border-radius: 8px;
+      background: #f8fbff;
+      color: var(--muted);
+    }
+    .pipeline-item.is-done .pipeline-icon { border-color: #bde9d8; background: var(--mint-soft); color: var(--mint); }
+    .pipeline-item.is-active .pipeline-icon { border-color: #bcd7fb; background: var(--blue-soft); color: var(--blue); }
+    .pipeline-name { color: var(--ink); font-size: 11px; font-weight: 600; }
+    .pipeline-status { margin-top: 3px; color: var(--muted-light); font-size: 10px; }
+
+    .recent-panel { overflow: hidden; }
+    .table-wrap { overflow-x: auto; padding: 13px 17px 9px; }
+    table { width: 100%; border-collapse: collapse; min-width: 610px; }
+    th, td { padding: 10px 7px; border-bottom: 1px solid #edf2f7; text-align: left; white-space: nowrap; }
+    th { color: var(--muted-light); font-size: 11px; font-weight: 500; }
+    td { color: #56667e; font-size: 12px; }
+    tbody tr:last-child td { border-bottom: 0; }
+    tbody tr:hover { background: #fbfdff; }
+    .file-cell { display: flex; align-items: center; gap: 8px; color: var(--ink); font-weight: 600; }
+    .file-icon { color: #ea7676; }
+    .file-icon.word { color: #518bd7; }
+    .status-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 99px; background: var(--mint-soft); color: var(--mint); font-size: 10px; }
+    .status-badge.partial { background: var(--blue-soft); color: var(--blue); }
+    .table-action { padding: 4px 0; border: 0; background: transparent; color: var(--blue); font-size: 11px; }
+    .table-action:hover { color: var(--blue-dark); text-decoration: underline; }
+    .panel-footer { padding: 0 18px 15px; text-align: right; }
+
+    .quick-panel { padding-bottom: 17px; }
+    .quick-list { display: grid; gap: 9px; padding: 17px; }
+    .primary-action, .secondary-action {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      width: 100%;
+      border-radius: 10px;
+      transition: transform .16s ease, box-shadow .16s ease, background .16s ease;
+    }
+    .primary-action {
+      padding: 14px 15px;
+      border: 1px solid var(--blue);
+      background: var(--blue);
+      color: #fff;
+      box-shadow: 0 8px 16px rgba(39, 120, 230, .16);
+    }
+    .primary-action:hover { transform: translateY(-1px); background: var(--blue-dark); box-shadow: 0 10px 20px rgba(39, 120, 230, .22); }
+    .secondary-action { padding: 11px 13px; border: 1px solid #cfe0f2; background: rgba(255, 255, 255, .72); color: var(--blue); }
+    .secondary-action:hover { border-color: #a9c8ed; background: #fff; }
+    .action-copy { display: flex; align-items: center; gap: 9px; }
+    .action-title { display: block; font-size: 13px; font-weight: 700; }
+    .action-caption { display: block; margin-top: 3px; color: rgba(255,255,255,.72); font-size: 10px; }
+    .secondary-action .action-caption { color: var(--muted-light); }
+    .action-arrow { opacity: .75; }
+    .format-note { padding: 0 17px; color: var(--muted-light); font-size: 10px; line-height: 1.7; }
+    .format-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .format-chip { padding: 4px 7px; border: 1px solid var(--line); border-radius: 6px; background: #fbfdff; color: var(--muted); font-size: 10px; }
+
+    .tip-panel { padding: 17px; }
+    .tip-heading { display: flex; align-items: center; gap: 8px; color: var(--ink-strong); font-size: 14px; font-weight: 700; }
+    .tip-heading .tip-icon { color: var(--lavender); }
+    .tip-list { display: grid; gap: 9px; margin: 13px 0 0; padding-left: 17px; color: var(--muted); font-size: 11px; line-height: 1.7; }
+    .tip-link { display: inline-flex; align-items: center; gap: 5px; margin-top: 14px; border: 0; background: transparent; color: var(--lavender); font-size: 11px; font-weight: 700; }
+
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      z-index: 20;
+      inset: 0;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(43, 63, 91, .16);
+      backdrop-filter: blur(5px);
+    }
+    .modal-backdrop.is-open { display: flex; }
+    .modal {
+      width: min(470px, 100%);
+      max-height: min(680px, calc(100vh - 40px));
+      overflow: auto;
+      padding: 22px;
+      border: 1px solid rgba(212, 226, 240, .94);
+      border-radius: 18px;
+      background: var(--surface-strong);
+      box-shadow: var(--shadow-float);
+      backdrop-filter: blur(24px);
+    }
+    .modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+    .modal-title { color: var(--ink-strong); font-size: 18px; font-weight: 700; }
+    .modal-subtitle { margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+    .close-button { display: grid; width: 30px; height: 30px; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--muted); }
+    .close-button:hover { color: var(--blue); border-color: #bfd5ef; }
+    .format-options { display: grid; gap: 8px; margin-top: 20px; }
+    .format-option {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 13px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--ink);
+      text-align: left;
+    }
+    .format-option:has(input:checked) { border-color: #bcd7fb; background: var(--blue-soft); }
+    .format-option input { accent-color: var(--blue); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 20px; }
+    .modal-button { padding: 9px 14px; border-radius: 9px; }
+    .modal-button.cancel { border: 1px solid var(--line); background: #fff; color: var(--muted); }
+    .modal-button.primary { border: 1px solid var(--blue); background: var(--blue); color: #fff; }
+
+    .command-modal { width: min(520px, 100%); padding: 10px; }
+    .command-input-wrap { display: flex; align-items: center; gap: 9px; padding: 9px 11px; border-bottom: 1px solid var(--line); color: var(--muted); }
+    .command-input { width: 100%; border: 0; outline: 0; background: transparent; color: var(--ink-strong); font-size: 14px; }
+    .command-list { display: grid; gap: 3px; max-height: 330px; overflow: auto; padding: 8px 0; }
+    .command-item { display: flex; align-items: center; gap: 10px; padding: 10px 11px; border: 0; border-radius: 9px; background: transparent; color: var(--ink); text-align: left; }
+    .command-item:hover, .command-item.is-highlighted { background: var(--blue-soft); color: var(--blue); }
+    .command-item small { margin-left: auto; color: var(--muted-light); }
+    .command-empty { padding: 18px; color: var(--muted); text-align: center; font-size: 12px; }
+
+    .toast {
+      position: fixed;
+      z-index: 30;
+      right: 24px;
+      bottom: 24px;
+      max-width: min(360px, calc(100vw - 48px));
+      padding: 11px 14px;
+      border: 1px solid #cfe0ef;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, .94);
+      box-shadow: var(--shadow-float);
+      color: var(--ink);
+      font-size: 12px;
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+      transition: opacity .2s ease, transform .2s ease;
+    }
+    .toast.is-visible { opacity: 1; transform: translateY(0); }
+
+    @media (max-width: 1180px) {
+      .main { padding: 22px 20px 32px; }
+      .content-grid { grid-template-columns: 1fr; }
+      .right-stack { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 780px) {
+      .app-shell { display: block; }
+      .sidebar { position: sticky; z-index: 10; top: 0; display: block; padding: 12px 14px; border-right: 0; border-bottom: 1px solid var(--line); }
+      .brand-subtitle, .sidebar-footer { display: none; }
+      .brand { display: inline-flex; }
+      .sidebar-search { display: none; }
+      .nav { display: flex; gap: 4px; margin-top: 12px; overflow-x: auto; }
+      .nav-button { width: auto; flex: 0 0 auto; padding: 8px 11px; }
+      .nav-button span:last-child { white-space: nowrap; }
+      .main { padding: 18px 14px 30px; }
+      .topbar { display: none; }
+      .page-header { display: block; margin-top: 4px; }
+      .page-date { display: block; margin-top: 8px; }
+      .status-banner { align-items: flex-start; flex-direction: column; gap: 12px; padding: 16px; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .right-stack { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 520px) {
+      .metrics { gap: 8px; }
+      .metric-card { padding: 13px; }
+      .metric-value { font-size: 20px; }
+      .progress-content { grid-template-columns: 1fr; justify-items: center; gap: 14px; text-align: center; }
+      .progress-copy { width: 100%; text-align: left; }
+      .pipeline { gap: 3px; }
+      .pipeline-name { font-size: 10px; }
+      .panel-heading { padding-left: 14px; padding-right: 14px; }
+      .table-wrap { padding-left: 10px; padding-right: 10px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="background-layer" aria-hidden="true">
+    <span class="background-orb blue"></span>
+    <span class="background-orb lilac"></span>
+  </div>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <div class="brand">
+        <span class="brand-mark" data-icon="book" aria-hidden="true"></span>
+        <span>题库助手</span>
+      </div>
+      <p class="brand-subtitle">本地题库工作台</p>
+
+      <button class="sidebar-search" type="button" data-open-command aria-label="打开快捷命令">
+        <span class="search-copy"><span data-icon="search" aria-hidden="true"></span>搜索快捷键</span>
+        <kbd>Ctrl K</kbd>
+      </button>
+
+      <nav class="nav">
+        <button class="nav-button is-active" type="button" data-nav="overview"><span class="nav-icon" data-icon="home" aria-hidden="true"></span><span>概览</span></button>
+        <button class="nav-button" type="button" data-nav="library"><span class="nav-icon" data-icon="database" aria-hidden="true"></span><span>题库</span></button>
+        <button class="nav-button" type="button" data-nav="exports"><span class="nav-icon" data-icon="export" aria-hidden="true"></span><span>导出记录</span></button>
+        <button class="nav-button" type="button" data-nav="settings"><span class="nav-icon" data-icon="settings" aria-hidden="true"></span><span>设置</span></button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="profile-card">
+          <div class="avatar">张</div>
+          <div>
+            <div class="profile-name">张老师</div>
+            <div class="profile-meta">教育机构 · 标准版</div>
+          </div>
+          <span class="profile-arrow" data-icon="chevron" aria-hidden="true"></span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="topbar" aria-label="工具栏">
+        <button class="topbar-button" type="button" aria-label="通知" data-action="notify"><span data-icon="bell" aria-hidden="true"></span></button>
+        <button class="topbar-button" type="button" aria-label="帮助" data-action="guide"><span data-icon="help" aria-hidden="true"></span></button>
+      </div>
+
+      <div class="page-header">
+        <div>
+          <h1>题库工作台</h1>
+          <p class="page-description">从文档中提取题目，整理成可复用的离线题库。</p>
+        </div>
+        <div class="page-date">今天 · 2024 年 05 月 18 日</div>
+      </div>
+
+      <section class="glass-panel status-banner" aria-live="polite">
+        <div class="status-main">
+          <div class="status-dot" data-icon="check" aria-hidden="true"></div>
+          <div>
+            <div class="status-title" id="statusTitle">上次任务已暂停</div>
+            <div class="status-copy" id="statusCopy">当前进度已保留，可以继续处理当前文档。</div>
+          </div>
+        </div>
+        <button class="text-button" type="button" data-action="guide"><span data-icon="book" aria-hidden="true"></span>查看使用指南</button>
+      </section>
+
+      <section class="metrics" aria-label="题库统计">
+        <article class="glass-panel metric-card"><div class="metric-head"><span class="metric-label">已提取</span><span class="metric-icon" data-icon="file" aria-hidden="true"></span></div><div class="metric-value" id="totalCount">3,285<span>题</span></div><div class="metric-note">累计题目总数</div></article>
+        <article class="glass-panel metric-card"><div class="metric-head"><span class="metric-label">本次新增</span><span class="metric-icon" data-icon="plus" aria-hidden="true"></span></div><div class="metric-value" id="newCount">256<span>题</span></div><div class="metric-note">较上次提取</div></article>
+        <article class="glass-panel metric-card"><div class="metric-head"><span class="metric-label">AI 待复核</span><span class="metric-icon" data-icon="bot" aria-hidden="true"></span></div><div class="metric-value" id="reviewCount">38<span>题</span></div><div class="metric-note">待人工确认</div></article>
+        <article class="glass-panel metric-card"><div class="metric-head"><span class="metric-label">导出文件</span><span class="metric-icon" data-icon="folder" aria-hidden="true"></span></div><div class="metric-value" id="exportCount">12<span>个</span></div><div class="metric-note">累计导出</div></article>
+      </section>
+
+      <div class="content-grid">
+        <div class="left-stack">
+          <section class="glass-panel progress-panel" aria-label="提取进度">
+            <div class="panel-heading"><h2>当前任务</h2><span class="panel-meta" id="taskState">已暂停 · 可继续</span></div>
+            <div class="progress-content">
+              <div class="ring" id="progressRing" style="--progress: 45"><div class="ring-copy"><div class="ring-value" id="progressValue">45%</div><div class="ring-label">已处理</div></div></div>
+              <div class="progress-copy">
+                <div class="progress-file" id="progressFile">2024 年高考数学真题（全国甲卷）.pdf</div>
+                <div class="progress-caption" id="progressCaption">识别题目并整理选项结构</div>
+                <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+                <div class="progress-meta"><span id="progressMeta">已用时 01:12　/　预计剩余 01:23</span><span id="progressPercent">45%</span></div>
+                <div class="pipeline">
+                  <div class="pipeline-item is-done"><div class="pipeline-icon" data-icon="scan" aria-hidden="true"></div><div class="pipeline-name">OCR 识别</div><div class="pipeline-status">已完成</div></div>
+                  <div class="pipeline-item is-active" id="pipelineParse"><div class="pipeline-icon" data-icon="list" aria-hidden="true"></div><div class="pipeline-name">题目解析</div><div class="pipeline-status">进行中</div></div>
+                  <div class="pipeline-item" id="pipelineStructure"><div class="pipeline-icon" data-icon="cube" aria-hidden="true"></div><div class="pipeline-name">结构化</div><div class="pipeline-status">等待中</div></div>
+                  <div class="pipeline-item" id="pipelineReview"><div class="pipeline-icon" data-icon="shield" aria-hidden="true"></div><div class="pipeline-name">AI 校验</div><div class="pipeline-status">等待中</div></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="glass-panel recent-panel" aria-label="最近提取">
+            <div class="panel-heading"><h2>最近提取</h2><span class="panel-meta">共 12 条记录</span></div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>文件名称</th><th>类型</th><th>题目数</th><th>状态</th><th>完成时间</th><th>操作</th></tr></thead>
+                <tbody id="recentTable">
+                  <tr><td><span class="file-cell"><span class="file-icon" data-icon="pdf" aria-hidden="true"></span>2024 年高考数学真题（全国甲卷）.pdf</span></td><td>高考试卷</td><td>23</td><td><span class="status-badge">● 完成</span></td><td>2024-05-18 14:32</td><td><button class="table-action" type="button" data-action="view">查看</button></td></tr>
+                  <tr><td><span class="file-cell"><span class="file-icon" data-icon="pdf" aria-hidden="true"></span>2023 年高考语文真题（全国新高考 I 卷）.pdf</span></td><td>高考试卷</td><td>38</td><td><span class="status-badge">● 完成</span></td><td>2024-05-18 10:21</td><td><button class="table-action" type="button" data-action="view">查看</button></td></tr>
+                  <tr><td><span class="file-cell"><span class="file-icon word" data-icon="word" aria-hidden="true"></span>高中物理必修二·章节练习题.docx</span></td><td>教辅资料</td><td>156</td><td><span class="status-badge">● 完成</span></td><td>2024-05-17 16:45</td><td><button class="table-action" type="button" data-action="view">查看</button></td></tr>
+                  <tr><td><span class="file-cell"><span class="file-icon" data-icon="pdf" aria-hidden="true"></span>2024 届高三一模试卷（理综）.pdf</span></td><td>模拟试卷</td><td>72</td><td><span class="status-badge">● 完成</span></td><td>2024-05-17 09:18</td><td><button class="table-action" type="button" data-action="view">查看</button></td></tr>
+                  <tr><td><span class="file-cell"><span class="file-icon" data-icon="ppt" aria-hidden="true"></span>圆锥曲线专题练习题.pptx</span></td><td>课件资料</td><td>28</td><td><span class="status-badge partial">● 部分完成</span></td><td>2024-05-16 20:11</td><td><button class="table-action" type="button" data-action="view">查看</button></td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="panel-footer"><button class="text-button" type="button" data-nav-target="exports">查看全部记录 <span data-icon="arrow" aria-hidden="true"></span></button></div>
+          </section>
+        </div>
+
+        <aside class="right-stack" aria-label="快捷操作">
+          <section class="glass-panel quick-panel">
+            <div class="panel-heading"><h2>快捷操作</h2></div>
+            <div class="quick-list">
+              <button class="primary-action" type="button" id="toggleExtraction"><span class="action-copy"><span data-icon="upload" aria-hidden="true"></span><span><span class="action-title" id="toggleText">开始提取</span><span class="action-caption" id="toggleCaption">上传试卷或图片文件</span></span></span><span class="action-arrow" data-icon="arrow" aria-hidden="true"></span></button>
+              <button class="secondary-action" type="button" id="practiceToggle" aria-pressed="false"><span class="action-copy"><span data-icon="practice" aria-hidden="true"></span><span><span class="action-title">练习版</span><span class="action-caption" id="practiceCaption">隐藏答案与解析</span></span></span><span class="action-arrow" data-icon="arrow" aria-hidden="true"></span></button>
+              <button class="secondary-action" type="button" id="exportButton"><span class="action-copy"><span data-icon="export" aria-hidden="true"></span><span><span class="action-title">导出题库</span><span class="action-caption">Word / PDF / Markdown</span></span></span><span class="action-arrow" data-icon="arrow" aria-hidden="true"></span></button>
+            </div>
+            <div class="format-note">支持格式<div class="format-list"><span class="format-chip">PDF</span><span class="format-chip">Word</span><span class="format-chip">Markdown</span><span class="format-chip">TXT</span></div></div>
+          </section>
+
+          <section class="glass-panel tip-panel">
+            <div class="tip-heading"><span class="tip-icon" data-icon="bulb" aria-hidden="true"></span>小贴士</div>
+            <ul class="tip-list">
+              <li>建议使用清晰的 PDF 或图片文件，以获得更好的识别效果。</li>
+              <li>复杂公式与表格请确保清晰可辨，有助于提升结构化准确率。</li>
+              <li>提取完成后，可在“AI 待复核”中快速处理需确认题目。</li>
+            </ul>
+            <button class="tip-link" type="button" data-action="guide">查看帮助文档 <span data-icon="arrow" aria-hidden="true"></span></button>
+          </section>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="exportModal" role="dialog" aria-modal="true" aria-labelledby="exportTitle">
+    <div class="modal">
+      <div class="modal-header"><div><div class="modal-title" id="exportTitle">导出题库</div><p class="modal-subtitle">选择格式后会使用当前题库内容生成离线文件。</p></div><button class="close-button" type="button" data-close-modal="exportModal" aria-label="关闭"><span data-icon="close" aria-hidden="true"></span></button></div>
+      <div class="format-options">
+        <label class="format-option"><input type="radio" name="export-format" value="PDF" checked /><span><strong>PDF 文档</strong><br /><small>适合打印与分享</small></span></label>
+        <label class="format-option"><input type="radio" name="export-format" value="Word" /><span><strong>Word 文档</strong><br /><small>便于继续编辑</small></span></label>
+        <label class="format-option"><input type="radio" name="export-format" value="Markdown" /><span><strong>Markdown</strong><br /><small>适合整理与二次处理</small></span></label>
+        <label class="format-option"><input type="radio" name="export-format" value="TXT" /><span><strong>纯文本</strong><br /><small>兼容性最好</small></span></label>
+      </div>
+      <div class="modal-actions"><button class="modal-button cancel" type="button" data-close-modal="exportModal">取消</button><button class="modal-button primary" type="button" id="confirmExport">开始导出</button></div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="commandModal" role="dialog" aria-modal="true" aria-labelledby="commandTitle">
+    <div class="modal command-modal">
+      <div class="command-input-wrap"><span data-icon="search" aria-hidden="true"></span><input class="command-input" id="commandInput" aria-label="搜索快捷命令" placeholder="搜索快捷命令…" autocomplete="off" /><kbd>Esc</kbd></div>
+      <div class="command-list" id="commandList" aria-label="快捷命令">
+        <button class="command-item" type="button" data-command="extract"><span data-icon="upload" aria-hidden="true"></span>开始或暂停提取<small>Ctrl Enter</small></button>
+        <button class="command-item" type="button" data-command="export"><span data-icon="export" aria-hidden="true"></span>导出当前题库<small>Ctrl E</small></button>
+        <button class="command-item" type="button" data-command="practice"><span data-icon="practice" aria-hidden="true"></span>切换练习版<small>Ctrl P</small></button>
+        <button class="command-item" type="button" data-command="guide"><span data-icon="help" aria-hidden="true"></span>打开使用指南<small>?</small></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    // 内联图标保持预览文件可离线打开，不依赖外部图标库。
+    const icons = {
+      book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5v-16Z"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M8 7h7M8 10h6"/></svg>',
+      search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="10.8" cy="10.8" r="6.6"/><path d="m16 16 4.2 4.2"/></svg>',
+      home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m4 10 8-6 8 6v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-9Z"/><path d="M9 20v-6h6v6"/></svg>',
+      database: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v7c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 12v7c0 1.7 3.1 3 7 3s7-1.3 7-3v-7"/></svg>',
+      export: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4m0 0L8 8m4-4 4 4"/><path d="M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>',
+      settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v2M12 19v2M4.2 5.2l1.4 1.4m12.8 12.8 1.4 1.4M3 12h2m14 0h2M5.6 18.4 4.2 19.8M19.8 4.2l-1.4 1.4"/><circle cx="12" cy="12" r="4"/></svg>',
+      bell: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>',
+      help: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9a2.5 2.5 0 1 1 4.5 1.5c-.9 1.2-2.1 1.4-2.1 3M12 17h.01"/></svg>',
+      check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4.5 4.5L19 7"/></svg>',
+      file: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>',
+      plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/></svg>',
+      bot: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="7" width="14" height="12" rx="3"/><path d="M12 3v4M8 12h.01M16 12h.01M9 16h6"/></svg>',
+      folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>',
+      upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4m0 0L8 8m4-4 4 4"/><path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg>',
+      practice: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h10a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3V4Z"/><path d="M8 20a3 3 0 0 1 3-3h7M9 8h6M9 12h5"/></svg>',
+      bulb: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M8.2 14.8A6 6 0 1 1 15.8 15c-.8.7-1.5 1.4-1.7 3h-4.2c-.2-1.5-.8-2.3-1.7-3.2Z"/></svg>',
+      arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>',
+      chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>',
+      close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>',
+      scan: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9V6a1 1 0 0 1 1-1h3M15 5h3a1 1 0 0 1 1 1v3M19 15v3a1 1 0 0 1-1 1h-3M9 19H6a1 1 0 0 1-1-1v-3"/><path d="M8 12h8"/></svg>',
+      list: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M8 7h11M8 12h11M8 17h11M4 7h.01M4 12h.01M4 17h.01"/></svg>',
+      cube: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/></svg>',
+      shield: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 20 6v5c0 5-3.5 8.2-8 10-4.5-1.8-8-5-8-10V6l8-3Z"/><path d="m8.5 12 2.2 2.2 4.8-5"/></svg>',
+      pdf: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 2h8l4 4v16H6V2Zm7 1.8V7h3.2L13 3.8ZM8.3 12.2v6.1h1.2v-2h.8c1.3 0 2-.8 2-2.1s-.7-2-2-2H8.3Zm1.2 1h.7c.6 0 .9.3.9 1s-.3 1-.9 1h-.7v-2Zm4.2-1v6.1h1.9c1.8 0 2.7-1 2.7-3.1s-.9-3-2.7-3h-1.9Zm1.2 1h.6c1 0 1.5.6 1.5 2s-.5 2-1.5 2h-.6v-4Z"/></svg>',
+      word: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 3h14v18H5V3Zm2.4 3.5v1.2l.9.2 1.7 7.2h1.4l.9-4.3.9 4.3h1.4l1.7-7.2.9-.2V6.5h-3.2v1.2l.8.2-.8 3.8-.9-4h-1.4l-.9 4-.8-3.8.8-.2V6.5H7.4Z"/></svg>',
+      ppt: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 3h14v18H5V3Zm2.4 3.2v8.4h1.3v-2.9h1.1c1.9 0 2.9-1 2.9-2.8s-1-2.7-2.9-2.7H7.4Zm1.3 1.2h1c1.1 0 1.6.5 1.6 1.5s-.5 1.6-1.6 1.6h-1V7.4Z"/></svg>'
+    };
+
+    document.querySelectorAll('[data-icon]').forEach((node) => {
+      const name = node.dataset.icon;
+      node.innerHTML = icons[name] || '';
+      const svg = node.querySelector('svg');
+      if (svg) { svg.style.width = '18px'; svg.style.height = '18px'; }
+    });
+
+    const $ = (selector) => document.querySelector(selector);
+    const $$ = (selector) => [...document.querySelectorAll(selector)];
+    let extractionTimer = null;
+    let progress = 45;
+    let isExtracting = false;
+    let toastTimer = null;
+
+    function showToast(message) {
+      const toast = $('#toast');
+      toast.textContent = message;
+      toast.classList.add('is-visible');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('is-visible'), 2600);
+    }
+
+    function setProgress(value) {
+      progress = Math.max(0, Math.min(100, value));
+      $('#progressRing').style.setProperty('--progress', progress);
+      $('#progressValue').textContent = `${progress}%`;
+      $('#progressPercent').textContent = `${progress}%`;
+      $('#progressFill').style.width = `${progress}%`;
+    }
+
+    function updatePipeline() {
+      const states = [$('#pipelineParse'), $('#pipelineStructure'), $('#pipelineReview')];
+      states.forEach((item, index) => {
+        const stageStart = [25, 52, 78][index];
+        item.classList.toggle('is-active', progress >= stageStart && progress < stageStart + 25);
+        item.classList.toggle('is-done', progress >= stageStart + 25);
+        const label = item.querySelector('.pipeline-status');
+        label.textContent = progress >= stageStart + 25 ? '已完成' : (progress >= stageStart ? '进行中' : '等待中');
+      });
+    }
+
+    function setExtractionState(running) {
+      isExtracting = running;
+      $('#toggleText').textContent = running ? '暂停提取' : '开始提取';
+      $('#toggleCaption').textContent = running ? '正在识别当前文档' : '上传试卷或图片文件';
+      $('#taskState').textContent = running ? '正在进行 · 自动保存中' : (progress > 0 && progress < 100 ? '已暂停 · 可继续' : '暂无进行中的任务');
+      $('#statusTitle').textContent = running ? '正在提取' : (progress > 0 && progress < 100 ? '上次任务已暂停' : '准备就绪');
+      $('#statusCopy').textContent = running ? '正在识别题目内容，请保持页面打开。' : (progress > 0 && progress < 100 ? '当前进度已保留，可以继续处理当前文档。' : '系统运行正常，可以开始提取题库。');
+      $('#progressCaption').textContent = running ? '识别题目并整理选项结构' : '上次任务已暂停，可继续处理当前文档';
+      if (!running) {
+        clearInterval(extractionTimer);
+        extractionTimer = null;
+      }
+    }
+
+    function toggleExtraction() {
+      if (isExtracting) {
+        setExtractionState(false);
+        showToast('提取已暂停，当前进度已保留');
+        return;
+      }
+      if (progress >= 100) setProgress(0);
+      setExtractionState(true);
+      showToast('已开始提取，系统会自动保存进度');
+      extractionTimer = setInterval(() => {
+        setProgress(progress + 2);
+        updatePipeline();
+        if (progress >= 100) {
+          setExtractionState(false);
+          $('#taskState').textContent = '已完成 · 可导出';
+          $('#statusTitle').textContent = '提取完成';
+          $('#statusCopy').textContent = '本次新增题目已保存，可以继续导出或复核。';
+          $('#newCount').innerHTML = '284<span>题</span>';
+          showToast('提取完成，共新增 284 道题目');
+        }
+      }, 520);
+    }
+
+    function openModal(id) { $(`#${id}`).classList.add('is-open'); }
+    function closeModal(id) { $(`#${id}`).classList.remove('is-open'); }
+
+    function togglePractice() {
+      const button = $('#practiceToggle');
+      const enabled = button.getAttribute('aria-pressed') === 'true';
+      button.setAttribute('aria-pressed', String(!enabled));
+      $('#practiceCaption').textContent = enabled ? '隐藏答案与解析' : '已开启，导出留出作答位';
+      showToast(enabled ? '已关闭练习版' : '已开启练习版，导出时隐藏答案与解析');
+    }
+
+    function openGuide() { showToast('使用指南：先开始提取，完成后在右侧选择导出格式'); }
+
+    $('#toggleExtraction').addEventListener('click', toggleExtraction);
+    $('#practiceToggle').addEventListener('click', togglePractice);
+    $('#exportButton').addEventListener('click', () => openModal('exportModal'));
+    $('#confirmExport').addEventListener('click', () => {
+      const format = document.querySelector('input[name="export-format"]:checked').value;
+      closeModal('exportModal');
+      $('#exportCount').innerHTML = '13<span>个</span>';
+      showToast(`正在生成 ${format} 文件，完成后会自动打开`);
+    });
+
+    $$('[data-close-modal]').forEach((button) => button.addEventListener('click', () => closeModal(button.dataset.closeModal)));
+    $$('.modal-backdrop').forEach((backdrop) => backdrop.addEventListener('click', (event) => { if (event.target === backdrop) backdrop.classList.remove('is-open'); }));
+    $$('[data-action="guide"]').forEach((button) => button.addEventListener('click', openGuide));
+    $$('[data-action="notify"]').forEach((button) => button.addEventListener('click', () => showToast('暂无新的系统通知')));
+    $$('[data-action="view"]').forEach((button) => button.addEventListener('click', () => showToast('预览：题目详情会在桌面端浏览器中打开')));
+    $('[data-nav-target="exports"]').addEventListener('click', () => setActiveNav('exports'));
+
+    function setActiveNav(key) {
+      $$('.nav-button').forEach((button) => button.classList.toggle('is-active', button.dataset.nav === key));
+      const labels = { overview: '概览', library: '题库', exports: '导出记录', settings: '设置' };
+      if (key !== 'overview') showToast(`已切换到${labels[key]}，预览中保留当前任务状态`);
+    }
+    $$('.nav-button').forEach((button) => button.addEventListener('click', () => setActiveNav(button.dataset.nav)));
+
+    const commandModal = $('#commandModal');
+    const commandInput = $('#commandInput');
+    function openCommand() { openModal('commandModal'); commandInput.value = ''; filterCommands(''); setTimeout(() => commandInput.focus(), 0); }
+    function filterCommands(query) {
+      const normalized = query.trim().toLowerCase();
+      let visible = 0;
+      $$('.command-item').forEach((item) => {
+        const match = item.textContent.toLowerCase().includes(normalized);
+        item.style.display = match ? 'flex' : 'none';
+        visible += match ? 1 : 0;
+      });
+      let empty = $('#commandEmpty');
+      if (!empty) { empty = document.createElement('div'); empty.id = 'commandEmpty'; empty.className = 'command-empty'; $('#commandList').appendChild(empty); }
+      empty.textContent = visible ? '' : '没有找到匹配的快捷命令';
+      empty.style.display = visible ? 'none' : 'block';
+    }
+    $('[data-open-command]').addEventListener('click', openCommand);
+    commandInput.addEventListener('input', (event) => filterCommands(event.target.value));
+    $$('.command-item').forEach((item) => item.addEventListener('click', () => {
+      const command = item.dataset.command;
+      closeModal('commandModal');
+      if (command === 'extract') toggleExtraction();
+      if (command === 'export') openModal('exportModal');
+      if (command === 'practice') togglePractice();
+      if (command === 'guide') openGuide();
+    }));
+
+    document.addEventListener('keydown', (event) => {
+      const modifier = event.ctrlKey || event.metaKey;
+      if (modifier && event.key.toLowerCase() === 'k') { event.preventDefault(); openCommand(); }
+      if (modifier && event.key === 'Enter') { event.preventDefault(); toggleExtraction(); }
+      if (modifier && event.key.toLowerCase() === 'e') { event.preventDefault(); openModal('exportModal'); }
+      if (modifier && event.key.toLowerCase() === 'p') { event.preventDefault(); togglePractice(); }
+      if (event.key === 'Escape') { $$('.modal-backdrop.is-open').forEach((modal) => modal.classList.remove('is-open')); }
+    });
+
+    updatePipeline();
+  </script>
+</body>
+</html>
