@@ -23,7 +23,11 @@ from modules.exporter import export_to_markdown, export_to_txt
 from modules.extraction_state import ExtractionRunState
 from modules.question_parser import parse_active_question
 from ui.settings_dialog import SettingsDialog
-from ui.theme import OVERLAY_STYLE
+from ui.theme import APP_SHELL_STYLE, OVERLAY_STYLE
+from ui.browser_shell import BrowserShell
+from ui.control_panel import ControlPanel
+from ui.navigation_rail import NavigationRail
+from ui.title_bar import TitleBar
 from ui.widgets import ToggleSwitch
 import json
 
@@ -114,6 +118,9 @@ class TampermonkeyFloatingWindow(QFrame):
         super().__init__(parent)
         self.main_app = main_app
         self.setWindowFlags(Qt.SubWindow) # 设为子窗体
+        # 让悬浮窗保留网页/桌面透出效果，具体模糊由 HTML 预览或宿主窗口负责。
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WA_NoSystemBackground, True)
         self.is_extracting = False  # 提取状态开关
         self.is_minimized = False   # 最小化状态
         self.drag_position = QPoint()
@@ -345,19 +352,14 @@ class YunKaoExtractorApp(QMainWindow):
         self.setWindowTitle(
             f"融智云考题库导出助手 {APP_RELEASE} - 免费使用 · 禁止倒卖 - {nickname}"
         )
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
+        self.setStyleSheet(APP_SHELL_STYLE)
         self.resize(1300, 850)
 
-        # 100% 铺满的浏览器组件
-        self.browser = QWebEngineView(self)
-        self.setCentralWidget(self.browser)
+        self._build_shell()
 
-        # 浏览器事件、悬浮操作区和网页桥接必须一起初始化，缺少任一项都会使提取链路失效。
+        # 浏览器事件、控制台和网页桥接必须一起初始化，缺少任一项都会使提取链路失效。
         self.browser.page().urlChanged.connect(self.on_url_changed)
-
-        self.overlay = TampermonkeyFloatingWindow(self.browser, main_app=self)
-        self.overlay.move(30, 30)
-        self.overlay.show()
-        self.overlay.raise_()
 
         self.channel = QWebChannel(self.browser.page())
         self.bridge = ExtractorBridge(self)
@@ -367,35 +369,102 @@ class YunKaoExtractorApp(QMainWindow):
         self.browser.page().loadFinished.connect(self.on_page_loaded)
         self.browser.load(QUrl("https://www.cctrcloud.net/practice/login.html"))
 
+    def _build_shell(self):
+        """装配标题栏、导航、浏览器和控制台，不触碰提取业务对象。"""
+        shell = QWidget()
+        shell.setObjectName("appShell")
+        shell_layout = QVBoxLayout(shell)
+        shell_layout.setContentsMargins(0, 0, 0, 0)
+        shell_layout.setSpacing(0)
+
+        self.title_bar = TitleBar(shell)
+        self.title_bar.minimize_requested.connect(self.showMinimized)
+        self.title_bar.maximize_requested.connect(self._toggle_maximized)
+        self.title_bar.close_requested.connect(self.close)
+        shell_layout.addWidget(self.title_bar)
+
+        workspace = QWidget()
+        workspace_layout = QHBoxLayout(workspace)
+        workspace_layout.setContentsMargins(10, 10, 10, 10)
+        workspace_layout.setSpacing(10)
+
+        self.navigation = NavigationRail(workspace)
+        self.browser_shell = BrowserShell(workspace)
+        self.control_panel = ControlPanel(workspace, main_app=self)
+
+        # overlay 是历史业务层使用的兼容名称，实际对象已经是停靠式控制台。
+        self.overlay = self.control_panel
+        self.overlay.btn_back = self.browser_shell.btn_back
+        self.overlay.chk_practice_export.blockSignals(True)
+        self.overlay.chk_practice_export.setChecked(
+            self.config.get("export_without_answers", False)
+        )
+        self.overlay.chk_practice_export.blockSignals(False)
+        self.overlay.chk_practice_export.toggled.connect(self.update_practice_export_mode)
+
+        self.browser = self.browser_shell.browser
+        workspace_layout.addWidget(self.navigation)
+        workspace_layout.addWidget(self.browser_shell, 1)
+        workspace_layout.addWidget(self.control_panel)
+        shell_layout.addWidget(workspace, 1)
+        self.setCentralWidget(shell)
+
+        self.navigation.page_requested.connect(self._on_navigation_page_requested)
+        self.navigation.btn_dock.clicked.connect(self.control_panel.toggle_minimize)
+
+    def _toggle_maximized(self):
+        if self.isMaximized():
+            self.showNormal()
+        else:
+            self.showMaximized()
+
+    def _on_navigation_page_requested(self, page_id):
+        if page_id == "settings":
+            self.overlay.open_settings()
+            return
+        if page_id == "workspace":
+            self.overlay.set_mini_status("已返回练习工作台", "#65B8DD")
+            return
+        labels = {
+            "history": "提取记录",
+            "exports": "导出中心",
+            "diagnostics": "运行诊断",
+        }
+        self.overlay.set_mini_status(
+            f"{labels.get(page_id, page_id)}入口已准备，当前任务仍在本地运行",
+            "#8B7EE8",
+        )
+
     def refresh_export_button(self):
         pending_jobs = len(self.pending_ai_workers)
+        self.overlay.set_run_metrics(
+            saved=len(self.extracted_questions),
+            ai_pending=pending_jobs,
+        )
         can_export = (
             bool(self.extracted_questions)
             and not self.overlay.is_extracting
             and pending_jobs == 0
         )
-        self.overlay.btn_export.setEnabled(can_export)
+        self.overlay.refresh_export_state(can_export)
 
     def _set_extraction_ui(self, active):
-        self.overlay.is_extracting = active
-        self.overlay.btn_toggle.setProperty("extracting", active)
-        self.overlay.btn_toggle.style().unpolish(self.overlay.btn_toggle)
-        self.overlay.btn_toggle.style().polish(self.overlay.btn_toggle)
-        if active:
-            self.overlay.btn_toggle.setText("停止提取")
-        else:
-            self.overlay.btn_toggle.setText("开始提取")
+        self.overlay.set_extracting(active)
+        self.title_bar.set_status(
+            "提取进行中" if active else "本地运行 · 凭据受保护",
+            "#65B8DD" if active else "#8495AA",
+        )
         self.refresh_export_button()
 
     def start_extraction(self):
         run_id = self.extraction_state.start()
         self._parse_retry_count = 0
         self._set_extraction_ui(True)
-        self.overlay.set_mini_status("🟢 自动运行中...", "#D83B01")
+        self.overlay.set_mini_status("自动运行中…", "#65B8DD")
         self.trigger_extraction(run_id)
         return run_id
 
-    def stop_extraction(self, run_id=None, status_text=None, color="#6A9955"):
+    def stop_extraction(self, run_id=None, status_text=None, color="#65B8DD"):
         if not self.extraction_state.stop(run_id):
             return False
         self._parse_retry_count = 0
@@ -414,7 +483,8 @@ class YunKaoExtractorApp(QMainWindow):
         self.seen_question_keys.clear()
         self.last_question_marker = ""
         self.overlay.set_progress_text("当前进度: 已清空 0 题")
-        self.overlay.set_mini_status("🗑️ 题库缓存已清空", "#6A9955")
+        self.overlay.set_run_metrics(current=0, total=0, saved=0, ai_pending=0, average="—")
+        self.overlay.set_mini_status("题库缓存已清空", "#65B8DD")
         self.refresh_export_button()
 
     def _build_question_key(self, question):

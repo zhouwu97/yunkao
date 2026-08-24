@@ -99,6 +99,37 @@ class UiRegressionTests(unittest.TestCase):
         self.assertTrue(window.overlay.btn_toggle.property("extracting"))
         self.assertEqual(window.overlay.btn_toggle.text(), "停止提取")
 
+    def test_main_window_uses_docked_shell_with_legacy_overlay_alias(self):
+        window = self.create_window()
+
+        self.assertIs(window.overlay, window.control_panel)
+        self.assertTrue(hasattr(window, "title_bar"))
+        self.assertTrue(hasattr(window, "navigation"))
+        self.assertTrue(hasattr(window, "browser_shell"))
+        self.assertIs(window.browser, window.browser_shell.browser)
+        self.assertTrue(window.navigation.buttons["workspace"].isChecked())
+        self.assertEqual(window.overlay.btn_back, window.browser_shell.btn_back)
+
+    def test_control_panel_metrics_and_export_state_are_synchronized(self):
+        window = self.create_window()
+        panel = window.control_panel
+
+        panel.set_progress_text("进度: 12 / 80 (已存 11 题)")
+        panel.set_run_metrics(ai_pending=2, average=1.6)
+        self.assertEqual(panel.lbl_current.text(), "12")
+        self.assertEqual(panel.lbl_total.text(), "/ 80 题")
+        self.assertEqual(panel.lbl_saved.text(), "11")
+        self.assertEqual(panel.lbl_ai.text(), "2")
+        self.assertEqual(panel.lbl_average.text(), "1.6s")
+        self.assertEqual(panel.progress_bar.value(), 15)
+
+        panel.refresh_export_state(False)
+        self.assertFalse(panel.btn_export.isEnabled())
+        self.assertFalse(panel.btn_export_pdf.isEnabled())
+        panel.refresh_export_state(True)
+        self.assertTrue(panel.btn_export.isEnabled())
+        self.assertTrue(panel.btn_export_more.isEnabled())
+
     def test_version_marker_is_semantic_and_visible_in_settings(self):
         self.assertRegex(APP_VERSION, r"^\d+\.\d+\.\d+$")
         self.assertEqual(len(APP_VERSION_TUPLE), 4)
