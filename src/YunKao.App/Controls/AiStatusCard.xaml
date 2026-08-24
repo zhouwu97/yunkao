@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="YunKao.Controls.AiStatusCard"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Border Style="{StaticResource SubtleCardStyle}">
+    <StackPanel Spacing="8">
+      <Grid>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <FontIcon Glyph="&#xE945;" Foreground="{StaticResource LavenderBrush}" />
+          <TextBlock Text="AI 辅助" Style="{StaticResource SmallLabelStyle}" />
+        </StackPanel>
+        <Border HorizontalAlignment="Right" Style="{StaticResource StatusPillStyle}">
+          <TextBlock Text="未接入" />
+        </Border>
+      </Grid>
+      <TextBlock Text="C# AiService 将在后续阶段接管 Provider、并发和取消。"
+                 TextWrapping="Wrap"
+                 Style="{StaticResource SecondaryTextStyle}" />
+    </StackPanel>
+  </Border>
+</UserControl>

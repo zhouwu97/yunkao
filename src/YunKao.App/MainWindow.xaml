@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="YunKao.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:YunKao.Controls"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    Title="融智云考"
+    mc:Ignorable="d">
+  <Grid Background="{StaticResource WindowBackgroundBrush}">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="52" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <Border x:Name="AppTitleBar"
+            Grid.Row="0"
+            Background="{StaticResource TitleBarBrush}"
+            Padding="20,0,144,0">
+      <Grid VerticalAlignment="Center">
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <Border Width="28" Height="28" CornerRadius="9" Background="{StaticResource IceBlueBrush}">
+            <TextBlock Text="Y" FontSize="16" FontWeight="SemiBold" Foreground="White"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+          <StackPanel VerticalAlignment="Center" Spacing="-2">
+            <TextBlock Text="融智云考" Style="{StaticResource TitleTextStyle}" />
+            <TextBlock Text="DESKTOP WORKSPACE · WINUI MIGRATION" Style="{StaticResource CaptionTextStyle}" />
+          </StackPanel>
+        </StackPanel>
+
+        <TextBlock Text="PySide 基准线 · Phase 1"
+                   HorizontalAlignment="Right"
+                   VerticalAlignment="Center"
+                   Style="{StaticResource CaptionTextStyle}" />
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="1" Padding="12,0,12,12" ColumnSpacing="12">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="220" />
+        <ColumnDefinition Width="*" />
+      </Grid.ColumnDefinitions>
+
+      <Border Grid.Column="0" Style="{StaticResource GlassCardStyle}">
+        <controls:NavigationRail x:Name="NavigationRail" />
+      </Border>
+
+      <Frame x:Name="RootFrame"
+             Grid.Column="1"
+             HorizontalContentAlignment="Stretch"
+             VerticalContentAlignment="Stretch"
+             Background="Transparent" />
+    </Grid>
+  </Grid>
+</Window>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="YunKao.Controls.ProgressCard"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Border Style="{StaticResource SubtleCardStyle}">
+    <StackPanel Spacing="8">
+      <Grid>
+        <TextBlock Text="提取进度" Style="{StaticResource SmallLabelStyle}" />
+        <TextBlock Text="0 / 0" HorizontalAlignment="Right" Style="{StaticResource SmallLabelStyle}" />
+      </Grid>
+      <ProgressBar Minimum="0" Maximum="100" Value="0" Foreground="{StaticResource IceBlueBrush}" />
+      <TextBlock Text="尚未开始" Style="{StaticResource SecondaryTextStyle}" />
+    </StackPanel>
+  </Border>
+</UserControl>
