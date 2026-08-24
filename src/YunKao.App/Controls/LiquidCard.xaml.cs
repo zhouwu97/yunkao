@@ -26,11 +26,21 @@ public sealed partial class LiquidCard : UserControl
         typeof(LiquidCard),
         new PropertyMetadata(LiquidCardVariant.Neutral, OnVariantChanged));
 
+    public static readonly DependencyProperty BackdropModeProperty = DependencyProperty.Register(
+        nameof(BackdropMode),
+        typeof(LiquidBackdropMode),
+        typeof(LiquidCard),
+        new PropertyMetadata(LiquidBackdropMode.System, OnBackdropModeChanged));
+
     public LiquidCard()
     {
         InitializeComponent();
         Padding = new Thickness(16);
-        Loaded += (_, _) => ApplyVariant();
+        Loaded += (_, _) =>
+        {
+            ApplyVariant();
+            ApplyBackdropMode();
+        };
     }
 
     public LiquidCardVariant Variant
@@ -39,9 +49,28 @@ public sealed partial class LiquidCard : UserControl
         set => SetValue(VariantProperty, value);
     }
 
+    public LiquidBackdropMode BackdropMode
+    {
+        get => (LiquidBackdropMode)GetValue(BackdropModeProperty);
+        set => SetValue(BackdropModeProperty, value);
+    }
+
     private static void OnVariantChanged(DependencyObject d, DependencyPropertyChangedEventArgs args)
     {
         if (d is LiquidCard card) card.ApplyVariant();
+    }
+
+    private static void OnBackdropModeChanged(DependencyObject d, DependencyPropertyChangedEventArgs args)
+    {
+        if (d is LiquidCard card) card.ApplyBackdropMode();
+    }
+
+    private void ApplyBackdropMode()
+    {
+        if (BackdropLayer is null) return;
+        BackdropLayer.Visibility = BackdropMode == LiquidBackdropMode.System
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     private void ApplyVariant()

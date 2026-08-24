@@ -1,6 +1,7 @@
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using YunKao.Services;
 using Windows.UI;
@@ -33,11 +34,28 @@ public sealed partial class LiquidButton : UserControl
         typeof(LiquidButton),
         new PropertyMetadata(LiquidButtonVariant.Primary, OnVariantChanged));
 
+    public static readonly DependencyProperty BackdropModeProperty = DependencyProperty.Register(
+        nameof(BackdropMode),
+        typeof(LiquidBackdropMode),
+        typeof(LiquidButton),
+        new PropertyMetadata(LiquidBackdropMode.System, OnBackdropModeChanged));
+
+    public static readonly DependencyProperty ShadowEnabledProperty = DependencyProperty.Register(
+        nameof(ShadowEnabled),
+        typeof(bool),
+        typeof(LiquidButton),
+        new PropertyMetadata(false, OnShadowEnabledChanged));
+
     public LiquidButton()
     {
         InitializeComponent();
         Padding = new Thickness(14, 9, 14, 9);
-        Loaded += (_, _) => ApplyVariant();
+        Loaded += (_, _) =>
+        {
+            ApplyVariant();
+            ApplyBackdropMode();
+            ApplyShadow();
+        };
     }
 
     public event RoutedEventHandler? Click;
@@ -54,9 +72,45 @@ public sealed partial class LiquidButton : UserControl
         set => SetValue(VariantProperty, value);
     }
 
+    public LiquidBackdropMode BackdropMode
+    {
+        get => (LiquidBackdropMode)GetValue(BackdropModeProperty);
+        set => SetValue(BackdropModeProperty, value);
+    }
+
+    public bool ShadowEnabled
+    {
+        get => (bool)GetValue(ShadowEnabledProperty);
+        set => SetValue(ShadowEnabledProperty, value);
+    }
+
     private static void OnVariantChanged(DependencyObject d, DependencyPropertyChangedEventArgs args)
     {
         if (d is LiquidButton button) button.ApplyVariant();
+    }
+
+    private static void OnBackdropModeChanged(DependencyObject d, DependencyPropertyChangedEventArgs args)
+    {
+        if (d is LiquidButton button) button.ApplyBackdropMode();
+    }
+
+    private static void OnShadowEnabledChanged(DependencyObject d, DependencyPropertyChangedEventArgs args)
+    {
+        if (d is LiquidButton button) button.ApplyShadow();
+    }
+
+    private void ApplyBackdropMode()
+    {
+        if (BackdropLayer is null) return;
+        BackdropLayer.Visibility = BackdropMode == LiquidBackdropMode.System
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+    }
+
+    private void ApplyShadow()
+    {
+        if (VisualRoot is null) return;
+        MotionService.SetSoftShadow(VisualRoot, ShadowEnabled);
     }
 
     private void ApplyVariant()
@@ -91,7 +145,8 @@ public sealed partial class LiquidButton : UserControl
     private void OnClick(object sender, RoutedEventArgs args) => Click?.Invoke(this, args);
     private void OnPointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs args)
     {
-        InteractiveHighlight.Opacity = 0.14;
+        UpdateSpecularPosition(args);
+        InteractiveHighlight.Opacity = 1;
         MotionService.AnimateScaleXY(VisualRoot, 1.012, 1.012);
     }
 
@@ -101,15 +156,18 @@ public sealed partial class LiquidButton : UserControl
         MotionService.AnimateScaleXY(VisualRoot, 1, 1, 140);
     }
 
+    private void OnPointerMoved(object sender, PointerRoutedEventArgs args) => UpdateSpecularPosition(args);
+
     private void OnPointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs args)
     {
-        InteractiveHighlight.Opacity = 0.24;
+        UpdateSpecularPosition(args);
+        InteractiveHighlight.Opacity = 1;
         MotionService.AnimateScaleXY(VisualRoot, 1.018, 0.955, 90);
     }
 
     private void OnPointerReleased(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs args)
     {
-        InteractiveHighlight.Opacity = 0.14;
+        InteractiveHighlight.Opacity = 1;
         MotionService.AnimateScaleXY(VisualRoot, 1.012, 1.012, 170);
     }
 
@@ -117,5 +175,15 @@ public sealed partial class LiquidButton : UserControl
     {
         InteractiveHighlight.Opacity = 0;
         MotionService.AnimateScaleXY(VisualRoot, 1, 1, 150);
+    }
+
+    private void UpdateSpecularPosition(PointerRoutedEventArgs args)
+    {
+        if (HitTarget.ActualWidth <= 0 || HitTarget.ActualHeight <= 0) return;
+        Windows.Foundation.Point point = args.GetCurrentPoint(HitTarget).Position;
+        SpecularBrush.Center = new Windows.Foundation.Point(
+            Math.Clamp(point.X / HitTarget.ActualWidth, 0, 1),
+            Math.Clamp(point.Y / HitTarget.ActualHeight, 0, 1));
+        SpecularBrush.GradientOrigin = SpecularBrush.Center;
     }
 }

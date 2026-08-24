@@ -20,7 +20,7 @@
       <Border x:Name="DrawerScrim"
               Grid.ColumnSpan="2"
               Background="#141E2E"
-              Opacity="0.08"
+              Opacity="0"
               Visibility="Collapsed"
               Canvas.ZIndex="1"
               Tapped="OnDrawerScrimTapped" />
@@ -28,6 +28,7 @@
       <Grid x:Name="ControlPanel" Grid.Column="1" Canvas.ZIndex="2">
         <SystemBackdropElement x:Name="DrawerBackdrop"
                                CornerRadius="18"
+                               Opacity="0.90"
                                Visibility="Collapsed">
           <SystemBackdropElement.SystemBackdrop>
             <DesktopAcrylicBackdrop />
@@ -67,6 +68,7 @@
                              Grid.ColumnSpan="2"
                              Label="任务状态"
                              Variant="Primary"
+                             ShadowEnabled="True"
                              HorizontalAlignment="Right"
                              VerticalAlignment="Bottom"
                              Click="OnDrawerToggleClick"

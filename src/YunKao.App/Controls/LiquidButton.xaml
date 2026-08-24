@@ -7,10 +7,6 @@
     MinHeight="42"
     Foreground="White">
   <Grid x:Name="VisualRoot" RenderTransformOrigin="0.5,0.5">
-    <Border Margin="0,2,0,3"
-            Background="{StaticResource LiquidShadowBrush}"
-            CornerRadius="11"
-            IsHitTestVisible="False" />
     <Border x:Name="Surface"
             Background="Transparent"
             BorderBrush="#66FFFFFF"
@@ -18,7 +14,8 @@
             CornerRadius="11">
       <Grid>
         <SystemBackdropElement x:Name="BackdropLayer"
-                               CornerRadius="11">
+                               CornerRadius="11"
+                               Opacity="0.84">
           <SystemBackdropElement.SystemBackdrop>
             <DesktopAcrylicBackdrop />
           </SystemBackdropElement.SystemBackdrop>
@@ -26,9 +23,20 @@
         <Border x:Name="TintLayer" CornerRadius="10" IsHitTestVisible="False" Opacity="0.86" />
         <Border x:Name="InteractiveHighlight"
                 CornerRadius="10"
-                Background="#46FFFFFF"
                 Opacity="0"
-                IsHitTestVisible="False" />
+                IsHitTestVisible="False">
+          <Border.Background>
+            <RadialGradientBrush x:Name="SpecularBrush"
+                                 Center="0.5,0.5"
+                                 GradientOrigin="0.5,0.5"
+                                 RadiusX="0.65"
+                                 RadiusY="0.65">
+              <GradientStop Color="#2AFFFFFF" Offset="0" />
+              <GradientStop Color="#0DFFFFFF" Offset="0.42" />
+              <GradientStop Color="#00FFFFFF" Offset="1" />
+            </RadialGradientBrush>
+          </Border.Background>
+        </Border>
         <Border Height="1"
                 Margin="12,1,12,0"
                 VerticalAlignment="Top"
@@ -44,6 +52,7 @@
                 Click="OnClick"
                 PointerEntered="OnPointerEntered"
                 PointerExited="OnPointerExited"
+                PointerMoved="OnPointerMoved"
                 PointerPressed="OnPointerPressed"
                 PointerReleased="OnPointerReleased"
                 PointerCaptureLost="OnPointerCaptureLost">

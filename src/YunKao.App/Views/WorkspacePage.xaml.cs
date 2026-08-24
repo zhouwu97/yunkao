@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml;
+using YunKao.Controls;
 using YunKao.Services;
 
 namespace YunKao.Views;
@@ -79,7 +80,7 @@ public sealed partial class WorkspacePage : Page
         ControlColumn.Width = new GridLength(0);
         Grid.SetColumn(ControlPanel, 0);
         Grid.SetColumnSpan(ControlPanel, 2);
-        ControlPanel.Width = 328;
+        ControlPanel.Width = GetDrawerWidth();
         ControlPanel.HorizontalAlignment = HorizontalAlignment.Right;
         DrawerToggle.Visibility = Visibility.Visible;
         if (enteringNarrowMode)
@@ -105,7 +106,10 @@ public sealed partial class WorkspacePage : Page
         DrawerToggle.Label = _drawerOpen ? "收起任务" : "任务状态";
         if (_drawerOpen)
         {
+            bool scrimWasHidden = DrawerScrim.Visibility != Visibility.Visible;
             DrawerScrim.Visibility = Visibility.Visible;
+            if (scrimWasHidden) DrawerScrim.Opacity = 0;
+            MotionService.AnimateOpacity(DrawerScrim, 0.08, 160, "drawer-scrim");
             bool wasHidden = ControlPanel.Visibility != Visibility.Visible;
             ControlPanel.Visibility = Visibility.Visible;
             if (wasHidden)
@@ -117,7 +121,18 @@ public sealed partial class WorkspacePage : Page
         }
         else
         {
-            DrawerScrim.Visibility = Visibility.Collapsed;
+            if (DrawerScrim.Visibility == Visibility.Visible)
+            {
+                MotionService.AnimateOpacity(
+                    DrawerScrim,
+                    0,
+                    160,
+                    "drawer-scrim",
+                    () =>
+                    {
+                        if (!_drawerOpen) DrawerScrim.Visibility = Visibility.Collapsed;
+                    });
+            }
             if (ControlPanel.Visibility != Visibility.Visible)
             {
                 MotionService.SetTranslateX(ControlPanel, 32);
@@ -147,6 +162,8 @@ public sealed partial class WorkspacePage : Page
     private void ConfigureDrawerSurface(bool narrow)
     {
         DrawerBackdrop.Visibility = narrow ? Visibility.Visible : Visibility.Collapsed;
+        DrawerScrim.Visibility = narrow && _drawerOpen ? Visibility.Visible : Visibility.Collapsed;
+        if (!narrow) DrawerScrim.Opacity = 0;
         DrawerShell.Background = narrow
             ? (Brush)Application.Current.Resources["DrawerSurfaceBrush"]
             : (Brush)Application.Current.Resources["TransparentBrush"];
@@ -155,5 +172,20 @@ public sealed partial class WorkspacePage : Page
             : (Brush)Application.Current.Resources["TransparentBrush"];
         DrawerShell.BorderThickness = narrow ? new Thickness(1) : new Thickness(0);
         DrawerShell.Padding = narrow ? new Thickness(10) : new Thickness(0);
+        MotionService.SetSoftShadow(DrawerShell, narrow);
+        LiquidBackdropMode islandMode = narrow
+            ? LiquidBackdropMode.Inherited
+            : LiquidBackdropMode.System;
+        TaskCard.BackdropMode = islandMode;
+        ToolsCard.BackdropMode = islandMode;
+        Events.BackdropMode = islandMode;
+    }
+
+    private double GetDrawerWidth()
+    {
+        double availableWidth = PageRoot.ActualWidth > 0
+            ? PageRoot.ActualWidth - 76
+            : 328;
+        return Math.Clamp(availableWidth, 280, 328);
     }
 }

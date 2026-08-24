@@ -53,7 +53,7 @@
   <SolidColorBrush x:Key="LiquidInnerBorderBrush" Color="#52FFFFFF" />
   <SolidColorBrush x:Key="LiquidShadowBrush" Color="#190F2D58" />
   <SolidColorBrush x:Key="RailSurfaceBrush" Color="#24F8FBFE" />
-  <SolidColorBrush x:Key="DrawerSurfaceBrush" Color="#8CF8FBFE" />
+  <SolidColorBrush x:Key="DrawerSurfaceBrush" Color="#54F8FBFE" />
   <SolidColorBrush x:Key="DrawerBorderBrush" Color="#72FFFFFF" />
 
   <!-- Level 2: content remains opaque and readable. -->

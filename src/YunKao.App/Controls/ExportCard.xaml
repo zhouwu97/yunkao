@@ -23,9 +23,9 @@
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
-        <controls:LiquidButton Grid.Column="0" Label="PDF" Variant="Soft" Click="OnPdfClick" />
-        <controls:LiquidButton Grid.Column="1" Label="DOCX" Variant="Violet" Click="OnDocxClick" />
-        <controls:LiquidButton Grid.Column="2" Label="更多" Variant="Coral" Click="OnMoreClick" />
+        <controls:LiquidButton Grid.Column="0" Label="PDF" Variant="Soft" BackdropMode="Inherited" Click="OnPdfClick" />
+        <controls:LiquidButton Grid.Column="1" Label="DOCX" Variant="Violet" BackdropMode="Inherited" Click="OnDocxClick" />
+        <controls:LiquidButton Grid.Column="2" Label="更多" Variant="Coral" BackdropMode="Inherited" Click="OnMoreClick" />
       </Grid>
     </StackPanel>
   </Border>

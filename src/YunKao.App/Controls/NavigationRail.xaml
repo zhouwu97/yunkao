@@ -35,6 +35,22 @@
           <Border.RenderTransform>
             <ScaleTransform x:Name="SelectionScale" />
           </Border.RenderTransform>
+          <Border x:Name="SelectionSpecular"
+                  Margin="1"
+                  CornerRadius="14"
+                  Opacity="0.82"
+                  IsHitTestVisible="False">
+            <Border.Background>
+              <RadialGradientBrush Center="0.32,0.22"
+                                   GradientOrigin="0.32,0.22"
+                                   RadiusX="0.78"
+                                   RadiusY="0.78">
+                <GradientStop Color="#30FFFFFF" Offset="0" />
+                <GradientStop Color="#0AFFFFFF" Offset="0.45" />
+                <GradientStop Color="#00FFFFFF" Offset="1" />
+              </RadialGradientBrush>
+            </Border.Background>
+          </Border>
         </Border>
       </Border>
 

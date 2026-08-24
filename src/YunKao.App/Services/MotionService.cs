@@ -125,6 +125,33 @@ public static class MotionService
         Run(element, TranslateChannel, storyboard, completed);
     }
 
+    public static void AnimateOpacity(
+        FrameworkElement element,
+        double target,
+        double durationMs = 160,
+        string channel = "opacity",
+        Action? completed = null)
+    {
+        if (ReduceMotion)
+        {
+            element.Opacity = target;
+            completed?.Invoke();
+            return;
+        }
+
+        var animation = new DoubleAnimation
+        {
+            To = target,
+            Duration = new Duration(TimeSpan.FromMilliseconds(durationMs)),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+        };
+        Storyboard.SetTarget(animation, element);
+        Storyboard.SetTargetProperty(animation, "Opacity");
+        var storyboard = new Storyboard();
+        storyboard.Children.Add(animation);
+        Run(element, channel, storyboard, completed);
+    }
+
     public static void AnimateTranslateY(FrameworkElement element, double target, double durationMs = 180, Action? completed = null)
     {
         TranslateTransform transform = element.RenderTransform as TranslateTransform ?? new TranslateTransform();
@@ -185,6 +212,12 @@ public static class MotionService
         TranslateTransform transform = element.RenderTransform as TranslateTransform ?? new TranslateTransform();
         element.RenderTransform = transform;
         transform.X = value;
+    }
+
+    public static void SetSoftShadow(FrameworkElement element, bool enabled)
+    {
+        // WinUI 3 2.3.1 暴露的是 UIElement.Shadow；ThemeShadow 会随系统主题和环境自动调整。
+        element.Shadow = enabled ? new ThemeShadow() : null;
     }
 
     private static ScaleTransform EnsureScaleTransform(FrameworkElement element)

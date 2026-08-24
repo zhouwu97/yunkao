@@ -59,6 +59,7 @@ public sealed partial class NavigationRail : UserControl
     private void OnLoaded(object sender, RoutedEventArgs args)
     {
         _isLoaded = true;
+        MotionService.SetSoftShadow(SelectionShape, enabled: true);
         MoveSelectionBlob(animate: false);
     }
 
@@ -85,9 +86,9 @@ public sealed partial class NavigationRail : UserControl
         }
 
         MotionService.AnimateTranslateY(SelectionBlob, translation, 180);
-        SelectionScale.ScaleX = 0.92;
-        SelectionScale.ScaleY = 1.15;
-        MotionService.AnimateScaleXY(SelectionShape, 1.08, 0.96, 80, () =>
+        SelectionScale.ScaleX = 0.90;
+        SelectionScale.ScaleY = 1.20;
+        MotionService.AnimateScaleXY(SelectionShape, 1.08, 0.94, 90, () =>
             MotionService.AnimateScaleXY(SelectionShape, 1, 1, 130));
     }
 

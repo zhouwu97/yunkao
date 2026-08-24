@@ -21,14 +21,14 @@
                  Text="进入练习后可自动连续提取"
                  TextWrapping="Wrap"
                  Style="{StaticResource SecondaryTextStyle}" />
-      <controls:LiquidButton x:Name="StartButton" Label="开始提取" Click="OnStartClick" Variant="Primary" />
+      <controls:LiquidButton x:Name="StartButton" Label="开始提取" Click="OnStartClick" Variant="Primary" BackdropMode="Inherited" />
       <Grid ColumnSpacing="8">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
-        <controls:LiquidButton x:Name="PauseButton" Grid.Column="0" Label="暂停提取" Click="OnPauseClick" Variant="Soft" IsEnabled="False" />
-        <controls:LiquidButton x:Name="StopButton" Grid.Column="1" Label="停止" Click="OnStopClick" Variant="Coral" IsEnabled="False" />
+        <controls:LiquidButton x:Name="PauseButton" Grid.Column="0" Label="暂停提取" Click="OnPauseClick" Variant="Soft" BackdropMode="Inherited" IsEnabled="False" />
+        <controls:LiquidButton x:Name="StopButton" Grid.Column="1" Label="停止" Click="OnStopClick" Variant="Coral" BackdropMode="Inherited" IsEnabled="False" />
       </Grid>
     </StackPanel>
   </Grid>

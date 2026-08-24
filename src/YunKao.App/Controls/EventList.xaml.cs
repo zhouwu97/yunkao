@@ -12,6 +12,12 @@ public sealed partial class EventList : UserControl
         InitializeComponent();
     }
 
+    public LiquidBackdropMode BackdropMode
+    {
+        get => EventSurface.BackdropMode;
+        set => EventSurface.BackdropMode = value;
+    }
+
     public void Add(string message, bool warning = false)
     {
         var item = new ListViewItem();

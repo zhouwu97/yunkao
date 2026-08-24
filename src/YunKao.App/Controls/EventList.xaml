@@ -4,7 +4,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:YunKao.Controls">
-  <controls:LiquidCard Padding="14">
+  <controls:LiquidCard x:Name="EventSurface" Padding="14">
     <StackPanel Spacing="10">
       <Grid>
         <StackPanel Orientation="Horizontal" Spacing="8">
