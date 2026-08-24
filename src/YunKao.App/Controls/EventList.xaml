@@ -13,23 +13,23 @@
             <TextBlock Text="LIVE" Foreground="{StaticResource CyanPrimaryBrush}" FontSize="9" />
           </Border>
         </StackPanel>
-        <TextBlock Text="最近 5 条" HorizontalAlignment="Right" Style="{StaticResource CaptionTextStyle}" />
+        <TextBlock Text="实时" HorizontalAlignment="Right" Style="{StaticResource CaptionTextStyle}" />
       </Grid>
       <ListView x:Name="Events" IsItemClickEnabled="False" MaxHeight="178" BorderThickness="0" Background="Transparent" Padding="0">
         <ListViewItem>
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Ellipse Width="6" Height="6" Fill="{StaticResource CyanBrush}" VerticalAlignment="Center" />
-            <TextBlock Text="刚刚  ·  UI 工作区已加载" Style="{StaticResource SecondaryTextStyle}" />
+            <TextBlock Text="刚刚  ·  练习页面已打开" Style="{StaticResource SecondaryTextStyle}" />
           </StackPanel>
         </ListViewItem>
         <ListViewItem>
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Ellipse Width="6" Height="6" Fill="{StaticResource AmberBrush}" VerticalAlignment="Center" />
-            <TextBlock Text="刚刚  ·  等待 WebView2 / Worker" Style="{StaticResource SecondaryTextStyle}" />
+            <TextBlock Text="刚刚  ·  等待下一题内容" Style="{StaticResource SecondaryTextStyle}" />
           </StackPanel>
         </ListViewItem>
       </ListView>
-      <Button Content="查看全部" HorizontalAlignment="Left" Style="{StaticResource GhostButtonStyle}" />
+      <Button Content="查看全部 →" HorizontalAlignment="Left" Style="{StaticResource GhostButtonStyle}" />
     </StackPanel>
   </controls:LiquidCard>
 </UserControl>

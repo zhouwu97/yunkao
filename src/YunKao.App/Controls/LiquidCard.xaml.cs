@@ -16,7 +16,7 @@ public enum LiquidCardVariant
 }
 
 /// <summary>
-/// 由半透明底、微弱 tint、内描边和顶部镜面高光组成的液态玻璃卡片。
+/// 使用局部 Desktop Acrylic 采样、色彩 tint、内描边和镜面高光组成的液态玻璃卡片。
 /// </summary>
 public sealed partial class LiquidCard : UserControl
 {

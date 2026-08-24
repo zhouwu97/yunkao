@@ -1,5 +1,9 @@
+using System.Numerics;
+using Microsoft.UI.Composition;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Hosting;
+using Microsoft.UI.Xaml.Input;
 using Windows.System;
 using YunKao.Services;
 
@@ -49,6 +53,15 @@ public sealed partial class BrowserShell : UserControl
     private void OnRefreshClick(object sender, RoutedEventArgs args) => _service.Refresh();
     private void OnExternalClick(object sender, RoutedEventArgs args) => _service.OpenExternal();
 
+    private void OnAddressDisplayTapped(object sender, TappedRoutedEventArgs args)
+    {
+        AddressDisplay.Visibility = Visibility.Collapsed;
+        AddressBox.Visibility = Visibility.Visible;
+        AddressBox.Text = _fullAddress;
+        AddressBox.Focus(FocusState.Programmatic);
+        AddressBox.SelectAll();
+    }
+
     private void OnAddressKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs args)
     {
         if (args.Key != VirtualKey.Enter) return;
@@ -69,20 +82,37 @@ public sealed partial class BrowserShell : UserControl
     private void OnNavigationChanged(object? sender, BrowserNavigationEventArgs args)
     {
         _fullAddress = args.Uri?.AbsoluteUri ?? _fullAddress;
-        AddressBox.Text = FormatAddress(args.Uri);
+        string display = FormatAddress(args.Uri);
+        AddressDisplay.Text = display;
+        AddressBox.Text = display;
         ToolTipService.SetToolTip(AddressBox, _fullAddress);
+        ToolTipService.SetToolTip(AddressDisplay, _fullAddress);
         StatusText.Text = args.Message;
-    }
-
-    private void OnAddressGotFocus(object sender, RoutedEventArgs args)
-    {
-        AddressBox.Text = _fullAddress;
-        AddressBox.SelectAll();
     }
 
     private void OnAddressLostFocus(object sender, RoutedEventArgs args)
     {
-        if (Uri.TryCreate(_fullAddress, UriKind.Absolute, out Uri? uri)) AddressBox.Text = FormatAddress(uri);
+        if (Uri.TryCreate(_fullAddress, UriKind.Absolute, out Uri? uri))
+        {
+            AddressDisplay.Text = FormatAddress(uri);
+            AddressBox.Text = AddressDisplay.Text;
+        }
+
+        AddressBox.Visibility = Visibility.Collapsed;
+        AddressDisplay.Visibility = Visibility.Visible;
+    }
+
+    private void OnWebViewSurfaceSizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        // Border 的圆角不一定能裁切 WebView2 原生 surface，因此在 Composition visual 上补真实圆角裁切。
+        if (WebView.ActualWidth <= 0 || WebView.ActualHeight <= 0) return;
+
+        Visual visual = ElementCompositionPreview.GetElementVisual(WebView);
+        Compositor compositor = visual.Compositor;
+        CompositionRoundedRectangleGeometry geometry = compositor.CreateRoundedRectangleGeometry();
+        geometry.Size = new Vector2((float)WebView.ActualWidth, (float)WebView.ActualHeight);
+        geometry.CornerRadius = new Vector2(17, 17);
+        visual.Clip = compositor.CreateGeometricClip(geometry);
     }
 
     private static string FormatAddress(Uri? uri)

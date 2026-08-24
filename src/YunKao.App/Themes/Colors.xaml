@@ -52,6 +52,9 @@
   <SolidColorBrush x:Key="LiquidBorderBrush" Color="#BFFFFFFF" />
   <SolidColorBrush x:Key="LiquidInnerBorderBrush" Color="#52FFFFFF" />
   <SolidColorBrush x:Key="LiquidShadowBrush" Color="#190F2D58" />
+  <SolidColorBrush x:Key="RailSurfaceBrush" Color="#24F8FBFE" />
+  <SolidColorBrush x:Key="DrawerSurfaceBrush" Color="#8CF8FBFE" />
+  <SolidColorBrush x:Key="DrawerBorderBrush" Color="#72FFFFFF" />
 
   <!-- Level 2: content remains opaque and readable. -->
   <SolidColorBrush x:Key="ContentSurfaceBrush" Color="#FAFBFD" />
@@ -61,7 +64,7 @@
   <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondary}" />
   <SolidColorBrush x:Key="TextTertiaryBrush" Color="{StaticResource TextTertiary}" />
   <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource LiquidBorderBrush}" />
-  <SolidColorBrush x:Key="ActiveNavigationBrush" Color="#4279D6" Opacity="0.18" />
+  <SolidColorBrush x:Key="ActiveNavigationBrush" Color="#6E9DFF" Opacity="0.34" />
   <SolidColorBrush x:Key="TransparentBrush" Color="Transparent" />
   <SolidColorBrush x:Key="NoticeBrush" Color="#FFF3D6" Opacity="0.84" />
   <SolidColorBrush x:Key="SuccessSoftBrush" Color="#CDEFF2" />

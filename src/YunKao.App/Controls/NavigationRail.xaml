@@ -14,7 +14,31 @@
       <TextBlock Text="Y" FontSize="16" FontWeight="SemiBold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
     </Border>
 
-    <StackPanel Grid.Row="1" Spacing="10" HorizontalAlignment="Center">
+    <Grid x:Name="NavigationArea"
+          Grid.Row="1"
+          SizeChanged="OnNavigationAreaSizeChanged">
+      <Border x:Name="SelectionBlob"
+              Width="44"
+              Height="44"
+              HorizontalAlignment="Center"
+              VerticalAlignment="Top"
+              Background="Transparent"
+              IsHitTestVisible="False">
+        <Border.RenderTransform>
+          <TranslateTransform x:Name="SelectionTranslation" />
+        </Border.RenderTransform>
+        <Border x:Name="SelectionShape"
+                Background="{StaticResource ActiveNavigationBrush}"
+                BorderBrush="{StaticResource LiquidInnerBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="15">
+          <Border.RenderTransform>
+            <ScaleTransform x:Name="SelectionScale" />
+          </Border.RenderTransform>
+        </Border>
+      </Border>
+
+      <StackPanel x:Name="NavigationItems" Spacing="10" HorizontalAlignment="Center" VerticalAlignment="Center">
       <Button x:Name="WorkspaceButton"
               Click="OnWorkspaceClick"
               ToolTipService.ToolTip="工作台"
@@ -39,7 +63,8 @@
               Style="{StaticResource NavigationButtonStyle}">
         <FontIcon Glyph="&#xE9D9;" FontSize="20" />
       </Button>
-    </StackPanel>
+      </StackPanel>
+    </Grid>
 
     <Button x:Name="SettingsButton"
             Grid.Row="2"

@@ -4,27 +4,12 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:YunKao.Controls">
-  <Grid x:Name="PageRoot" Padding="14,12,14,14" RowSpacing="10">
+  <Grid x:Name="PageRoot" Padding="14,8,14,14">
     <Grid.RowDefinitions>
-      <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
 
-    <Grid Grid.Row="0">
-      <StackPanel Spacing="3">
-        <TextBlock Text="工作台" Style="{StaticResource PageTitleStyle}" />
-        <TextBlock Text="浏览、提取和导出都在这里完成。"
-                   Style="{StaticResource SecondaryTextStyle}" />
-      </StackPanel>
-      <controls:StatusPill HorizontalAlignment="Right" Variant="Cyan">
-        <StackPanel Orientation="Horizontal" Spacing="7">
-          <Ellipse Width="6" Height="6" Fill="{StaticResource CyanPrimaryBrush}" />
-          <TextBlock Text="本地运行" FontSize="11" />
-        </StackPanel>
-      </controls:StatusPill>
-    </Grid>
-
-    <Grid x:Name="ContentGrid" Grid.Row="1" ColumnSpacing="12">
+    <Grid x:Name="ContentGrid" Grid.Row="0" ColumnSpacing="12">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" />
         <ColumnDefinition x:Name="ControlColumn" Width="328" />
@@ -32,16 +17,50 @@
 
       <controls:BrowserShell x:Name="Browser" Grid.Column="0" />
 
-      <Grid x:Name="ControlPanel" Grid.Column="1">
-        <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Spacing="12">
-          <controls:ExtractionPanel x:Name="Extraction" />
-          <controls:ProgressCard x:Name="Progress" />
-          <controls:ExportCard x:Name="Export" />
-          <controls:AiStatusCard x:Name="AiStatus" />
-          <controls:EventList x:Name="Events" />
-        </StackPanel>
-        </ScrollViewer>
+      <Border x:Name="DrawerScrim"
+              Grid.ColumnSpan="2"
+              Background="#141E2E"
+              Opacity="0.08"
+              Visibility="Collapsed"
+              Canvas.ZIndex="1"
+              Tapped="OnDrawerScrimTapped" />
+
+      <Grid x:Name="ControlPanel" Grid.Column="1" Canvas.ZIndex="2">
+        <SystemBackdropElement x:Name="DrawerBackdrop"
+                               CornerRadius="18"
+                               Visibility="Collapsed">
+          <SystemBackdropElement.SystemBackdrop>
+            <DesktopAcrylicBackdrop />
+          </SystemBackdropElement.SystemBackdrop>
+        </SystemBackdropElement>
+        <Border x:Name="DrawerShell"
+                Background="Transparent"
+                BorderBrush="Transparent"
+                BorderThickness="0"
+                CornerRadius="18"
+                Padding="0">
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="12">
+              <controls:LiquidCard x:Name="TaskCard" Variant="Blue" Padding="15">
+                <StackPanel Spacing="14">
+                  <controls:ExtractionPanel x:Name="Extraction" />
+                  <Border Height="1" Background="{StaticResource LiquidInnerBorderBrush}" />
+                  <controls:ProgressCard x:Name="Progress" />
+                </StackPanel>
+              </controls:LiquidCard>
+
+              <controls:LiquidCard x:Name="ToolsCard" Variant="Violet" Padding="14">
+                <StackPanel Spacing="12">
+                  <controls:ExportCard x:Name="Export" />
+                  <Border Height="1" Background="{StaticResource LiquidInnerBorderBrush}" />
+                  <controls:AiStatusCard x:Name="AiStatus" />
+                </StackPanel>
+              </controls:LiquidCard>
+
+              <controls:EventList x:Name="Events" />
+            </StackPanel>
+          </ScrollViewer>
+        </Border>
       </Grid>
 
       <controls:LiquidButton x:Name="DrawerToggle"
@@ -52,6 +71,7 @@
                              VerticalAlignment="Bottom"
                              Click="OnDrawerToggleClick"
                              Visibility="Collapsed"
+                             Canvas.ZIndex="3"
                              Margin="0,0,8,8" />
     </Grid>
   </Grid>

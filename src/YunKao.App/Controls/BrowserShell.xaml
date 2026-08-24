@@ -27,24 +27,29 @@
         <Button Grid.Column="1" Click="OnRefreshClick" ToolTipService.ToolTip="刷新" Style="{StaticResource IconButtonStyle}">
           <FontIcon Glyph="&#xE72C;" />
         </Button>
-        <Border Grid.Column="2" Background="#42F8FBFE" CornerRadius="11" Padding="6,2">
-          <Grid ColumnSpacing="6">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="Auto" />
-              <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-            <FontIcon Grid.Column="0" Glyph="&#xE72E;" FontSize="13" Foreground="{StaticResource CyanPrimaryBrush}" VerticalAlignment="Center" />
+        <Grid Grid.Column="2" ColumnSpacing="6">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <FontIcon Grid.Column="0" Glyph="&#xE72E;" FontSize="13" Foreground="{StaticResource CyanPrimaryBrush}" VerticalAlignment="Center" />
+          <Grid Grid.Column="1">
+            <TextBlock x:Name="AddressDisplay"
+                       Text="cctrcloud.net"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       Tapped="OnAddressDisplayTapped"
+                       ToolTipService.ToolTip="点击编辑 HTTPS 地址"
+                       Style="{StaticResource SecondaryTextStyle}" />
             <TextBox x:Name="AddressBox"
-                     Grid.Column="1"
-                     Text="cctrcloud.net"
+                     Visibility="Collapsed"
                      PlaceholderText="输入 HTTPS 地址"
                      KeyDown="OnAddressKeyDown"
-                     GotFocus="OnAddressGotFocus"
                      LostFocus="OnAddressLostFocus"
                      ToolTipService.ToolTip="完整地址"
                      Style="{StaticResource AddressBarStyle}" />
           </Grid>
-        </Border>
+        </Grid>
         <Button Grid.Column="3" Click="OnExternalClick" ToolTipService.ToolTip="在浏览器中打开" Style="{StaticResource IconButtonStyle}">
           <FontIcon Glyph="&#xE8A7;" />
         </Button>
@@ -57,7 +62,7 @@
             BorderThickness="1"
             CornerRadius="18"
             Padding="1">
-      <wv2:WebView2 x:Name="WebView" />
+      <wv2:WebView2 x:Name="WebView" SizeChanged="OnWebViewSurfaceSizeChanged" />
     </Border>
 
     <TextBlock x:Name="StatusText"

@@ -4,7 +4,11 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:YunKao.Controls">
-  <controls:LiquidCard Variant="Violet" Padding="14">
+  <Border Background="#248C7BE8"
+          BorderBrush="#48FFFFFF"
+          BorderThickness="1"
+          CornerRadius="12"
+          Padding="10">
     <StackPanel Spacing="8">
       <Grid>
         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -19,5 +23,5 @@
                  TextWrapping="Wrap"
                  Style="{StaticResource SecondaryTextStyle}" />
     </StackPanel>
-  </controls:LiquidCard>
+  </Border>
 </UserControl>

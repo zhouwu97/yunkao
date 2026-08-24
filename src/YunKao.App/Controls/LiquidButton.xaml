@@ -12,12 +12,23 @@
             CornerRadius="11"
             IsHitTestVisible="False" />
     <Border x:Name="Surface"
-            Background="{StaticResource BluePrimaryBrush}"
+            Background="Transparent"
             BorderBrush="#66FFFFFF"
             BorderThickness="1"
             CornerRadius="11">
       <Grid>
-        <Border x:Name="TintLayer" CornerRadius="10" IsHitTestVisible="False" Opacity="0.7" />
+        <SystemBackdropElement x:Name="BackdropLayer"
+                               CornerRadius="11">
+          <SystemBackdropElement.SystemBackdrop>
+            <DesktopAcrylicBackdrop />
+          </SystemBackdropElement.SystemBackdrop>
+        </SystemBackdropElement>
+        <Border x:Name="TintLayer" CornerRadius="10" IsHitTestVisible="False" Opacity="0.86" />
+        <Border x:Name="InteractiveHighlight"
+                CornerRadius="10"
+                Background="#46FFFFFF"
+                Opacity="0"
+                IsHitTestVisible="False" />
         <Border Height="1"
                 Margin="12,1,12,0"
                 VerticalAlignment="Top"

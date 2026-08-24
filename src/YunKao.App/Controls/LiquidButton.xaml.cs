@@ -17,7 +17,7 @@ public enum LiquidButtonVariant
 }
 
 /// <summary>
-/// 统一的液态按钮：小面积 tint、顶部高光和可中断的按压反馈。
+/// 统一的液态按钮：局部 Acrylic、小面积 tint、顶部高光和可中断的液体形变反馈。
 /// </summary>
 public sealed partial class LiquidButton : UserControl
 {
@@ -69,7 +69,8 @@ public sealed partial class LiquidButton : UserControl
             LiquidButtonVariant.Violet => (Color.FromArgb(0x5A, 0x8C, 0x7B, 0xE8), Color.FromArgb(0x42, 0xD7, 0x92, 0xB7), Colors.White, Color.FromArgb(0x72, 0xFF, 0xFF, 0xFF)),
             LiquidButtonVariant.Coral => (Color.FromArgb(0x5A, 0xEA, 0x8D, 0x7C), Color.FromArgb(0x42, 0xD8, 0xA4, 0x51), Colors.White, Color.FromArgb(0x72, 0xFF, 0xFF, 0xFF)),
             LiquidButtonVariant.Ghost => (Color.FromArgb(0x18, 0xFF, 0xFF, 0xFF), Color.FromArgb(0x0C, 0x62, 0xB7, 0xD8), Color.FromArgb(0xFF, 0x65, 0x79, 0x8E), Color.FromArgb(0x62, 0xFF, 0xFF, 0xFF)),
-            _ => (Color.FromArgb(0xFF, 0x6C, 0x9F, 0xFF), Color.FromArgb(0xFF, 0x7E, 0x8F, 0xEB), Colors.White, Color.FromArgb(0x7A, 0xFF, 0xFF, 0xFF)),
+            // 主按钮保留 35~55% 的蓝色玻璃 tint，让 Acrylic backdrop 仍然可见。
+            _ => (Color.FromArgb(0xA0, 0x6C, 0x9F, 0xFF), Color.FromArgb(0x78, 0x7E, 0x8F, 0xEB), Colors.White, Color.FromArgb(0x7A, 0xFF, 0xFF, 0xFF)),
         };
 
         Surface.BorderBrush = new SolidColorBrush(border);
@@ -88,9 +89,33 @@ public sealed partial class LiquidButton : UserControl
     }
 
     private void OnClick(object sender, RoutedEventArgs args) => Click?.Invoke(this, args);
-    private void OnPointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs args) => MotionService.AnimateScale(VisualRoot, 1.015);
-    private void OnPointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs args) => MotionService.AnimateScale(VisualRoot, 1);
-    private void OnPointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs args) => MotionService.AnimateScale(VisualRoot, 0.985, 90);
-    private void OnPointerReleased(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs args) => MotionService.AnimateScale(VisualRoot, 1.015, 100);
-    private void OnPointerCaptureLost(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs args) => MotionService.AnimateScale(VisualRoot, 1, 100);
+    private void OnPointerEntered(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs args)
+    {
+        InteractiveHighlight.Opacity = 0.14;
+        MotionService.AnimateScaleXY(VisualRoot, 1.012, 1.012);
+    }
+
+    private void OnPointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs args)
+    {
+        InteractiveHighlight.Opacity = 0;
+        MotionService.AnimateScaleXY(VisualRoot, 1, 1, 140);
+    }
+
+    private void OnPointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs args)
+    {
+        InteractiveHighlight.Opacity = 0.24;
+        MotionService.AnimateScaleXY(VisualRoot, 1.018, 0.955, 90);
+    }
+
+    private void OnPointerReleased(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs args)
+    {
+        InteractiveHighlight.Opacity = 0.14;
+        MotionService.AnimateScaleXY(VisualRoot, 1.012, 1.012, 170);
+    }
+
+    private void OnPointerCaptureLost(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs args)
+    {
+        InteractiveHighlight.Opacity = 0;
+        MotionService.AnimateScaleXY(VisualRoot, 1, 1, 150);
+    }
 }

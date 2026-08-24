@@ -17,9 +17,12 @@ public sealed partial class ExtractionPanel : UserControl
     public void SetState(string state, bool running, bool paused)
     {
         StateText.Text = state;
+        HintText.Text = running || paused
+            ? "正在等待下一题内容稳定…"
+            : "进入练习后可自动连续提取";
         StartButton.IsEnabled = !running;
         PauseButton.IsEnabled = running || paused;
-        PauseButton.Label = paused ? "继续" : "暂停";
+        PauseButton.Label = paused ? "继续提取" : "暂停提取";
         StopButton.IsEnabled = running || paused;
     }
 

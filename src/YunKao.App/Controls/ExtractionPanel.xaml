@@ -4,8 +4,8 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:YunKao.Controls">
-  <controls:LiquidCard Variant="Blue" Padding="15">
-    <StackPanel Spacing="12">
+  <Grid>
+    <StackPanel Spacing="10">
       <StackPanel Orientation="Horizontal" Spacing="10">
         <Border Width="34" Height="34" CornerRadius="11" Background="{StaticResource IceBlueSoftBrush}">
           <FontIcon Glyph="&#xE8A5;" Foreground="{StaticResource IceBlueBrush}"
@@ -17,7 +17,8 @@
         </StackPanel>
       </StackPanel>
 
-      <TextBlock Text="MutationObserver 驱动，稳定 100ms 后读取当前题。"
+      <TextBlock x:Name="HintText"
+                 Text="进入练习后可自动连续提取"
                  TextWrapping="Wrap"
                  Style="{StaticResource SecondaryTextStyle}" />
       <controls:LiquidButton x:Name="StartButton" Label="开始提取" Click="OnStartClick" Variant="Primary" />
@@ -26,9 +27,9 @@
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
-        <controls:LiquidButton x:Name="PauseButton" Grid.Column="0" Label="暂停" Click="OnPauseClick" Variant="Soft" IsEnabled="False" />
+        <controls:LiquidButton x:Name="PauseButton" Grid.Column="0" Label="暂停提取" Click="OnPauseClick" Variant="Soft" IsEnabled="False" />
         <controls:LiquidButton x:Name="StopButton" Grid.Column="1" Label="停止" Click="OnStopClick" Variant="Coral" IsEnabled="False" />
       </Grid>
     </StackPanel>
-  </controls:LiquidCard>
+  </Grid>
 </UserControl>

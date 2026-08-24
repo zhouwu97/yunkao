@@ -4,7 +4,11 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:YunKao.Controls">
-  <controls:LiquidCard Variant="Coral" Padding="14">
+  <Border Background="#24EA8D7C"
+          BorderBrush="#48FFFFFF"
+          BorderThickness="1"
+          CornerRadius="12"
+          Padding="10">
     <StackPanel Spacing="10">
       <Grid>
         <StackPanel Orientation="Horizontal" Spacing="8">
@@ -24,5 +28,5 @@
         <controls:LiquidButton Grid.Column="2" Label="更多" Variant="Coral" Click="OnMoreClick" />
       </Grid>
     </StackPanel>
-  </controls:LiquidCard>
+  </Border>
 </UserControl>

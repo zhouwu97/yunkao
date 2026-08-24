@@ -57,10 +57,10 @@
     <Setter Property="BorderBrush" Value="#42EA8D7C" />
   </Style>
   <Style x:Key="AddressBarStyle" TargetType="TextBox">
-    <Setter Property="Padding" Value="8,3" />
+    <Setter Property="Padding" Value="4,3" />
     <Setter Property="FontSize" Value="12" />
     <Setter Property="BorderThickness" Value="0" />
-    <Setter Property="Background" Value="#4DF8FBFE" />
+    <Setter Property="Background" Value="#28F8FBFE" />
     <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}" />
     <Setter Property="CornerRadius" Value="10" />
     <Setter Property="SelectionHighlightColor" Value="{StaticResource BluePrimaryBrush}" />

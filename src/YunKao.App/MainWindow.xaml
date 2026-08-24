@@ -45,9 +45,18 @@
         <ColumnDefinition Width="*" />
       </Grid.ColumnDefinitions>
 
-      <controls:LiquidCard Grid.Column="0" Padding="0">
+      <Grid x:Name="NavigationSurface" Grid.Column="0">
+        <SystemBackdropElement x:Name="NavigationBackdrop" CornerRadius="20">
+          <SystemBackdropElement.SystemBackdrop>
+          <DesktopAcrylicBackdrop />
+          </SystemBackdropElement.SystemBackdrop>
+        </SystemBackdropElement>
+        <Border Background="{StaticResource RailSurfaceBrush}"
+                BorderBrush="{StaticResource LiquidInnerBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="20" />
         <controls:NavigationRail x:Name="NavigationRail" />
-      </controls:LiquidCard>
+      </Grid>
 
       <Frame x:Name="RootFrame"
              Grid.Column="1"
