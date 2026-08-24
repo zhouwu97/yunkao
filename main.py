@@ -63,14 +63,19 @@ if not ensure_windows_admin():
 
 hide_native_console()
 
-# Must be configured before importing QtWebEngine.
-
-# Must be configured before importing QtWebEngine.
-os.environ["QT_OPENGL"] = "software"
-os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
-    "--disable-gpu --disable-gpu-compositing --log-level=3 "
-    "--disable-logging"
-)
+# Must be configured before importing QtWebEngine. 默认保留 GPU，只有显式兼容模式才切软件渲染。
+if os.environ.get("YUNKAO_COMPAT_MODE", "").strip() == "1":
+    os.environ["QT_OPENGL"] = "software"
+    os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+        "--disable-gpu --disable-gpu-compositing --log-level=3 "
+        "--disable-logging"
+    )
+else:
+    os.environ.setdefault("QT_OPENGL", "desktop")
+    os.environ.setdefault(
+        "QTWEBENGINE_CHROMIUM_FLAGS",
+        "--log-level=3 --disable-logging",
+    )
 
 import requests
 
@@ -79,7 +84,7 @@ if getattr(sys, 'frozen', False):
     os.chdir(exe_dir)
 
 from PySide6.QtWidgets import QApplication
-from config.settings import load_config, save_config
+from config.settings import load_config
 from config.version import APP_NAME, APP_VERSION
 from ui.main_window import YunKaoExtractorApp
 
@@ -91,16 +96,11 @@ if __name__ == "__main__":
     app.setOrganizationName("zhouwu97")
     
     cfg = load_config()
-    current_user = cfg.get("yunkao_user") or cfg.get("user") or "local_user"
+    current_user = str(cfg.get("yunkao_user") or "").strip()
     user_data = {
         "nickname": cfg.get("nickname") or "本地用户",
         "role": "local",
     }
-    
-    cfg["jwt_token"] = ""
-    cfg["user"] = current_user
-    cfg["user_data"] = user_data
-    save_config(cfg)
     
     window = YunKaoExtractorApp(
         current_user=current_user,

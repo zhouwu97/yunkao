@@ -4,6 +4,7 @@ from PySide6.QtCore import QPoint, Qt, Signal
 from PySide6.QtWidgets import QFrame, QLabel, QHBoxLayout, QPushButton
 
 from config.version import APP_RELEASE
+from ui.theme import STATUS_INFO
 
 
 class TitleBar(QFrame):
@@ -16,6 +17,9 @@ class TitleBar(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._drag_position = QPoint()
+        self._dragging = False
+        self._was_maximized = False
+        self._restore_ratio = 0.5
         self.setObjectName("titleBar")
         self.setFixedHeight(54)
 
@@ -65,24 +69,57 @@ class TitleBar(QFrame):
         button.setFixedSize(38, 32)
         return button
 
-    def set_status(self, text, color="#65B8DD"):
+    def set_status(self, text, color=STATUS_INFO):
         """更新标题栏状态胶囊，颜色由运行状态决定。"""
         self.status.setText(f"●  {text}")
         self.status.setStyleSheet(f"color: {color};")
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
-            self._drag_position = event.globalPosition().toPoint()
+            window = self.window()
+            global_position = event.globalPosition().toPoint()
+            self._dragging = True
+            self._was_maximized = window.isMaximized()
+            if self._was_maximized:
+                frame = window.frameGeometry()
+                self._restore_ratio = max(
+                    0.0,
+                    min(
+                        1.0,
+                        (global_position.x() - frame.left()) / max(frame.width(), 1),
+                    ),
+                )
+                self._drag_position = QPoint()
+            else:
+                self._drag_position = global_position - window.frameGeometry().topLeft()
             event.accept()
             return
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
-        if event.buttons() & Qt.LeftButton:
+        if self._dragging and event.buttons() & Qt.LeftButton:
             window = self.window()
-            window.move(window.pos() + event.globalPosition().toPoint() - self._drag_position)
-            self._drag_position = event.globalPosition().toPoint()
+            if window.isMaximized():
+                window.showNormal()
+                self._drag_position = QPoint(
+                    int(window.width() * self._restore_ratio),
+                    min(20, max(window.height() - 1, 0)),
+                )
+            window.move(event.globalPosition().toPoint() - self._drag_position)
+            self._was_maximized = False
             event.accept()
             return
         super().mouseMoveEvent(event)
 
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._dragging = False
+        super().mouseReleaseEvent(event)
+
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self._dragging = False
+            self.maximize_requested.emit()
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)

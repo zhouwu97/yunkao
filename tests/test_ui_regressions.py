@@ -2,7 +2,7 @@ import json
 import os
 import tempfile
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 os.environ.setdefault("QT_OPENGL", "software")
@@ -11,10 +11,11 @@ os.environ.setdefault(
     "--disable-gpu --disable-gpu-compositing --disable-logging",
 )
 
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import QEvent, QPoint, QPointF, QUrl, Qt
+from PySide6.QtGui import QCloseEvent, QMouseEvent
 from PySide6.QtWebEngineCore import QWebEnginePage
 from PySide6.QtWebEngineWidgets import QWebEngineView
-from PySide6.QtWidgets import QApplication, QLineEdit
+from PySide6.QtWidgets import QApplication, QLineEdit, QMainWindow
 
 from config import settings as config_settings
 from config.settings import HARDCODED_SCHOOL_CODE
@@ -28,6 +29,7 @@ from modules.exporter import (
 )
 from ui.main_window import YunKaoExtractorApp
 from ui.settings_dialog import SettingsDialog, extract_model_ids
+from ui.title_bar import TitleBar
 
 
 class UiRegressionTests(unittest.TestCase):
@@ -110,6 +112,51 @@ class UiRegressionTests(unittest.TestCase):
         self.assertTrue(window.navigation.buttons["workspace"].isChecked())
         self.assertEqual(window.overlay.btn_back, window.browser_shell.btn_back)
 
+    def test_browser_fit_scales_wide_page_to_the_available_viewport(self):
+        window = self.create_window()
+
+        with patch.object(window.browser, "setZoomFactor") as set_zoom:
+            window._apply_browser_fit({"viewport": 1000, "content": 1250})
+
+        set_zoom.assert_called_once_with(0.8)
+
+    def test_title_bar_drag_is_manual_and_does_not_trigger_windows_snap(self):
+        window = QMainWindow()
+        window.setWindowFlags(Qt.FramelessWindowHint | Qt.Window)
+        window.resize(640, 480)
+        window.move(100, 100)
+        title_bar = TitleBar(window)
+        title_bar.show()
+        self.addCleanup(window.close)
+
+        native_handle = Mock()
+        native_handle.startSystemMove.return_value = True
+        press_event = QMouseEvent(
+            QEvent.MouseButtonPress,
+            QPointF(20, 20),
+            QPointF(20, 20),
+            QPointF(120, 120),
+            Qt.LeftButton,
+            Qt.LeftButton,
+            Qt.NoModifier,
+        )
+        move_event = QMouseEvent(
+            QEvent.MouseMove,
+            QPointF(60, 45),
+            QPointF(60, 45),
+            QPointF(160, 125),
+            Qt.NoButton,
+            Qt.LeftButton,
+            Qt.NoModifier,
+        )
+
+        with patch.object(window, "windowHandle", return_value=native_handle):
+            title_bar.mousePressEvent(press_event)
+            title_bar.mouseMoveEvent(move_event)
+
+        native_handle.startSystemMove.assert_not_called()
+        self.assertEqual(window.pos(), QPoint(140, 105))
+
     def test_control_panel_metrics_and_export_state_are_synchronized(self):
         window = self.create_window()
         panel = window.control_panel
@@ -129,6 +176,130 @@ class UiRegressionTests(unittest.TestCase):
         panel.refresh_export_state(True)
         self.assertTrue(panel.btn_export.isEnabled())
         self.assertTrue(panel.btn_export_more.isEnabled())
+
+    def test_export_shortcuts_forward_their_explicit_format(self):
+        window = self.create_window()
+        export = Mock()
+        window.export_basic_questions = export
+
+        window.control_panel.btn_export_pdf.click()
+        window.control_panel.btn_export.click()
+        window.control_panel.btn_export_more.click()
+
+        self.assertEqual(
+            export.call_args_list,
+            [call("PDF"), call("DOCX"), call(None)],
+        )
+
+    def test_direct_pdf_export_locks_dialog_filter_and_extension(self):
+        window = self.create_window()
+        window.extracted_questions.append({"title": "测试题"})
+
+        export_thread = Mock()
+        progress_dialog = Mock()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            window.config["default_export_dir"] = temp_dir
+            with (
+                patch(
+                    "ui.main_window.QFileDialog.getSaveFileName",
+                    return_value=(os.path.join(temp_dir, "题库"), "PDF 文件 (*.pdf)"),
+                ) as get_save_file_name,
+                patch("ui.main_window.QProgressDialog", return_value=progress_dialog),
+                patch("ui.main_window.ExportThread", return_value=export_thread) as export_cls,
+            ):
+                window.export_basic_questions("PDF")
+
+        self.assertEqual(
+            get_save_file_name.call_args.args[3],
+            "PDF 文件 (*.pdf)",
+        )
+        self.assertTrue(export_cls.call_args.args[1].endswith(".pdf"))
+        self.assertEqual(export_cls.call_args.args[2], "PDF 文件 (*.pdf)")
+
+    def test_external_browser_button_opens_current_url(self):
+        window = self.create_window()
+        with (
+            patch.object(
+                window.browser,
+                "url",
+                return_value=QUrl("https://www.cctrcloud.net/practice/login.html"),
+            ),
+            patch("ui.main_window.QDesktopServices.openUrl", return_value=True) as open_url,
+        ):
+            window.browser_shell.btn_external.click()
+
+        open_url.assert_called_once_with(
+            QUrl("https://www.cctrcloud.net/practice/login.html")
+        )
+
+    def test_clearing_questions_keeps_running_ai_worker_referenced_until_finished(self):
+        window = self.create_window()
+        worker = Mock()
+        worker.isRunning.return_value = True
+        key = (window.ai_session_id, 0)
+        window.pending_ai_workers[key] = worker
+        window._live_ai_workers[key] = worker
+        window.extracted_questions.append({"title": "待补全题"})
+
+        window.clear_extracted_questions()
+
+        self.assertNotIn(key, window.pending_ai_workers)
+        self.assertIn(key, window._live_ai_workers)
+        window._cleanup_ai_fill_worker(key)
+        self.assertNotIn(key, window._live_ai_workers)
+        worker.deleteLater.assert_called_once_with()
+
+    def test_close_event_requests_running_ai_workers_before_destroying_window(self):
+        window = self.create_window()
+        worker = Mock()
+        worker.isRunning.return_value = True
+        window._live_ai_workers[(window.ai_session_id, 0)] = worker
+
+        event = QCloseEvent()
+        with patch("ui.main_window.QTimer.singleShot") as schedule:
+            window.closeEvent(event)
+
+        self.assertFalse(event.isAccepted())
+        worker.requestInterruption.assert_called_once_with()
+        self.assertTrue(window._close_after_ai_workers)
+        schedule.assert_called_once()
+
+        worker.isRunning.return_value = False
+        window._close_after_ai_workers = False
+        window.close()
+
+    def test_save_config_never_persists_ai_key(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_file = os.path.join(temp_dir, "config.json")
+            with patch.object(config_settings, "CONFIG_FILE", config_file):
+                config_settings.save_config(
+                    {"ai_api_key": "secret-key", "ai_key_saved": True, "value": 1}
+                )
+            with open(config_file, "r", encoding="utf-8") as handle:
+                saved = json.load(handle)
+
+        self.assertNotIn("ai_api_key", saved)
+        self.assertTrue(saved["ai_key_saved"])
+
+    def test_settings_open_does_not_fetch_models_without_explicit_click(self):
+        config = {
+            "default_export_dir": tempfile.gettempdir(),
+            "default_filename_prefix": "题库",
+            "yunkao_user": "",
+            "ai_provider": "custom",
+            "ai_base_url": "https://api.example.com/v1",
+            "ai_model": "existing-model",
+            "ai_api_key": "test-key",
+        }
+        with (
+            patch("ui.settings_dialog.load_config", return_value=config),
+            patch("ui.settings_dialog.keyring.get_password", return_value=None),
+        ):
+            dialog = SettingsDialog()
+            self.addCleanup(dialog.close)
+            with patch.object(dialog.network_manager, "get") as get_models:
+                self.app.processEvents()
+                self.assertFalse(get_models.called)
 
     def test_version_marker_is_semantic_and_visible_in_settings(self):
         self.assertRegex(APP_VERSION, r"^\d+\.\d+\.\d+$")
@@ -216,16 +387,24 @@ class UiRegressionTests(unittest.TestCase):
                 dialog.txt_ai_key.setText("example-key")
                 dialog.save_settings()
 
-            set_password.assert_called_once_with(
-                "YunKaoDesktop",
-                f"{HARDCODED_SCHOOL_CODE}_20260002",
-                "local-secret",
+            self.assertIn(
+                call(
+                    "YunKaoDesktop",
+                    f"{HARDCODED_SCHOOL_CODE}_20260002",
+                    "local-secret",
+                ),
+                set_password.call_args_list,
+            )
+            self.assertIn(
+                call("YunKaoDesktop/AI", "openai", "example-key"),
+                set_password.call_args_list,
             )
             saved = save_config.call_args.args[0]
             self.assertEqual(saved["yunkao_user"], "20260002")
             self.assertEqual(saved["ai_base_url"], "https://api.example.com/v1")
             self.assertEqual(saved["ai_model"], "example-model")
-            self.assertEqual(saved["ai_api_key"], "example-key")
+            self.assertNotIn("ai_api_key", saved)
+            self.assertTrue(saved["ai_key_saved"])
 
     def test_custom_api_fetches_selectable_model_list(self):
         self.assertEqual(
@@ -254,7 +433,6 @@ class UiRegressionTests(unittest.TestCase):
                 dialog = SettingsDialog()
                 self.addCleanup(dialog.close)
 
-            dialog.model_fetch_timer.stop()
             self.assertEqual(dialog.btn_fetch_models.text(), "查询模型")
             self.assertIn("AI 生成内容可能不准确", dialog.lbl_ai_warning.text())
             reply = Mock()
@@ -426,6 +604,28 @@ class UiRegressionTests(unittest.TestCase):
         self.assertEqual(len(scripts), 1)
         self.assertIn(HARDCODED_SCHOOL_CODE, scripts[0])
         self.assertIn("20260003", scripts[0])
+
+    def test_auto_fill_with_empty_account_never_injects_local_user(self):
+        window = self.create_window(current_user="")
+        scripts = []
+
+        def capture_script(_page, script, *args):
+            scripts.append(script)
+
+        with (
+            patch.object(
+                QWebEngineView,
+                "url",
+                return_value=QUrl("https://www.cctrcloud.net/practice/login.html"),
+            ),
+            patch("ui.main_window.keyring.get_password", return_value=None),
+            patch.object(QWebEnginePage, "runJavaScript", new=capture_script),
+        ):
+            window.trigger_auto_fill()
+
+        self.assertEqual(len(scripts), 1)
+        self.assertIn(HARDCODED_SCHOOL_CODE, scripts[0])
+        self.assertNotIn("local_user", scripts[0])
 
     def test_config_update_switches_active_student_number(self):
         window = self.create_window(current_user="old-user")

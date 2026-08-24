@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 
 from config.version import APP_RELEASE
 from ui.settings_dialog import SettingsDialog
+from ui.theme import STATUS_INFO
 from ui.widgets import ToggleSwitch
 
 
@@ -240,8 +241,9 @@ class ControlPanel(QFrame):
         self.btn_toggle.clicked.connect(self.toggle_extraction)
         self.btn_stop.clicked.connect(self.stop_extraction)
         self.btn_clear.clicked.connect(self.clear_questions)
-        for button in (self.btn_export_pdf, self.btn_export, self.btn_export_more):
-            button.clicked.connect(self._export)
+        self.btn_export_pdf.clicked.connect(lambda: self._export("PDF"))
+        self.btn_export.clicked.connect(lambda: self._export("DOCX"))
+        self.btn_export_more.clicked.connect(lambda: self._export(None))
         self.btn_min.clicked.connect(self.toggle_minimize)
 
         self._append_event("系统就绪，等待进入练习页面")
@@ -280,9 +282,9 @@ class ControlPanel(QFrame):
         button.setMinimumHeight(48)
         return button
 
-    def _export(self):
+    def _export(self, export_format=None):
         if self.main_app is not None:
-            self.main_app.export_basic_questions()
+            self.main_app.export_basic_questions(export_format)
 
     def toggle_extraction(self):
         if self.main_app is None:
@@ -315,12 +317,12 @@ class ControlPanel(QFrame):
         self.btn_toggle.setText("停止提取" if self.is_extracting else "开始提取")
         self.status_label.setText("提取进行中" if self.is_extracting else self.status_label.text())
 
-    def set_status(self, text, color="#65B8DD"):
+    def set_status(self, text, color=STATUS_INFO):
         self.status_label.setText(text)
         self.status_label.setStyleSheet(f"color: {color};")
         self.status_dot.setStyleSheet(f"color: {color};")
 
-    def set_mini_status(self, text, color="#65B8DD"):
+    def set_mini_status(self, text, color=STATUS_INFO):
         clean_text = str(text or "系统就绪")
         self.lbl_status_mini.setText(clean_text)
         self.lbl_status_mini.setStyleSheet(f"color: {color};")

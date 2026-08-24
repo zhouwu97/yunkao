@@ -37,7 +37,7 @@ class NavigationRail(QFrame):
 
         layout.addStretch(1)
 
-        self.btn_dock = self._make_button("dock", "◫", "切换停靠 / 悬浮")
+        self.btn_dock = self._make_button("collapse", "⌃", "折叠控制台")
         self.btn_settings = self._make_button("settings", "⚙", "设置")
         layout.addWidget(self.btn_dock)
         layout.addWidget(self.btn_settings)
@@ -61,4 +61,3 @@ class NavigationRail(QFrame):
         button = self.button_group.button(button_id)
         if button is not None:
             self.page_requested.emit(button.property("pageId"))
-

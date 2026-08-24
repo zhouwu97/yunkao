@@ -1,5 +1,6 @@
 import os
 import json
+import keyring
 
 APP_NAME = "YunKaoDesktop"
 _app_data_root = os.environ.get("APPDATA") or os.path.join(
@@ -21,6 +22,7 @@ LEGACY_CONFIG_FILES = tuple(
     )
 )
 SERVICE_NAME = "YunKaoDesktop"
+AI_KEYRING_SERVICE = f"{SERVICE_NAME}/AI"
 HARDCODED_SCHOOL_CODE = "u101441"
 CONFIG_VERSION = 2
 
@@ -42,6 +44,35 @@ DEFAULT_CONFIG = {
     "yunkao_remember_password": True,
     "config_version": CONFIG_VERSION,
 }
+
+
+def _ai_keyring_user(provider):
+    """返回稳定的 AI 凭据用户名，避免把 API Key 写入配置文件。"""
+    return str(provider or "custom").strip().lower() or "custom"
+
+
+def get_ai_api_key(provider):
+    """从系统凭据库读取指定提供商的 AI Key。"""
+    try:
+        return keyring.get_password(AI_KEYRING_SERVICE, _ai_keyring_user(provider)) or ""
+    except Exception:
+        return ""
+
+
+def set_ai_api_key(provider, api_key):
+    """保存或删除指定提供商的 AI Key。"""
+    username = _ai_keyring_user(provider)
+    try:
+        if str(api_key or "").strip():
+            keyring.set_password(AI_KEYRING_SERVICE, username, str(api_key).strip())
+        else:
+            try:
+                keyring.delete_password(AI_KEYRING_SERVICE, username)
+            except Exception:
+                pass
+        return True
+    except Exception:
+        return False
 
 def load_config():
     """加载用户级配置，并兼容迁移旧版工作目录配置。"""
@@ -96,19 +127,39 @@ def load_config():
         cfg["config_version"] = CONFIG_VERSION
         migrated = True
 
+    # 旧版可能把 AI Key 明文写在 JSON 中；首次读取时迁移到系统凭据库。
+    provider = cfg.get("ai_provider", "custom")
+    plaintext_ai_key = str(cfg.get("ai_api_key", "") or "").strip()
+    stored_ai_key = get_ai_api_key(provider)
+    ai_key_migration_failed = False
+    if plaintext_ai_key and not stored_ai_key:
+        if set_ai_api_key(provider, plaintext_ai_key):
+            stored_ai_key = plaintext_ai_key
+            migrated = True
+        else:
+            # 凭据库暂不可用时保留旧值，避免迁移失败导致用户的 Key 丢失。
+            ai_key_migration_failed = True
+    cfg["ai_api_key"] = stored_ai_key or (
+        plaintext_ai_key if ai_key_migration_failed else ""
+    )
+    cfg["ai_key_saved"] = bool(stored_ai_key)
+
     # 文件不存在或发生迁移/损坏，写入配置
-    if not file_existed or not config_valid or migrated:
+    if (not file_existed or not config_valid or migrated) and not ai_key_migration_failed:
         save_config(cfg)
 
     return cfg
 
 def save_config(data):
     """以原子替换方式保存用户级配置。"""
+    persisted = dict(data or {})
+    # AI Key 只允许存在于内存配置和 Windows Credential Manager 中。
+    persisted.pop("ai_api_key", None)
     config_dir = os.path.dirname(os.path.abspath(CONFIG_FILE))
     os.makedirs(config_dir, exist_ok=True)
     temp_file = f"{CONFIG_FILE}.tmp"
     with open(temp_file, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+        json.dump(persisted, f, ensure_ascii=False, indent=2)
         f.flush()
         os.fsync(f.fileno())
     os.replace(temp_file, CONFIG_FILE)

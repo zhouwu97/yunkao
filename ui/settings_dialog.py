@@ -2,12 +2,18 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                                 QLineEdit, QPushButton, QCheckBox, QFileDialog, QMessageBox,
                                 QGroupBox, QFrame, QScrollArea, QWidget, QSpacerItem, QSizePolicy,
                                 QToolButton, QStackedWidget, QButtonGroup)
-from PySide6.QtCore import Signal, Qt, QTimer, QUrl
+from PySide6.QtCore import Signal, Qt, QUrl
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 import json
 import os
 import keyring
-from config.settings import load_config, save_config, SERVICE_NAME, HARDCODED_SCHOOL_CODE
+from config.settings import (
+    AI_KEYRING_SERVICE,
+    load_config,
+    save_config,
+    SERVICE_NAME,
+    HARDCODED_SCHOOL_CODE,
+)
 from config.version import APP_RELEASE
 from ui.widgets import NoWheelComboBox, ToggleSwitch
 from ui.theme import SETTINGS_DIALOG_STYLE
@@ -70,12 +76,7 @@ class SettingsDialog(QDialog):
         self.original_yunkao_user = str(configured_user or "").strip()
         self.network_manager = QNetworkAccessManager(self)
         self.model_reply = None
-        self.model_fetch_timer = QTimer(self)
-        self.model_fetch_timer.setSingleShot(True)
-        self.model_fetch_timer.setInterval(800)
-        self.model_fetch_timer.timeout.connect(self.fetch_models)
         self.init_ui()
-        self._schedule_model_fetch()
 
     def init_ui(self):
         root_layout = QHBoxLayout(self)
@@ -413,9 +414,6 @@ class SettingsDialog(QDialog):
             self.chk_custom_images,
         )
 
-        self.txt_ai_url.textChanged.connect(self._schedule_model_fetch)
-        self.txt_ai_key.textChanged.connect(self._schedule_model_fetch)
-        self.cmb_provider.currentIndexChanged.connect(self._schedule_model_fetch)
         layout.addStretch(1)
         return page
 
@@ -439,13 +437,6 @@ class SettingsDialog(QDialog):
         if preset.get("model"):
             self.txt_ai_model.setText(preset["model"])
         self.chk_custom_images.setChecked(bool(preset.get("supports_images", False)))
-
-    def _schedule_model_fetch(self, *_args):
-        if self.txt_ai_url.text().strip() and self.txt_ai_key.text().strip():
-            self.model_fetch_timer.start()
-        else:
-            self.model_fetch_timer.stop()
-            self.lbl_model_status.clear()
 
     def fetch_models(self, *_args):
         base_url = self.txt_ai_url.text().strip().rstrip("/")
@@ -578,9 +569,25 @@ class SettingsDialog(QDialog):
         self.config["ai_provider"] = self.cmb_provider.currentData()
         self.config["ai_base_url"] = self.txt_ai_url.text().strip() or "https://api.openai.com/v1"
         self.config["ai_model"] = self.txt_ai_model.text().strip() or "gpt-4o-mini"
-        self.config["ai_api_key"] = self.txt_ai_key.text().strip()
+        provider = self.cmb_provider.currentData() or "custom"
+        api_key = self.txt_ai_key.text().strip()
+        try:
+            if api_key:
+                keyring.set_password(AI_KEYRING_SERVICE, str(provider), api_key)
+            else:
+                try:
+                    keyring.delete_password(AI_KEYRING_SERVICE, str(provider))
+                except Exception:
+                    pass
+        except Exception as exc:
+            QMessageBox.warning(self, "凭据保存失败", f"AI Key 无法保存到系统凭据库：{exc}")
+            return
+        self.config["ai_api_key"] = api_key
+        self.config["ai_key_saved"] = bool(api_key)
         self.config["ai_supports_images"] = self.chk_custom_images.isChecked()
 
-        save_config(self.config)
+        persisted_config = dict(self.config)
+        persisted_config.pop("ai_api_key", None)
+        save_config(persisted_config)
         self.config_updated.emit(self.config)
         self.accept()
