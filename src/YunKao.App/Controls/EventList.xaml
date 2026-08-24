@@ -9,7 +9,7 @@
         <TextBlock Text="运行事件" Style="{StaticResource CardTitleStyle}" />
         <TextBlock Text="LIVE" HorizontalAlignment="Right" Style="{StaticResource CaptionTextStyle}" />
       </Grid>
-      <ListView IsItemClickEnabled="False" MaxHeight="150" BorderThickness="0" Background="Transparent">
+      <ListView x:Name="Events" IsItemClickEnabled="False" MaxHeight="150" BorderThickness="0" Background="Transparent">
         <ListViewItem>
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Ellipse Width="6" Height="6" Fill="{StaticResource CyanBrush}" VerticalAlignment="Center" />

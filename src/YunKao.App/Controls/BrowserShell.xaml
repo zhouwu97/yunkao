@@ -2,7 +2,9 @@
 <UserControl
     x:Class="YunKao.Controls.BrowserShell"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:wv2="using:Microsoft.UI.Xaml.Controls"
+    Loaded="OnLoaded">
   <Grid RowSpacing="10">
     <Grid.RowDefinitions>
       <RowDefinition Height="48" />
@@ -18,43 +20,25 @@
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
-        <Button Grid.Column="0" Content="‹" Style="{StaticResource IconButtonStyle}" IsEnabled="False" />
-        <Button Grid.Column="1" Content="↻" Style="{StaticResource IconButtonStyle}" IsEnabled="False" />
-        <TextBox Grid.Column="2"
+        <Button Grid.Column="0" Content="‹" Click="OnBackClick" Style="{StaticResource IconButtonStyle}" />
+        <Button Grid.Column="1" Content="↻" Click="OnRefreshClick" Style="{StaticResource IconButtonStyle}" />
+        <TextBox x:Name="AddressBox"
+                 Grid.Column="2"
                  Text="https://www.cctrcloud.net/"
-                 IsReadOnly="True"
+                 PlaceholderText="输入 HTTPS 地址"
+                 KeyDown="OnAddressKeyDown"
                  Style="{StaticResource AddressBarStyle}" />
-        <Button Grid.Column="3" Content="↗" Style="{StaticResource IconButtonStyle}" IsEnabled="False" />
+        <Button Grid.Column="3" Content="↗" Click="OnExternalClick" Style="{StaticResource IconButtonStyle}" />
       </Grid>
     </Border>
 
     <Border Grid.Row="1" Background="{StaticResource WebViewSurfaceBrush}" CornerRadius="14">
-      <Grid>
-        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" MaxWidth="420">
-          <Border Width="72" Height="72" CornerRadius="24" Background="{StaticResource IceBlueSoftBrush}"
-                  HorizontalAlignment="Center">
-            <FontIcon Glyph="&#xE774;" FontSize="32" Foreground="{StaticResource IceBlueBrush}"
-                      HorizontalAlignment="Center" VerticalAlignment="Center" />
-          </Border>
-          <TextBlock Text="WebView2 插槽" Style="{StaticResource SectionTitleStyle}" HorizontalAlignment="Center" />
-          <TextBlock Text="下一阶段接入融智云考页面、地址栏、导航和安全域名白名单。"
-                     TextWrapping="Wrap"
-                     TextAlignment="Center"
-                     Style="{StaticResource SecondaryTextStyle}" />
-          <Border Style="{StaticResource NoticeCardStyle}">
-            <StackPanel Orientation="Horizontal" Spacing="8">
-              <FontIcon Glyph="&#xE946;" Foreground="{StaticResource AmberBrush}" />
-              <TextBlock Text="当前仅显示迁移骨架，不会访问网络。"
-                         TextWrapping="Wrap"
-                         Style="{StaticResource SecondaryTextStyle}" />
-            </StackPanel>
-          </Border>
-        </StackPanel>
-      </Grid>
+      <wv2:WebView2 x:Name="WebView" />
     </Border>
 
-    <TextBlock Grid.Row="2"
-               Text="安全边界：仅 cctrcloud.net / www.cctrcloud.net 允许后续注入桥接脚本。"
+    <TextBlock x:Name="StatusText"
+               Grid.Row="2"
+               Text="正在准备 WebView2..."
                Style="{StaticResource CaptionTextStyle}"
                TextTrimming="CharacterEllipsis" />
   </Grid>

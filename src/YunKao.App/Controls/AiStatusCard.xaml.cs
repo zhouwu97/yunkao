@@ -8,4 +8,10 @@ public sealed partial class AiStatusCard : UserControl
     {
         InitializeComponent();
     }
+
+    public void SetStatus(string status, string detail)
+    {
+        StatusText.Text = status;
+        DetailText.Text = detail;
+    }
 }

@@ -22,6 +22,11 @@
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.7705" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.3.1" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools.WinApp" Version="0.6.1" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4129.50" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\YunKao.Core\YunKao.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -34,6 +39,11 @@
     <Content Include="Assets\Square44x44Logo.targetsize-48_altform-lightunplated.png" />
     <Content Include="Assets\StoreLogo.png" />
     <Content Include="Assets\Wide310x150Logo.scale-200.png" />
+    <Content Include="..\..\worker\*.py" Link="worker\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" ExcludeFromResourceIndex="true" />
+    <Content Include="..\..\modules\question_parser.py" Link="modules\question_parser.py" CopyToOutputDirectory="PreserveNewest" ExcludeFromResourceIndex="true" />
+    <Content Include="..\..\modules\exporter.py" Link="modules\exporter.py" CopyToOutputDirectory="PreserveNewest" ExcludeFromResourceIndex="true" />
+    <Content Include="..\..\worker\YunKao.Worker.exe" Link="worker\YunKao.Worker.exe" CopyToOutputDirectory="PreserveNewest" ExcludeFromResourceIndex="true" Condition="Exists('..\..\worker\YunKao.Worker.exe')" />
+    <Content Include="Scripts\yunkao-bridge.js" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
@@ -45,9 +55,8 @@
   </ItemGroup>
 
   <PropertyGroup>
-    <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
-    <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
-    <PublishTrimmed Condition="'$(Configuration)' == 'Debug'">False</PublishTrimmed>
-    <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
+    <!-- WinUI、WebView2 和 JSON 反射依赖运行时元数据；保持发布包不裁剪，避免启动后缺少类型。 -->
+    <PublishReadyToRun>False</PublishReadyToRun>
+    <PublishTrimmed>False</PublishTrimmed>
   </PropertyGroup>
 </Project>

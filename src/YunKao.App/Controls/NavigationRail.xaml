@@ -10,10 +10,10 @@
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
-    <StackPanel Grid.Row="0" Margin="4,0,4,24" Spacing="4">
-      <TextBlock Text="导航" Style="{StaticResource CaptionTextStyle}" />
-      <TextBlock Text="YunKao" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
-      <TextBlock Text="专注题库工作流" Style="{StaticResource SecondaryTextStyle}" />
+    <StackPanel x:Name="HeaderPanel" Grid.Row="0" Margin="4,0,4,24" Spacing="4">
+      <TextBlock x:Name="HeaderLabel" Text="导航" Style="{StaticResource CaptionTextStyle}" />
+      <TextBlock x:Name="BrandLabel" Text="YunKao" FontSize="24" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" />
+      <TextBlock x:Name="SubtitleLabel" Text="专注题库工作流" Style="{StaticResource SecondaryTextStyle}" />
     </StackPanel>
 
     <StackPanel Grid.Row="1" Spacing="4">
@@ -22,15 +22,43 @@
               Style="{StaticResource NavigationButtonStyle}">
         <StackPanel Orientation="Horizontal" Spacing="12">
           <FontIcon Glyph="&#xE80F;" FontSize="16" />
-          <TextBlock Text="工作台" />
+          <TextBlock x:Name="WorkspaceLabel" Text="工作台" />
+        </StackPanel>
+      </Button>
+      <Button x:Name="HistoryButton"
+              Click="OnHistoryClick"
+              ToolTipService.ToolTip="历史记录"
+              Style="{StaticResource NavigationButtonStyle}">
+        <StackPanel Orientation="Horizontal" Spacing="12">
+          <FontIcon Glyph="&#xE81C;" FontSize="16" />
+          <TextBlock x:Name="HistoryLabel" Text="历史记录" />
+        </StackPanel>
+      </Button>
+      <Button x:Name="ExportButton"
+              Click="OnExportClick"
+              ToolTipService.ToolTip="导出记录"
+              Style="{StaticResource NavigationButtonStyle}">
+        <StackPanel Orientation="Horizontal" Spacing="12">
+          <FontIcon Glyph="&#xE896;" FontSize="16" />
+          <TextBlock x:Name="ExportLabel" Text="导出记录" />
+        </StackPanel>
+      </Button>
+      <Button x:Name="DiagnosticsButton"
+              Click="OnDiagnosticsClick"
+              ToolTipService.ToolTip="诊断"
+              Style="{StaticResource NavigationButtonStyle}">
+        <StackPanel Orientation="Horizontal" Spacing="12">
+          <FontIcon Glyph="&#xE9D9;" FontSize="16" />
+          <TextBlock x:Name="DiagnosticsLabel" Text="诊断" />
         </StackPanel>
       </Button>
       <Button x:Name="SettingsButton"
               Click="OnSettingsClick"
+              ToolTipService.ToolTip="设置"
               Style="{StaticResource NavigationButtonStyle}">
         <StackPanel Orientation="Horizontal" Spacing="12">
           <FontIcon Glyph="&#xE713;" FontSize="16" />
-          <TextBlock Text="设置" />
+          <TextBlock x:Name="SettingsLabel" Text="设置" />
         </StackPanel>
       </Button>
     </StackPanel>
@@ -39,9 +67,9 @@
       <StackPanel Spacing="6">
         <StackPanel Orientation="Horizontal" Spacing="8">
           <Ellipse Width="8" Height="8" Fill="{StaticResource CyanBrush}" />
-          <TextBlock Text="迁移基准" Style="{StaticResource SmallLabelStyle}" />
+        <TextBlock x:Name="BaselineLabel" Text="迁移基准" Style="{StaticResource SmallLabelStyle}" />
         </StackPanel>
-        <TextBlock Text="PySide6 已验证功能保留为对照基线。"
+        <TextBlock x:Name="BaselineDescription" Text="PySide6 已验证功能保留为对照基线。"
                    TextWrapping="Wrap"
                    Style="{StaticResource SecondaryTextStyle}" />
       </StackPanel>

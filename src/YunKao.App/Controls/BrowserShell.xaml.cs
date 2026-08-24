@@ -1,14 +1,79 @@
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Windows.System;
+using YunKao.Services;
 
 namespace YunKao.Controls;
 
 /// <summary>
-/// 浏览器承载区的阶段一占位控件。尚未创建 WebView2，避免提前触发网络或凭据流程。
+/// WebView2 浏览器壳。它只负责浏览器生命周期和消息转发，不解析题目、不启动 Worker。
 /// </summary>
 public sealed partial class BrowserShell : UserControl
 {
+    private readonly WebViewService _service = new();
+    private bool _loaded;
+
     public BrowserShell()
     {
         InitializeComponent();
+        _service.NavigationChanged += OnNavigationChanged;
+        _service.StatusChanged += OnStatusChanged;
+        _service.ProcessFailed += OnProcessFailed;
+        _service.BridgeMessageReceived += OnBridgeMessageReceived;
+    }
+
+    public WebViewService Service => _service;
+    public event EventHandler<BridgeMessageEventArgs>? BridgeMessageReceived;
+
+    private async void OnLoaded(object sender, RoutedEventArgs args)
+    {
+        if (_loaded) return;
+        _loaded = true;
+        try
+        {
+            await _service.InitializeAsync(WebView);
+            _service.Navigate(new Uri("https://www.cctrcloud.net/"));
+        }
+        catch (WebViewInitializationException exception)
+        {
+            StatusText.Text = exception.Message + "，请安装 Evergreen Runtime。";
+        }
+        catch (Exception exception)
+        {
+            StatusText.Text = "浏览器启动失败：" + exception.Message;
+        }
+    }
+
+    private void OnBackClick(object sender, RoutedEventArgs args) => _service.Back();
+    private void OnRefreshClick(object sender, RoutedEventArgs args) => _service.Refresh();
+    private void OnExternalClick(object sender, RoutedEventArgs args) => _service.OpenExternal();
+
+    private void OnAddressKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs args)
+    {
+        if (args.Key != VirtualKey.Enter) return;
+        args.Handled = true;
+        if (!Uri.TryCreate(AddressBox.Text.Trim(), UriKind.Absolute, out Uri? uri)
+            || !uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+        {
+            StatusText.Text = "地址必须是 HTTPS URL。";
+            return;
+        }
+
+        try { _service.Navigate(uri); }
+        catch (Exception exception) { StatusText.Text = "导航失败：" + exception.Message; }
+    }
+
+    private void OnNavigationChanged(object? sender, BrowserNavigationEventArgs args)
+    {
+        AddressBox.Text = args.Uri?.AbsoluteUri ?? "";
+        StatusText.Text = args.Message;
+    }
+
+    private void OnStatusChanged(object? sender, string message) => StatusText.Text = message;
+    private void OnProcessFailed(object? sender, string message) => StatusText.Text = message + "，可刷新恢复。";
+
+    private void OnBridgeMessageReceived(object? sender, BridgeMessageEventArgs args)
+    {
+        BridgeMessageReceived?.Invoke(this, args);
     }
 }

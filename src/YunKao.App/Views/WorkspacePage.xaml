@@ -30,14 +30,14 @@
         <ColumnDefinition Width="304" />
       </Grid.ColumnDefinitions>
 
-      <controls:BrowserShell Grid.Column="0" />
+      <controls:BrowserShell x:Name="Browser" Grid.Column="0" />
 
       <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
         <StackPanel Spacing="12">
-          <controls:ExtractionPanel />
-          <controls:ProgressCard />
-          <controls:AiStatusCard />
-          <controls:EventList />
+          <controls:ExtractionPanel x:Name="Extraction" />
+          <controls:ProgressCard x:Name="Progress" />
+          <controls:AiStatusCard x:Name="AiStatus" />
+          <controls:EventList x:Name="Events" />
         </StackPanel>
       </ScrollViewer>
     </Grid>

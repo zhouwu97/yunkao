@@ -17,9 +17,10 @@
   <SolidColorBrush x:Key="PinkMistBrush" Color="{StaticResource PinkMistColor}" />
   <SolidColorBrush x:Key="CyanBrush" Color="{StaticResource CyanColor}" />
 
-  <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#EAF1F8" />
-  <SolidColorBrush x:Key="TitleBarBrush" Color="#C9DEF1" Opacity="0.78" />
-  <SolidColorBrush x:Key="SurfaceBrush" Color="#EFF6FC" />
+  <SolidColorBrush x:Key="WindowBackgroundBrush" Color="Transparent" />
+  <SolidColorBrush x:Key="SolidWindowBackgroundBrush" Color="#EAF1F8" />
+  <SolidColorBrush x:Key="TitleBarBrush" Color="#C9DEF1" Opacity="0.58" />
+  <SolidColorBrush x:Key="SurfaceBrush" Color="#C8EFF6FC" />
   <SolidColorBrush x:Key="WebViewSurfaceBrush" Color="#FBFDFF" />
   <SolidColorBrush x:Key="TextPrimaryBrush" Color="#1D2B3A" />
   <SolidColorBrush x:Key="TextSecondaryBrush" Color="#65788B" />

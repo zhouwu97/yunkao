@@ -9,8 +9,8 @@
         <TextBlock Text="提取进度" Style="{StaticResource SmallLabelStyle}" />
         <TextBlock Text="0 / 0" HorizontalAlignment="Right" Style="{StaticResource SmallLabelStyle}" />
       </Grid>
-      <ProgressBar Minimum="0" Maximum="100" Value="0" Foreground="{StaticResource IceBlueBrush}" />
-      <TextBlock Text="尚未开始" Style="{StaticResource SecondaryTextStyle}" />
+      <ProgressBar x:Name="Progress" Minimum="0" Maximum="100" Value="0" Foreground="{StaticResource IceBlueBrush}" />
+      <TextBlock x:Name="ProgressText" Text="尚未开始" Style="{StaticResource SecondaryTextStyle}" />
     </StackPanel>
   </Border>
 </UserControl>

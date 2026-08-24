@@ -8,7 +8,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     Title="融智云考"
     mc:Ignorable="d">
-  <Grid Background="{StaticResource WindowBackgroundBrush}">
+  <Grid x:Name="RootGrid" Background="{StaticResource WindowBackgroundBrush}">
     <Grid.RowDefinitions>
       <RowDefinition Height="52" />
       <RowDefinition Height="*" />
@@ -39,7 +39,7 @@
 
     <Grid Grid.Row="1" Padding="12,0,12,12" ColumnSpacing="12">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="220" />
+        <ColumnDefinition x:Name="NavigationColumn" Width="220" />
         <ColumnDefinition Width="*" />
       </Grid.ColumnDefinitions>
 

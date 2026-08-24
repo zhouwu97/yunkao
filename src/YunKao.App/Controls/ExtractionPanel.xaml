@@ -12,22 +12,36 @@
         </Border>
         <StackPanel>
           <TextBlock Text="提取控制" Style="{StaticResource CardTitleStyle}" />
-          <TextBlock Text="Extraction session" Style="{StaticResource CaptionTextStyle}" />
+          <TextBlock x:Name="StateText" Text="等待开始" Style="{StaticResource CaptionTextStyle}" />
         </StackPanel>
       </StackPanel>
 
-      <TextBlock Text="等待浏览器和 Worker 接入"
+      <TextBlock Text="MutationObserver 驱动，稳定 100ms 后读取当前题。"
+                 TextWrapping="Wrap"
                  Style="{StaticResource SecondaryTextStyle}" />
-      <ProgressBar Minimum="0" Maximum="100" Value="0" />
       <Grid ColumnSpacing="8">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
-        <Button Grid.Column="0" Content="开始提取" Style="{StaticResource PrimaryButtonStyle}" IsEnabled="False" />
-        <Button Grid.Column="1" Content="暂停" Style="{StaticResource SecondaryButtonStyle}" IsEnabled="False" />
+        <Button x:Name="StartButton" Grid.Column="0" Content="开始提取" Click="OnStartClick" Style="{StaticResource PrimaryButtonStyle}" />
+        <Button x:Name="PauseButton" Grid.Column="1" Content="暂停" Click="OnPauseClick" Style="{StaticResource SecondaryButtonStyle}" IsEnabled="False" />
       </Grid>
-      <Button Content="停止并清空" Style="{StaticResource QuietButtonStyle}" IsEnabled="False" />
+      <Button x:Name="StopButton" Content="停止" Click="OnStopClick" Style="{StaticResource QuietButtonStyle}" IsEnabled="False" />
+      <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,0">
+        <StackPanel Spacing="8">
+          <TextBlock Text="快捷导出" Style="{StaticResource SmallLabelStyle}" />
+          <Grid ColumnSpacing="6">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="0" Content="PDF" Click="OnPdfClick" Style="{StaticResource SecondaryButtonStyle}" />
+            <Button Grid.Column="1" Content="DOCX" Click="OnDocxClick" Style="{StaticResource SecondaryButtonStyle}" />
+          </Grid>
+          <Button Content="更多格式 · MD / TXT" Click="OnMoreExportClick" Style="{StaticResource QuietButtonStyle}" />
+        </StackPanel>
+      </Border>
     </StackPanel>
   </Border>
 </UserControl>

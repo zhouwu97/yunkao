@@ -4,34 +4,43 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel Padding="18,16,18,24" Spacing="14" MaxWidth="760">
-      <StackPanel Spacing="3">
-        <TextBlock Text="设置" Style="{StaticResource PageTitleStyle}" />
-        <TextBlock Text="第一阶段先固定信息架构，服务接入后再绑定持久化配置。"
-                   Style="{StaticResource SecondaryTextStyle}" />
-      </StackPanel>
+    <StackPanel Padding="18,16,18,28" Spacing="14" MaxWidth="820">
+      <Grid>
+        <StackPanel Spacing="3">
+          <TextBlock Text="设置" Style="{StaticResource PageTitleStyle}" />
+          <TextBlock Text="配置会写入本地 settings.json；密码和 API Key 只进入系统凭据库。"
+                     Style="{StaticResource SecondaryTextStyle}" />
+        </StackPanel>
+        <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="10" VerticalAlignment="Bottom">
+          <TextBlock x:Name="StatusText" VerticalAlignment="Center" Style="{StaticResource SecondaryTextStyle}" />
+          <Button x:Name="SaveButton" Content="保存设置" Click="OnSaveClick" Style="{StaticResource PrimaryButtonStyle}" />
+        </StackPanel>
+      </Grid>
 
       <Border Style="{StaticResource GlassCardStyle}">
         <StackPanel Spacing="14">
-          <TextBlock Text="账号" Style="{StaticResource SectionTitleStyle}" />
-          <TextBox Header="云考账号" PlaceholderText="后续接入 Credential Manager" IsEnabled="False" />
-          <PasswordBox Header="云考密码" PlaceholderText="不会写入 settings.json" IsEnabled="False" />
-          <CheckBox Content="自动填写登录信息" IsChecked="True" IsEnabled="False" />
+          <TextBlock Text="云考账号" Style="{StaticResource SectionTitleStyle}" />
+          <TextBox x:Name="YunKaoUserBox" Header="学号 / 用户名" PlaceholderText="例如 20260001" />
+          <PasswordBox x:Name="YunKaoPasswordBox" Header="密码" PlaceholderText="留空表示保持现有凭据" />
+          <CheckBox x:Name="RememberPasswordCheckBox" Content="记住密码并在白名单页面自动填写" />
+          <TextBlock Text="学校代码固定为 u101441；凭据不会进入导出文件或诊断日志。"
+                     TextWrapping="Wrap" Style="{StaticResource CaptionTextStyle}" />
         </StackPanel>
       </Border>
 
       <Border Style="{StaticResource GlassCardStyle}">
         <StackPanel Spacing="14">
           <TextBlock Text="导出" Style="{StaticResource SectionTitleStyle}" />
-          <TextBox Header="默认目录" PlaceholderText="后续接入 ExportService" IsEnabled="False" />
-          <TextBox Header="文件名前缀" Text="yunkao" IsEnabled="False" />
-          <ComboBox Header="默认格式" SelectedIndex="0" IsEnabled="False">
-            <ComboBoxItem Content="PDF" />
-            <ComboBoxItem Content="DOCX" />
-            <ComboBoxItem Content="Markdown" />
-            <ComboBoxItem Content="TXT" />
+          <TextBox x:Name="ExportDirectoryBox" Header="默认目录" PlaceholderText="留空使用文档目录" />
+          <TextBox x:Name="ExportPrefixBox" Header="文件名前缀" />
+          <ComboBox x:Name="ExportFormatCombo" Header="默认格式">
+            <ComboBoxItem Tag="PDF" Content="PDF" />
+            <ComboBoxItem Tag="DOCX" Content="DOCX" />
+            <ComboBoxItem Tag="MD" Content="Markdown" />
+            <ComboBoxItem Tag="TXT" Content="TXT" />
           </ComboBox>
-          <CheckBox Content="导出后打开文件" IsChecked="True" IsEnabled="False" />
+          <CheckBox x:Name="AutoOpenCheckBox" Content="导出后打开文件" />
+          <CheckBox x:Name="ExportWithoutAnswersCheckBox" Content="导出练习版（隐藏答案和解析）" />
         </StackPanel>
       </Border>
 
@@ -40,44 +49,34 @@
           <Grid>
             <TextBlock Text="AI 辅助" Style="{StaticResource SectionTitleStyle}" />
             <Border HorizontalAlignment="Right" Style="{StaticResource StatusPillStyle}">
-              <TextBlock Text="下一阶段" />
+              <TextBlock x:Name="AiKeyStatusText" Text="未保存 Key" />
             </Border>
           </Grid>
-          <CheckBox Content="启用 AI 补全" IsEnabled="False" />
-          <ComboBox Header="Provider" SelectedIndex="0" IsEnabled="False">
-            <ComboBoxItem Content="OpenAI-compatible" />
+          <CheckBox x:Name="AiEnabledCheckBox" Content="自动补全网页缺失答案" />
+          <ComboBox x:Name="ProviderCombo" Header="Provider" SelectionChanged="OnProviderChanged">
+            <ComboBoxItem Tag="openai" Content="OpenAI / GPT" />
+            <ComboBoxItem Tag="deepseek" Content="DeepSeek" />
+            <ComboBoxItem Tag="kimi" Content="Kimi / Moonshot" />
+            <ComboBoxItem Tag="qwen" Content="千问 / Qwen" />
+            <ComboBoxItem Tag="glm" Content="智谱 / GLM" />
+            <ComboBoxItem Tag="mimo" Content="小米 MiMo" />
+            <ComboBoxItem Tag="custom" Content="自定义兼容接口" />
           </ComboBox>
-          <TextBox Header="Base URL" PlaceholderText="https://..." IsEnabled="False" />
-          <TextBox Header="Model" PlaceholderText="model-name" IsEnabled="False" />
-          <PasswordBox Header="API Key" PlaceholderText="仅保存到系统凭据库" IsEnabled="False" />
-        </StackPanel>
-      </Border>
-
-      <Border Style="{StaticResource GlassCardStyle}">
-        <StackPanel Spacing="14">
-          <TextBlock Text="外观" Style="{StaticResource SectionTitleStyle}" />
-          <RadioButtons Header="背景材质" SelectedIndex="0" IsEnabled="False">
-            <x:String>Desktop Acrylic</x:String>
-            <x:String>Mica</x:String>
-            <x:String>Solid</x:String>
-          </RadioButtons>
-          <RadioButtons Header="透明度" SelectedIndex="0" IsEnabled="False">
-            <x:String>标准</x:String>
-            <x:String>更透明</x:String>
-          </RadioButtons>
-          <RadioButtons Header="动画" SelectedIndex="0" IsEnabled="False">
-            <x:String>开</x:String>
-            <x:String>减少动画</x:String>
-          </RadioButtons>
+          <TextBox x:Name="AiBaseUrlBox" Header="Base URL" PlaceholderText="https://.../v1" />
+          <TextBox x:Name="AiModelBox" Header="Model" PlaceholderText="模型名称" />
+          <PasswordBox x:Name="AiKeyBox" Header="API Key" PlaceholderText="留空保持已保存的 Key" />
+          <CheckBox x:Name="ClearAiKeyCheckBox" Content="清除已保存的 API Key" />
+          <CheckBox x:Name="AiSupportsImagesCheckBox" Content="允许把题目中的远程图片交给支持视觉的模型" />
+          <TextBlock Text="AI 返回仅用于辅助，导出时会标记 AI 来源和置信度。"
+                     TextWrapping="Wrap" Style="{StaticResource CaptionTextStyle}" />
         </StackPanel>
       </Border>
 
       <Border Style="{StaticResource NoticeCardStyle}">
         <StackPanel Orientation="Horizontal" Spacing="8">
           <FontIcon Glyph="&#xE946;" Foreground="{StaticResource AmberBrush}" />
-          <TextBlock Text="设置控件已按最终信息架构预留；真正的读写将在配置迁移阶段接入。"
-                     TextWrapping="Wrap"
-                     Style="{StaticResource SecondaryTextStyle}" />
+          <TextBlock Text="首次使用前请确认 WebView2 Evergreen Runtime、Python Worker 依赖以及 PDF 所需的 Word/WPS 组件已经安装。"
+                     TextWrapping="Wrap" Style="{StaticResource SecondaryTextStyle}" />
         </StackPanel>
       </Border>
     </StackPanel>

@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Windows.UI.ViewManagement;
 
@@ -18,27 +19,50 @@ public static class BackdropService
 {
     public static BackdropMaterial AppliedMaterial { get; private set; } = BackdropMaterial.Solid;
 
-    public static void Apply(Window window, BackdropMaterial preferred)
+    public static BackdropMaterial Apply(Window window, Panel? root, BackdropMaterial preferred)
     {
         if (IsHighContrastEnabled())
         {
             window.SystemBackdrop = null;
             AppliedMaterial = BackdropMaterial.Solid;
-            return;
+            ApplyRootBackground(root);
+            return AppliedMaterial;
         }
 
         if (preferred == BackdropMaterial.DesktopAcrylic && TrySetDesktopAcrylic(window))
         {
-            return;
+            ApplyRootBackground(root);
+            return AppliedMaterial;
         }
 
         if (preferred != BackdropMaterial.Solid && TrySetMica(window))
         {
-            return;
+            ApplyRootBackground(root);
+            return AppliedMaterial;
         }
 
         window.SystemBackdrop = null;
         AppliedMaterial = BackdropMaterial.Solid;
+        ApplyRootBackground(root);
+        return AppliedMaterial;
+    }
+
+    public static BackdropMaterial Apply(Window window, BackdropMaterial preferred)
+    {
+        return Apply(window, null, preferred);
+    }
+
+    private static void ApplyRootBackground(Panel? root)
+    {
+        if (root is null)
+        {
+            return;
+        }
+
+        root.Background = new SolidColorBrush(
+            AppliedMaterial == BackdropMaterial.Solid
+                ? Windows.UI.Color.FromArgb(255, 234, 241, 248)
+                : Windows.UI.Color.FromArgb(0, 0, 0, 0));
     }
 
     private static bool TrySetDesktopAcrylic(Window window)

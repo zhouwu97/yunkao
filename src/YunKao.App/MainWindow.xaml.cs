@@ -21,9 +21,10 @@ public sealed partial class MainWindow : Window
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
         ConfigureWindow();
-        BackdropService.Apply(this, BackdropMaterial.DesktopAcrylic);
+        BackdropService.Apply(this, RootGrid, BackdropMaterial.DesktopAcrylic);
 
         NavigationRail.NavigationRequested += OnNavigationRequested;
+        RootGrid.SizeChanged += OnRootGridSizeChanged;
         RootFrame.Navigate(typeof(WorkspacePage));
     }
 
@@ -34,12 +35,28 @@ public sealed partial class MainWindow : Window
             case NavigationTarget.Workspace:
                 RootFrame.Navigate(typeof(WorkspacePage));
                 break;
+            case NavigationTarget.History:
+                RootFrame.Navigate(typeof(HistoryPage));
+                break;
+            case NavigationTarget.Export:
+                RootFrame.Navigate(typeof(ExportPage));
+                break;
+            case NavigationTarget.Diagnostics:
+                RootFrame.Navigate(typeof(DiagnosticsPage));
+                break;
             case NavigationTarget.Settings:
                 RootFrame.Navigate(typeof(SettingsPage));
                 break;
         }
 
         NavigationRail.SetActive(args.Target);
+    }
+
+    private void OnRootGridSizeChanged(object sender, Microsoft.UI.Xaml.SizeChangedEventArgs args)
+    {
+        bool compact = args.NewSize.Width < 1120;
+        NavigationColumn.Width = new GridLength(compact ? 76 : 220);
+        NavigationRail.SetCompact(compact);
     }
 
     private void ConfigureWindow()

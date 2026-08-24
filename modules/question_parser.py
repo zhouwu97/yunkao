@@ -1,5 +1,6 @@
 import os
 import re
+from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
@@ -299,7 +300,29 @@ def _extract_subjective_answer(target, raw_answer):
     return ""
 
 
-def parse_active_question(html_content):
+def _resolve_question_images(question, base_url):
+    """把题目中的相对图片地址统一转成绝对地址，交给导出器或视觉模型使用。"""
+    if not base_url:
+        return question
+
+    pattern = re.compile(r"!\[img\]<([^>|]+)([^>]*)>")
+
+    def replace(match):
+        source = match.group(1).strip()
+        if source.startswith(("http://", "https://", "data:")):
+            absolute = source
+        else:
+            absolute = urljoin(base_url, source)
+        return f"![img]<{absolute}{match.group(2)}>"
+
+    for field in ("title", "answer", "analysis"):
+        if question.get(field):
+            question[field] = pattern.sub(replace, question[field])
+    question["options"] = [pattern.sub(replace, option) for option in question.get("options", [])]
+    return question
+
+
+def parse_active_question(html_content, base_url=None):
     soup = BeautifulSoup(html_content, "html.parser")
 
     target = soup.select_one(".swiper-slide-active")
@@ -391,4 +414,4 @@ def parse_active_question(html_content):
     if analysis_text:
         question["analysis"] = analysis_text
 
-    return question
+    return _resolve_question_images(question, base_url)

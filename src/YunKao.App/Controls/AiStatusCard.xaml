@@ -11,10 +11,10 @@
           <TextBlock Text="AI 辅助" Style="{StaticResource SmallLabelStyle}" />
         </StackPanel>
         <Border HorizontalAlignment="Right" Style="{StaticResource StatusPillStyle}">
-          <TextBlock Text="未接入" />
+          <TextBlock x:Name="StatusText" Text="未开始" />
         </Border>
       </Grid>
-      <TextBlock Text="C# AiService 将在后续阶段接管 Provider、并发和取消。"
+      <TextBlock x:Name="DetailText" Text="最多 3 个并发请求，随会话取消。"
                  TextWrapping="Wrap"
                  Style="{StaticResource SecondaryTextStyle}" />
     </StackPanel>

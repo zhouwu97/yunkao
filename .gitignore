@@ -32,6 +32,11 @@ MANIFEST
 *.manifest
 *.spec
 !yunkao_dev.spec
+!src/YunKao.App/app.manifest
+!worker/YunKao.Worker.spec
+worker/YunKao.Worker/
+!worker/YunKao.Worker.onefile.spec
+worker/YunKao.Worker.exe
 
 # Installer logs
 pip-log.txt
