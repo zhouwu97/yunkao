@@ -15,8 +15,8 @@ public sealed partial class WorkspacePage : Page
     public WorkspacePage()
     {
         InitializeComponent();
+        NavigationCacheMode = Microsoft.UI.Xaml.Navigation.NavigationCacheMode.Required;
         Loaded += OnLoaded;
-        Unloaded += OnUnloaded;
     }
 
     private void OnLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs args)
@@ -29,13 +29,6 @@ public sealed partial class WorkspacePage : Page
             Export,
             AiStatus,
             Events);
-    }
-
-    private async void OnUnloaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs args)
-    {
-        if (_coordinator is null) return;
-        await _coordinator.DisposeAsync();
-        _coordinator = null;
     }
 
     public void ApplyWindowWidth(double windowWidth)

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -22,6 +23,7 @@ public enum LiquidButtonVariant
 /// </summary>
 public sealed partial class LiquidButton : UserControl
 {
+    private long _lastSpecularUpdate;
     public static readonly DependencyProperty LabelProperty = DependencyProperty.Register(
         nameof(Label),
         typeof(string),
@@ -147,7 +149,7 @@ public sealed partial class LiquidButton : UserControl
     {
         UpdateSpecularPosition(args);
         InteractiveHighlight.Opacity = 1;
-        MotionService.AnimateScaleXY(VisualRoot, 1.012, 1.012);
+        MotionService.AnimateScaleXY(VisualRoot, 1.008, 1.008, 100);
     }
 
     private void OnPointerExited(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs args)
@@ -162,13 +164,13 @@ public sealed partial class LiquidButton : UserControl
     {
         UpdateSpecularPosition(args);
         InteractiveHighlight.Opacity = 1;
-        MotionService.AnimateScaleXY(VisualRoot, 1.018, 0.955, 90);
+        MotionService.AnimateScaleXY(VisualRoot, 1.012, 0.965, 85);
     }
 
     private void OnPointerReleased(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs args)
     {
         InteractiveHighlight.Opacity = 1;
-        MotionService.AnimateScaleXY(VisualRoot, 1.012, 1.012, 170);
+        MotionService.AnimateScaleXY(VisualRoot, 1.008, 1.008, 150);
     }
 
     private void OnPointerCaptureLost(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs args)
@@ -179,6 +181,9 @@ public sealed partial class LiquidButton : UserControl
 
     private void UpdateSpecularPosition(PointerRoutedEventArgs args)
     {
+        long now = Stopwatch.GetTimestamp();
+        if (now - _lastSpecularUpdate < Stopwatch.Frequency / 60) return;
+        _lastSpecularUpdate = now;
         if (HitTarget.ActualWidth <= 0 || HitTarget.ActualHeight <= 0) return;
         Windows.Foundation.Point point = args.GetCurrentPoint(HitTarget).Position;
         SpecularBrush.Center = new Windows.Foundation.Point(

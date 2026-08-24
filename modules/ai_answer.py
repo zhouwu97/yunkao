@@ -1,5 +1,7 @@
 import json
+import random
 import re
+import time
 import requests
 
 PLACEHOLDER_ANSWERS = {"", "略", "暂无", "未知", "未提供", "无"}
@@ -218,12 +220,34 @@ def infer_answer_with_ai(question, config, jwt_token=None):
         auth_header: f"{auth_prefix}{api_key}",
     }
 
-    response = requests.post(
-        f"{base_url}/chat/completions",
-        headers=headers,
-        json=payload,
-        timeout=45,
-    )
+    response = None
+    for attempt in range(4):
+        try:
+            response = requests.post(
+                f"{base_url}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=45,
+            )
+        except requests.RequestException:
+            if attempt >= 3:
+                raise
+            time.sleep((0.5, 1.2, 2.5)[attempt] + random.uniform(0, 0.2))
+            continue
+
+        status_code = getattr(response, "status_code", None)
+        if status_code in {408, 429, 500, 502, 503, 504} and attempt < 3:
+            retry_after = getattr(response, "headers", {}).get("Retry-After")
+            try:
+                delay = min(float(retry_after), 30.0) if retry_after else (0.5, 1.2, 2.5)[attempt]
+            except (TypeError, ValueError):
+                delay = (0.5, 1.2, 2.5)[attempt]
+            time.sleep(delay + random.uniform(0, 0.2))
+            continue
+        break
+
+    if response is None:
+        raise RuntimeError("AI 请求未返回响应")
     response.raise_for_status()
     data = response.json()
     content = data["choices"][0]["message"]["content"]

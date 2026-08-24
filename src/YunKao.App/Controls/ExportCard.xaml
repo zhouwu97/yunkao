@@ -15,7 +15,7 @@
           <FontIcon Glyph="&#xE74E;" FontSize="16" Foreground="{StaticResource CoralPrimaryBrush}" />
           <TextBlock Text="快捷导出" Style="{StaticResource CardTitleStyle}" />
         </StackPanel>
-        <TextBlock Text="READY" HorizontalAlignment="Right" Style="{StaticResource CaptionTextStyle}" />
+        <TextBlock x:Name="StateText" Text="READY" HorizontalAlignment="Right" Style="{StaticResource CaptionTextStyle}" />
       </Grid>
       <Grid ColumnSpacing="7">
         <Grid.ColumnDefinitions>
@@ -23,9 +23,9 @@
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
-        <controls:LiquidButton Grid.Column="0" Label="PDF" Variant="Soft" BackdropMode="Inherited" Click="OnPdfClick" />
-        <controls:LiquidButton Grid.Column="1" Label="DOCX" Variant="Violet" BackdropMode="Inherited" Click="OnDocxClick" />
-        <controls:LiquidButton Grid.Column="2" Label="更多" Variant="Coral" BackdropMode="Inherited" Click="OnMoreClick" />
+        <controls:LiquidButton x:Name="PdfButton" Grid.Column="0" Label="PDF" Variant="Soft" BackdropMode="Inherited" Click="OnPdfClick" />
+        <controls:LiquidButton x:Name="DocxButton" Grid.Column="1" Label="DOCX" Variant="Violet" BackdropMode="Inherited" Click="OnDocxClick" />
+        <controls:LiquidButton x:Name="MoreButton" Grid.Column="2" Label="更多" Variant="Coral" BackdropMode="Inherited" Click="OnMoreClick" />
       </Grid>
     </StackPanel>
   </Border>

@@ -32,4 +32,26 @@ public sealed class SettingsServiceTests
             Directory.Delete(root, recursive: true);
         }
     }
+
+    [Fact]
+    public void Backs_up_corrupt_settings_before_recreating_defaults()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "yunkao-settings-corrupt-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            string settingsPath = Path.Combine(root, "settings.json");
+            File.WriteAllText(settingsPath, "{ this is not json");
+
+            var service = new SettingsService(root, new InMemoryCredentialStore());
+            service.Load();
+
+            Assert.NotEmpty(Directory.GetFiles(root, "settings.corrupt-*.json"));
+            Assert.DoesNotContain("this is not json", File.ReadAllText(settingsPath));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
 }

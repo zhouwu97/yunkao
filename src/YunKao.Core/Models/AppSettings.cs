@@ -45,4 +45,13 @@ public sealed class AppSettings
 
     [JsonIgnore]
     public bool AiKeySaved { get; set; }
+
+    [JsonPropertyName("appearance_material")]
+    public string AppearanceMaterial { get; set; } = "acrylic";
+
+    [JsonPropertyName("appearance_clarity")]
+    public string AppearanceClarity { get; set; } = "standard";
+
+    [JsonPropertyName("reduce_motion")]
+    public bool ReduceMotion { get; set; }
 }

@@ -1,3 +1,4 @@
+import os
 import re
 
 
@@ -9,6 +10,8 @@ PDF_FLATTEN_DPI = 130
 
 SCORE_MARKER_PATTERN = re.compile(r"[ \t\u00a0]{2,}([（(]?\d+\s*分[）)]?)")
 LEGACY_AI_SUFFIX_PATTERN = re.compile(r"\s*[（(]AI\s*生成[）)]\s*$", re.IGNORECASE)
+IMAGE_MARKER_PATTERN = re.compile(r'!\[[^\]]*\](?:<[^>]+>|\((?:[^)(]+|\([^)(]*\))*\))')
+MAX_REMOTE_IMAGE_BYTES = 10 * 1024 * 1024
 
 
 
@@ -87,6 +90,16 @@ def normalize_ai_content(text, source):
     return text
 
 
+def strip_image_markers(text):
+    """统一清理内部 ![img]<...> 和普通 Markdown 图片标记。"""
+    return IMAGE_MARKER_PATTERN.sub("[图片]", text or "")
+
+
+def normalize_markdown_images(text):
+    """把内部图片标记转换为标准 Markdown，避免导出内部协议。"""
+    return re.sub(r'!\[img\]<([^>|]+)[^>]*>', r'![img](\1)', text or '')
+
+
 def get_practice_line_count(question):
     """按题型返回紧凑作答行数，避免练习版出现过多空白。"""
     question_type = str(question.get("question_type", "") or "")
@@ -115,19 +128,19 @@ def export_to_markdown(questions, file_path, include_answers=True):
         title = "题库导出" if include_answers else "题库练习版"
         f.write(f"# {title}\n\n")
         for i, q in enumerate(questions, 1):
-            f.write(f"### {i}. {q['title']}\n\n")
+            f.write(f"### {i}. {normalize_markdown_images(q['title'])}\n\n")
             for opt in q['options']:
-                f.write(f"- {opt}\n")
+                f.write(f"- {normalize_markdown_images(opt)}\n")
             
             if not include_answers:
                 _write_markdown_practice_area(f, q)
             elif q.get('answer'):
                 answer_title = get_export_label(q, "answer")
-                f.write(f"\n**{answer_title}**\n{q['answer']}\n")
+                f.write(f"\n**{answer_title}**\n{normalize_markdown_images(q['answer'])}\n")
             if include_answers and q.get('analysis'):
                 analysis_title = get_export_label(q, "analysis")
                 analysis = normalize_ai_content(q['analysis'], q.get("analysis_source"))
-                f.write(f"\n**{analysis_title}**\n{analysis}\n")
+                f.write(f"\n**{analysis_title}**\n{normalize_markdown_images(analysis)}\n")
                 
             # 练习版依靠作答线和自然留白分隔题目，避免打印出突兀的黑色横线。
             f.write("\n---\n\n" if include_answers else "\n\n")
@@ -137,22 +150,22 @@ def export_to_txt(questions, file_path, include_answers=True):
         f.write("题库导出\n" if include_answers else "题库练习版\n")
         f.write("="*30 + "\n\n")
         for i, q in enumerate(questions, 1):
-            # TXT 去除图片 markdown 标记
-            title = re.sub(r'!\[[^\]]*\]\((?:[^)(]+|\([^)(]*\))*\)', '[图片]', q['title'])
+            # TXT 不暴露内部图片协议标记。
+            title = strip_image_markers(q['title'])
             f.write(f"{i}. {title}\n")
             for opt in q['options']:
-                opt_txt = re.sub(r'!\[[^\]]*\]\((?:[^)(]+|\([^)(]*\))*\)', '[图片]', opt)
+                opt_txt = strip_image_markers(opt)
                 f.write(f"  {opt_txt}\n")
                 
             if not include_answers:
                 _write_txt_practice_area(f, q)
             elif q.get('answer'):
-                ans_txt = re.sub(r'!\[[^\]]*\]\((?:[^)(]+|\([^)(]*\))*\)', '[图片]', q['answer'])
+                ans_txt = strip_image_markers(q['answer'])
                 answer_title = get_export_label(q, "answer")
                 f.write(f"\n  {answer_title}: {ans_txt}\n")
             if include_answers and q.get('analysis'):
                 analysis = normalize_ai_content(q['analysis'], q.get("analysis_source"))
-                ana_txt = re.sub(r'!\[[^\]]*\]\((?:[^)(]+|\([^)(]*\))*\)', '[图片]', analysis)
+                ana_txt = strip_image_markers(analysis)
                 f.write(f"  {get_export_label(q, 'analysis')}: {ana_txt}\n")
                 
             if include_answers:
@@ -367,8 +380,17 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True,
                     last_end = match.end()
                     continue
 
-                response = requests.get(url, timeout=5)
-                if response.status_code == 200:
+                headers = {
+                    "User-Agent": os.environ.get("YUNKAO_IMAGE_USER_AGENT", "YunKaoDesktop/2.0"),
+                }
+                cookie = os.environ.get("YUNKAO_IMAGE_COOKIE", "")
+                referer = os.environ.get("YUNKAO_IMAGE_REFERER", "")
+                if cookie:
+                    headers["Cookie"] = cookie
+                if referer:
+                    headers["Referer"] = referer
+                response = requests.get(url, headers=headers, timeout=5)
+                if response.status_code == 200 and len(response.content) <= MAX_REMOTE_IMAGE_BYTES:
                     from PIL import Image
                     image_data = response.content
                     image_stream = BytesIO(image_data)

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using System.Threading.Channels;
 using Microsoft.UI.Xaml;
 using YunKao.Controls;
 using YunKao.Core.Models;
@@ -8,7 +9,7 @@ using YunKao.Core.Services;
 namespace YunKao.Services;
 
 /// <summary>
-/// 将 WebView2 的 questionReady、Python Parser、ExtractionSession、AI 和导出串成一条可取消流程。
+/// 工作台提取控制器。Bridge 事件进入单消费者队列，页面生命周期不再决定业务会话生命周期。
 /// </summary>
 public sealed class ExtractionCoordinator : IAsyncDisposable
 {
@@ -19,11 +20,19 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
     private readonly ExportCard _export;
     private readonly AiStatusCard _aiStatus;
     private readonly EventList _events;
-    private readonly SemaphoreSlim _questionGate = new(1, 1);
+    private readonly ExtractionSession _session;
+    private readonly ImageResolver _imageResolver;
+    private readonly Channel<QuestionMarker> _markerQueue = Channel.CreateUnbounded<QuestionMarker>(
+        new UnboundedChannelOptions { SingleReader = true, SingleWriter = false, AllowSynchronousContinuations = false });
+    private readonly CancellationTokenSource _lifetimeCancellation = new();
+    private readonly SemaphoreSlim _startGate = new(1, 1);
     private readonly ConcurrentBag<Task> _backgroundTasks = [];
-    private readonly ExtractionSession _session = new();
-    private CancellationTokenSource? _sessionCancellation;
+    private readonly Task _markerLoop;
+    private CancellationTokenSource? _extractionCancellation;
+    private CancellationTokenSource? _aiCancellation;
     private Guid _sessionId;
+    private string _lastProcessedMarker = "";
+    private bool _restoredSessionPending;
     private bool _workerRestarted;
     private bool _disposed;
 
@@ -43,45 +52,78 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         _export = export;
         _aiStatus = aiStatus;
         _events = events;
+        _session = services.Workspace.Session;
+        _imageResolver = new ImageResolver(browser.Service);
+        _markerLoop = ProcessMarkerQueueAsync(_lifetimeCancellation.Token);
+
         _panel.StartRequested += (_, _) => Track(StartAsync());
         _panel.PauseRequested += (_, _) => TogglePause();
         _panel.StopRequested += (_, _) => Stop();
+        _panel.RestoreRequested += (_, _) => RestoreInterruptedSession();
         _export.ExportRequested += (_, format) => Track(ExportAsync(format));
         _browser.BridgeMessageReceived += OnBridgeMessageReceived;
+        _browser.ProcessFailed += OnBrowserProcessFailed;
+        _browser.Service.HttpStatusChanged += OnHttpStatusChanged;
         _session.Changed += OnSessionChanged;
         _services.Exports.ProgressChanged += OnExportProgress;
-        if (_browser.Service.IsBridgeInstalled) _ = FillCredentialsOnBridgeReadyAsync();
+        _services.Initialized += OnServicesInitialized;
+        if (_browser.Service.IsBridgeInstalled) Track(FillCredentialsOnBridgeReadyAsync());
+        RenderInterruptedPrompt();
     }
 
     public ExtractionSession Session => _session;
 
     public async Task StartAsync()
     {
-        if (_session.Status is ExtractionStatus.Running or ExtractionStatus.Paused) return;
-        _sessionCancellation?.Dispose();
-        _sessionCancellation = new CancellationTokenSource();
-        _sessionId = _session.Start();
-        _workerRestarted = false;
-        _panel.SetState("正在启动", running: true, paused: false);
-        _events.Add("开始提取：准备 Worker");
-
+        await _startGate.WaitAsync().ConfigureAwait(true);
         try
         {
-            await _services.Worker.StartAsync(_sessionCancellation.Token);
-            var health = await _services.Worker.CallAsync<JsonElement>("health", null, _sessionCancellation.Token);
-            _events.Add($"Parser Worker 已就绪：{health.GetProperty("version").GetString()}");
-            await ReadCurrentQuestionAsync(_sessionCancellation.Token);
-        }
-        catch (Exception exception)
-        {
-            if (_sessionCancellation?.IsCancellationRequested == true)
+            if (_session.Status is ExtractionStatus.Running or ExtractionStatus.Paused) return;
+            _extractionCancellation?.Dispose();
+            _aiCancellation?.Dispose();
+            _extractionCancellation = new CancellationTokenSource();
+            _aiCancellation = new CancellationTokenSource();
+            if (_restoredSessionPending && _session.ResumeRestored())
+            {
+                _restoredSessionPending = false;
+                _sessionId = _session.SessionId;
+            }
+            else
+            {
+                _sessionId = _session.Start();
+            }
+            _lastProcessedMarker = "";
+            _workerRestarted = false;
+            _services.Workspace.AuthExpired = false;
+            _services.Workspace.PermissionDenied = false;
+            _panel.SetState("正在启动", running: true, paused: false);
+            _events.Add("开始提取：准备 Worker");
+
+            try
+            {
+                await _services.Worker.StartAsync(_extractionCancellation.Token).ConfigureAwait(true);
+                JsonElement health = await _services.Worker.CallAsync<JsonElement>(
+                    "health", null, _extractionCancellation.Token).ConfigureAwait(true);
+                string version = health.TryGetProperty("version", out JsonElement versionElement)
+                    ? versionElement.GetString() ?? "unknown"
+                    : "unknown";
+                _events.Add($"Parser Worker 已就绪：{version}");
+                QueueCurrentQuestion();
+            }
+            catch (OperationCanceledException) when (_extractionCancellation.IsCancellationRequested)
             {
                 _session.Stop();
-                return;
             }
-            _services.Diagnostics.Error("提取启动失败", exception);
-            _events.Add("提取启动失败：" + exception.Message, warning: true);
-            _session.Fail();
+            catch (Exception exception)
+            {
+                _services.Diagnostics.Error("提取启动失败", exception);
+                _events.Add("提取启动失败：" + exception.Message, warning: true);
+                _session.Fail();
+            }
+        }
+        finally
+        {
+            _startGate.Release();
         }
     }
 
@@ -90,28 +132,31 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         if (_session.Status == ExtractionStatus.Running)
         {
             _session.Pause();
-            _events.Add("已暂停：Bridge 事件会被忽略");
+            _events.Add("已暂停：不会自动推进下一题");
         }
         else if (_session.Status == ExtractionStatus.Paused)
         {
             _session.Resume();
             _events.Add("已继续：读取当前题");
-            Track(ReadCurrentQuestionAsync(_sessionCancellation?.Token ?? CancellationToken.None));
+            QueueCurrentQuestion();
         }
     }
 
     public void Stop()
     {
-        _sessionCancellation?.Cancel();
-        _services.Exports.CancelActive();
+        if (_session.Status is not (ExtractionStatus.Running or ExtractionStatus.Paused)) return;
+        _extractionCancellation?.Cancel();
+        _aiCancellation?.Cancel();
+        // 停止提取不取消导出；已保存题目必须仍可导出。
         _session.Stop();
-        _events.Add("提取已停止");
+        _events.Add("提取已停止，已保存题目仍可导出");
         Track(PersistSessionAsync());
     }
 
     public async Task ExportAsync(string format)
     {
-        if (_session.SavedCount == 0)
+        IReadOnlyList<Question> snapshot = _session.Questions;
+        if (snapshot.Count == 0)
         {
             _events.Add("没有可导出的题目", warning: true);
             return;
@@ -124,20 +169,26 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
             : settings.DefaultExportDirectory;
         Directory.CreateDirectory(directory);
         string extension = format == "docx" ? "docx" : format == "pdf" ? "pdf" : format == "txt" ? "txt" : "md";
-        string path = Path.Combine(
-            directory,
-            $"{settings.ExportPrefix}_{DateTime.Now:yyyyMMdd_HHmmss}.{extension}");
+        string path = Path.Combine(directory, $"{settings.ExportPrefix}_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid():N}.{extension}");
+
         try
         {
-            _events.Add($"开始导出 {extension.ToUpperInvariant()}：{_session.SavedCount} 题");
+            _export.SetExporting(true);
+            _events.Add($"开始导出 {extension.ToUpperInvariant()}：{snapshot.Count} 题");
+            var resolved = new List<Question>(snapshot.Count);
+            foreach (Question question in snapshot)
+            {
+                resolved.Add(await _imageResolver.ResolveAsync(question).ConfigureAwait(true));
+            }
+
             ExportResult result = await _services.Exports.ExportAsync(
                 new ExportRequest(
                     format,
                     path,
-                    _session.Questions,
+                    resolved,
                     IncludeAnswers: !settings.ExportWithoutAnswers,
                     Watermark: true),
-                _sessionCancellation?.Token ?? CancellationToken.None);
+                CancellationToken.None).ConfigureAwait(true);
             var record = new ExportRecord(
                 0,
                 extension.ToUpperInvariant(),
@@ -145,12 +196,16 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
                 result.QuestionCount,
                 DateTimeOffset.Now,
                 "completed");
-            await _services.History.SaveExportAsync(record);
+            await _services.History.SaveExportAsync(record).ConfigureAwait(true);
             _events.Add($"导出完成：{result.FilePath}");
             if (settings.AutoOpenAfterExport)
             {
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(result.FilePath) { UseShellExecute = true });
             }
+        }
+        catch (ExportAlreadyRunningException exception)
+        {
+            _events.Add(exception.Message, warning: true);
         }
         catch (OperationCanceledException)
         {
@@ -161,24 +216,39 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
             _services.Diagnostics.Error("导出失败", exception);
             _events.Add("导出失败：" + exception.Message, warning: true);
         }
+        finally
+        {
+            _export.SetExporting(false);
+        }
     }
 
     public async ValueTask DisposeAsync()
     {
-        _sessionCancellation?.Cancel();
-        _services.Exports.CancelActive();
+        if (_disposed) return;
         _disposed = true;
+        _extractionCancellation?.Cancel();
+        _aiCancellation?.Cancel();
+        _services.Exports.CancelActive();
+        _lifetimeCancellation.Cancel();
+        _markerQueue.Writer.TryComplete();
         _browser.BridgeMessageReceived -= OnBridgeMessageReceived;
+        _browser.ProcessFailed -= OnBrowserProcessFailed;
+        _browser.Service.HttpStatusChanged -= OnHttpStatusChanged;
         _session.Changed -= OnSessionChanged;
         _services.Exports.ProgressChanged -= OnExportProgress;
+        _services.Initialized -= OnServicesInitialized;
         try
         {
+            await _markerLoop.WaitAsync(TimeSpan.FromSeconds(3)).ConfigureAwait(false);
             await Task.WhenAll(_backgroundTasks.ToArray()).WaitAsync(TimeSpan.FromSeconds(3)).ConfigureAwait(false);
         }
         catch { }
-        _questionGate.Dispose();
         await PersistSessionAsync().ConfigureAwait(false);
-        _sessionCancellation?.Dispose();
+        _imageResolver.Dispose();
+        _extractionCancellation?.Dispose();
+        _aiCancellation?.Dispose();
+        _lifetimeCancellation.Dispose();
+        _startGate.Dispose();
     }
 
     private void OnBridgeMessageReceived(object? sender, BridgeMessageEventArgs args)
@@ -195,14 +265,64 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
                 Track(FillCredentialsOnBridgeReadyAsync());
                 return;
             }
-            if (messageType != "questionReady") return;
-            if (_session.Status != ExtractionStatus.Running) return;
-            Track(HandleQuestionReadyAsync(root.Clone(), _sessionCancellation?.Token ?? CancellationToken.None));
+            if (messageType != "questionReady" || _session.Status != ExtractionStatus.Running) return;
+            _markerQueue.Writer.TryWrite(new QuestionMarker(_sessionId, root.Clone(), 0));
         }
         catch (Exception exception)
         {
             _services.Diagnostics.Warning("Bridge 消息解析失败：" + exception.Message);
         }
+    }
+
+    private void OnHttpStatusChanged(object? sender, BrowserHttpEventArgs args)
+    {
+        if (args.StatusCode is not (401 or 403)) return;
+        if (args.StatusCode == 401) _services.Workspace.AuthExpired = true;
+        if (args.StatusCode == 403) _services.Workspace.PermissionDenied = true;
+        if (_session.Status is ExtractionStatus.Running or ExtractionStatus.Paused)
+        {
+            _session.Pause();
+            _events.Add(args.StatusCode == 401
+                ? "登录状态已失效，提取已暂停；已保存题目不会丢失"
+                : "当前页面无访问权限，提取已暂停", warning: true);
+        }
+    }
+
+    private void OnBrowserProcessFailed(object? sender, string message)
+    {
+        if (_session.Status is ExtractionStatus.Running or ExtractionStatus.Paused)
+        {
+            _session.Pause();
+            _events.Add("WebView2 已崩溃，提取已暂停；页面重建后请点击继续", warning: true);
+        }
+        _services.Diagnostics.Warning(message);
+    }
+
+    private void OnServicesInitialized(object? sender, EventArgs args) => RenderInterruptedPrompt();
+
+    private void RenderInterruptedPrompt()
+    {
+        ExtractionSessionSnapshot? snapshot = _services.InterruptedSessions.FirstOrDefault();
+        if (snapshot is null || _session.SavedCount > 0) return;
+
+        void Render()
+        {
+            _panel.SetInterrupted(snapshot.Questions.Count);
+            _events.Add($"发现上次未完成任务：已保存 {snapshot.Questions.Count} 题，可恢复为当前题库");
+        }
+
+        if (!_panel.DispatcherQueue.TryEnqueue(Render)) Render();
+    }
+
+    private void RestoreInterruptedSession()
+    {
+        ExtractionSessionSnapshot? snapshot = _services.InterruptedSessions.FirstOrDefault();
+        if (snapshot is null || _session.SavedCount > 0) return;
+        if (!_session.Restore(snapshot)) return;
+        _restoredSessionPending = true;
+        _services.Workspace.CurrentCourse = snapshot.Course;
+        _panel.ClearInterrupted();
+        _events.Add($"已恢复上次任务：{snapshot.Questions.Count} 题；当前保持暂停，请确认页面后再开始");
     }
 
     private async Task FillCredentialsOnBridgeReadyAsync()
@@ -215,9 +335,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
                 ? _services.Settings.GetYunKaoPassword(settings.YunKaoUser)
                 : "";
             await _browser.Service.FillCredentialsAsync(
-                SettingsService.SchoolCode,
-                settings.YunKaoUser,
-                password).ConfigureAwait(true);
+                SettingsService.SchoolCode, settings.YunKaoUser, password).ConfigureAwait(true);
         }
         catch (Exception exception)
         {
@@ -225,61 +343,84 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         }
     }
 
-    private async Task HandleQuestionReadyAsync(JsonElement markerMessage, CancellationToken cancellationToken)
+    private void QueueCurrentQuestion()
     {
-        bool entered = false;
+        if (_session.Status != ExtractionStatus.Running || _sessionId == Guid.Empty) return;
+        using JsonDocument document = JsonDocument.Parse("{\"type\":\"questionReady\",\"marker\":\"manual\"}");
+        _markerQueue.Writer.TryWrite(new QuestionMarker(_sessionId, document.RootElement.Clone(), 0));
+    }
+
+    private async Task ProcessMarkerQueueAsync(CancellationToken lifetimeToken)
+    {
         try
         {
-            entered = await _questionGate.WaitAsync(0, cancellationToken).ConfigureAwait(true);
-            if (!entered) return;
-            if (!_session.IsCurrent(_sessionId) || _session.Status != ExtractionStatus.Running) return;
-            string marker = markerMessage.TryGetProperty("marker", out JsonElement markerElement)
-                ? markerElement.GetString() ?? ""
-                : "";
-            if (!string.IsNullOrWhiteSpace(marker) && marker == _session.LastQuestionMarker) return;
-            await ParseAndSaveCurrentQuestionAsync(markerMessage, cancellationToken).ConfigureAwait(true);
+            await foreach (QuestionMarker item in _markerQueue.Reader.ReadAllAsync(lifetimeToken).ConfigureAwait(false))
+            {
+                if (!_session.IsCurrent(item.SessionId) || _session.Status != ExtractionStatus.Running) continue;
+                try
+                {
+                    await HandleQuestionReadyAsync(item, lifetimeToken).ConfigureAwait(true);
+                }
+                catch (QuestionNotReadyException) when (item.Attempt < 10 && !lifetimeToken.IsCancellationRequested)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(250), lifetimeToken).ConfigureAwait(true);
+                    _markerQueue.Writer.TryWrite(item with { Attempt = item.Attempt + 1 });
+                }
+                catch (WorkerCallException exception) when (exception.Code == "question_not_ready" && item.Attempt < 10 && !lifetimeToken.IsCancellationRequested)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(250), lifetimeToken).ConfigureAwait(true);
+                    _markerQueue.Writer.TryWrite(item with { Attempt = item.Attempt + 1 });
+                }
+                catch (WorkerCallException exception) when (exception.Code is "question_unsupported" or "question_not_ready")
+                {
+                    _events.Add("当前页面还没有可解析题目，已暂停等待页面稳定", warning: true);
+                }
+                catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested)
+                {
+                    return;
+                }
+                catch (OperationCanceledException) when (_extractionCancellation?.IsCancellationRequested == true)
+                {
+                }
+                catch (Exception exception)
+                {
+                    _services.Diagnostics.Error("题目处理失败", exception);
+                    _events.Add("题目处理失败：" + exception.Message, warning: true);
+                    if (_session.Status == ExtractionStatus.Running) _session.Fail();
+                }
+            }
         }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested)
         {
-        }
-        finally
-        {
-            if (entered) _questionGate.Release();
         }
     }
 
-    private async Task ReadCurrentQuestionAsync(CancellationToken cancellationToken)
+    private async Task HandleQuestionReadyAsync(QuestionMarker marker, CancellationToken lifetimeToken)
     {
-        if (_session.Status != ExtractionStatus.Running) return;
-        using JsonDocument document = JsonDocument.Parse("{\"type\":\"questionReady\",\"marker\":\"manual\"}");
-        await HandleQuestionReadyAsync(document.RootElement.Clone(), cancellationToken).ConfigureAwait(true);
+        CancellationToken extractionToken = _extractionCancellation?.Token ?? lifetimeToken;
+        string markerValue = ReadString(marker.Message, "marker");
+        if (!string.IsNullOrWhiteSpace(markerValue)
+            && (markerValue == _lastProcessedMarker || markerValue == _session.LastQuestionMarker)) return;
+        await ParseAndSaveCurrentQuestionAsync(marker, extractionToken).ConfigureAwait(true);
     }
 
-    private async Task ParseAndSaveCurrentQuestionAsync(JsonElement markerMessage, CancellationToken cancellationToken)
+    private async Task ParseAndSaveCurrentQuestionAsync(QuestionMarker marker, CancellationToken cancellationToken)
     {
-        string html = await _browser.Service.GetActiveQuestionHtmlAsync(cancellationToken);
+        string html = await _browser.Service.GetActiveQuestionHtmlAsync(cancellationToken).ConfigureAwait(true);
+        if (string.IsNullOrWhiteSpace(html)) throw new QuestionNotReadyException();
         string baseUrl = _browser.Service.CurrentUri?.AbsoluteUri ?? "https://www.cctrcloud.net/";
         Question question = await CallWorkerWithRecoveryAsync<Question>(
-            "parseQuestion",
-            new { html, baseUrl },
-            cancellationToken);
-        if (string.IsNullOrWhiteSpace(question.Marker))
+            "parseQuestion", new { html, baseUrl }, cancellationToken).ConfigureAwait(true);
+        if (string.IsNullOrWhiteSpace(question.Marker)) question.Marker = ReadString(marker.Message, "marker");
+        question = await _imageResolver.ResolveAsync(question, cancellationToken).ConfigureAwait(true);
+
+        if (TryReadProgress(marker.Message, out int current, out int total))
         {
-            question.Marker = markerMessage.TryGetProperty("marker", out JsonElement marker)
-                ? marker.GetString() ?? ""
-                : "";
-        }
-        if (markerMessage.TryGetProperty("current", out JsonElement current)
-            && int.TryParse(current.GetString(), out int currentNumber))
-        {
-            int total = markerMessage.TryGetProperty("total", out JsonElement totalElement)
-                && int.TryParse(totalElement.GetString(), out int totalNumber)
-                ? totalNumber
-                : 0;
-            _session.SetProgress(currentNumber, total, question.Marker);
+            _session.SetProgress(current, total, question.Marker);
         }
 
         bool added = _session.TryAddQuestion(_sessionId, question);
+        _lastProcessedMarker = question.Marker;
         if (!added)
         {
             _events.Add($"跳过重复题：{TrimForEvent(question.Title)}");
@@ -287,10 +428,11 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         else
         {
             _events.Add($"已保存第 {_session.SavedCount} 题：{TrimForEvent(question.Title)}");
+            Track(PersistSessionAsync());
             if (string.IsNullOrWhiteSpace(question.Answer) && _services.Settings.Load().AiEnabled)
             {
                 _session.IncrementAiPending();
-                Track(FillAiAsync(_sessionId, question, cancellationToken));
+                Track(FillAiAsync(_sessionId, question, _aiCancellation?.Token ?? CancellationToken.None));
             }
         }
 
@@ -300,7 +442,32 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
             return;
         }
 
-        await _browser.Service.ClickNextAsync(cancellationToken);
+        bool clicked = await _browser.Service.ClickNextAsync(cancellationToken).ConfigureAwait(true);
+        if (!clicked)
+        {
+            _events.Add("未找到下一题按钮，提取已暂停，请检查页面结构", warning: true);
+            _session.Pause();
+            return;
+        }
+
+        await WaitForNextMarkerAsync(question.Marker, cancellationToken).ConfigureAwait(true);
+    }
+
+    private async Task WaitForNextMarkerAsync(string previousMarker, CancellationToken cancellationToken)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken).ConfigureAwait(true);
+        string marker = await _browser.Service.ReadQuestionMarkerAsync(cancellationToken).ConfigureAwait(true);
+        if (!string.IsNullOrWhiteSpace(marker) && !string.Equals(marker, previousMarker, StringComparison.Ordinal))
+        {
+            _markerQueue.Writer.TryWrite(new QuestionMarker(_sessionId, CreateMarkerJson(marker), 0));
+            return;
+        }
+
+        if (_session.Status == ExtractionStatus.Running)
+        {
+            _events.Add("等待下一题超时，提取已暂停，请检查网络或页面", warning: true);
+            _session.Pause();
+        }
     }
 
     private async Task FillAiAsync(Guid sessionId, Question question, CancellationToken parentToken)
@@ -316,7 +483,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
                 SupportsImages = settings.AiSupportsImages,
                 ApiKey = _services.Settings.GetAiKey(settings.AiProvider),
             };
-            AiResult result = await _services.AiQueue.EnqueueAsync(question, configuration, parentToken);
+            AiResult result = await _services.AiQueue.EnqueueAsync(question, configuration, parentToken).ConfigureAwait(false);
             _session.TryUpdateQuestion(sessionId, question, item =>
             {
                 item.Answer = result.Answer;
@@ -325,9 +492,15 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
                 item.AnalysisSource = "ai";
                 item.AnswerConfidence = result.Confidence;
             });
+            Track(PersistSessionAsync());
             SetAiStatus("已补全", $"置信度 {result.Confidence:0.00}");
         }
         catch (OperationCanceledException) { }
+        catch (AiHttpException exception)
+        {
+            _services.Diagnostics.Warning($"AI 请求失败 HTTP {exception.StatusCode}：{exception.Message}");
+            SetAiStatus("请求失败", exception.StatusCode == 429 ? "请求过于频繁，稍后重试" : "题目保留，稍后可重试");
+        }
         catch (Exception exception)
         {
             _services.Diagnostics.Warning("AI 补全失败：" + exception.Message);
@@ -343,15 +516,23 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
     {
         try
         {
-            return await _services.Worker.CallAsync<T>(method, parameters, cancellationToken);
+            return await _services.Worker.CallAsync<T>(method, parameters, cancellationToken).ConfigureAwait(true);
         }
-        catch when (!_workerRestarted && !cancellationToken.IsCancellationRequested)
+        catch (WorkerCallException)
+        {
+            throw;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception) when (!_workerRestarted && !cancellationToken.IsCancellationRequested)
         {
             _workerRestarted = true;
-            _services.Diagnostics.Warning("Parser Worker 异常，尝试重启一次");
-            await _services.Worker.StopAsync(CancellationToken.None);
-            await _services.Worker.StartAsync(cancellationToken);
-            return await _services.Worker.CallAsync<T>(method, parameters, cancellationToken);
+            _services.Diagnostics.Warning("Parser Worker 传输异常，尝试重启一次");
+            await _services.Worker.StopAsync(CancellationToken.None).ConfigureAwait(true);
+            await _services.Worker.StartAsync(cancellationToken).ConfigureAwait(true);
+            return await _services.Worker.CallAsync<T>(method, parameters, cancellationToken).ConfigureAwait(true);
         }
     }
 
@@ -368,9 +549,10 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
                 ExtractionStatus.Completing => "等待 AI 完成",
                 ExtractionStatus.Completed => "已完成",
                 ExtractionStatus.Error => "异常",
-                _ => "等待开始",
+                _ => _session.SavedCount > 0 ? "已停止 · 可导出" : "等待开始",
             }, running, paused);
-            _progress.SetProgress(_session.Current, _session.Total, $"已保存 {_session.SavedCount} 题 · AI 待处理 {_session.AiPending}", _session.SavedCount, _session.AiPending);
+            _progress.SetProgress(_session.Current, _session.Total,
+                $"已保存 {_session.SavedCount} 题 · AI 待处理 {_session.AiPending}", _session.SavedCount, _session.AiPending);
         }
 
         if (!_panel.DispatcherQueue.TryEnqueue(Render)) Render();
@@ -385,7 +567,6 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         }
 
         if (!_progress.DispatcherQueue.TryEnqueue(Render)) Render();
-        if (_session.Status == ExtractionStatus.Completed) Track(PersistSessionAsync());
     }
 
     private void Track(Task task)
@@ -411,8 +592,37 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
     private async Task PersistSessionAsync()
     {
         if (_session.SessionId == Guid.Empty || _session.SavedCount == 0) return;
-        try { await _services.History.SaveSessionAsync(_session, ""); } catch { }
+        try { await _services.History.SaveSessionAsync(_session, _services.Workspace.CurrentCourse).ConfigureAwait(false); }
+        catch (Exception exception) { _services.Diagnostics.Warning("历史会话保存失败：" + exception.Message); }
+    }
+
+    private static bool TryReadProgress(JsonElement root, out int current, out int total)
+    {
+        current = ReadInt(root, "current");
+        total = ReadInt(root, "total");
+        return current > 0;
+    }
+
+    private static JsonElement CreateMarkerJson(string marker)
+    {
+        using JsonDocument document = JsonDocument.Parse(JsonSerializer.Serialize(new { type = "questionReady", marker }));
+        return document.RootElement.Clone();
+    }
+
+    private static string ReadString(JsonElement root, string property)
+        => root.TryGetProperty(property, out JsonElement value) ? value.GetString() ?? "" : "";
+
+    private static int ReadInt(JsonElement root, string property)
+    {
+        if (!root.TryGetProperty(property, out JsonElement value)) return 0;
+        return value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out int number)
+            ? number
+            : int.TryParse(value.GetString(), out number) ? number : 0;
     }
 
     private static string TrimForEvent(string value) => value.Length <= 30 ? value : value[..30] + "…";
+
+    private sealed record QuestionMarker(Guid SessionId, JsonElement Message, int Attempt);
+
+    private sealed class QuestionNotReadyException() : Exception("active question is not ready");
 }

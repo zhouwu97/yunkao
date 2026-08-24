@@ -176,6 +176,7 @@ public sealed class WindowsCredentialStore : ICredentialStore
 /// </summary>
 public sealed class SettingsService
 {
+    public const int CurrentSchemaVersion = 3;
     public const string AppName = "YunKaoDesktop";
     public const string AiCredentialService = "YunKaoDesktop/AI";
     public const string YunKaoCredentialService = "YunKaoDesktop";
@@ -212,7 +213,11 @@ public sealed class SettingsService
             {
                 settings = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsPath), _jsonOptions);
             }
-            catch { migrate = true; }
+            catch
+            {
+                BackupCorruptSettings();
+                migrate = true;
+            }
         }
 
         if (settings is null)
@@ -231,6 +236,7 @@ public sealed class SettingsService
             }
         }
 
+        Migrate(settings);
         Normalize(settings);
         string provider = string.IsNullOrWhiteSpace(settings.AiProvider) ? "custom" : settings.AiProvider;
         if (!string.IsNullOrWhiteSpace(legacyAiKey))
@@ -331,10 +337,63 @@ public sealed class SettingsService
 
     private static void Normalize(AppSettings settings)
     {
-        settings.SchemaVersion = 1;
+        settings.SchemaVersion = CurrentSchemaVersion;
         settings.AiProvider = string.IsNullOrWhiteSpace(settings.AiProvider) ? "custom" : settings.AiProvider.Trim();
         settings.ExportPrefix = string.IsNullOrWhiteSpace(settings.ExportPrefix) ? "基础题库导出" : settings.ExportPrefix.Trim();
         settings.DefaultExportFormat = string.IsNullOrWhiteSpace(settings.DefaultExportFormat) ? "PDF" : settings.DefaultExportFormat.ToUpperInvariant();
+        settings.AppearanceMaterial = settings.AppearanceMaterial.ToLowerInvariant() switch
+        {
+            "acrylic" or "mica" or "solid" => settings.AppearanceMaterial.ToLowerInvariant(),
+            _ => "acrylic",
+        };
+        settings.AppearanceClarity = settings.AppearanceClarity.ToLowerInvariant() switch
+        {
+            "clear" or "standard" or "transparent" => settings.AppearanceClarity.ToLowerInvariant(),
+            _ => "standard",
+        };
+    }
+
+    private static void Migrate(AppSettings settings)
+    {
+        int version = settings.SchemaVersion;
+        if (version < 1) version = 1;
+
+        // v1 -> v2：引入可持久化的外观材质和透明度配置。
+        if (version < 2)
+        {
+            settings.AppearanceMaterial = string.IsNullOrWhiteSpace(settings.AppearanceMaterial)
+                ? "acrylic"
+                : settings.AppearanceMaterial;
+            settings.AppearanceClarity = string.IsNullOrWhiteSpace(settings.AppearanceClarity)
+                ? "standard"
+                : settings.AppearanceClarity;
+            version = 2;
+        }
+
+        // v2 -> v3：引入系统级减少动画开关。
+        if (version < 3)
+        {
+            version = 3;
+        }
+
+        settings.SchemaVersion = version;
+    }
+
+    private void BackupCorruptSettings()
+    {
+        if (!File.Exists(SettingsPath)) return;
+        try
+        {
+            Directory.CreateDirectory(_root);
+            string backupPath = Path.Combine(
+                _root,
+                $"settings.corrupt-{DateTimeOffset.Now:yyyyMMdd-HHmmssfff}.json");
+            File.Move(SettingsPath, backupPath, overwrite: false);
+        }
+        catch
+        {
+            // 备份失败不能阻止应用继续使用默认设置；诊断会在上层记录加载结果。
+        }
     }
 
     private static string? GetString(JsonElement root, string name)

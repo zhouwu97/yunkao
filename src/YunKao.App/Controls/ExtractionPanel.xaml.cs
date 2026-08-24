@@ -13,6 +13,7 @@ public sealed partial class ExtractionPanel : UserControl
     public event EventHandler? StartRequested;
     public event EventHandler? PauseRequested;
     public event EventHandler? StopRequested;
+    public event EventHandler? RestoreRequested;
 
     public void SetState(string state, bool running, bool paused)
     {
@@ -26,7 +27,16 @@ public sealed partial class ExtractionPanel : UserControl
         StopButton.IsEnabled = running || paused;
     }
 
+    public void SetInterrupted(int questionCount)
+    {
+        RestoreButton.Label = $"恢复上次 · {questionCount} 题";
+        RestoreButton.Visibility = Visibility.Visible;
+    }
+
+    public void ClearInterrupted() => RestoreButton.Visibility = Visibility.Collapsed;
+
     private void OnStartClick(object sender, RoutedEventArgs e) => StartRequested?.Invoke(this, EventArgs.Empty);
     private void OnPauseClick(object sender, RoutedEventArgs e) => PauseRequested?.Invoke(this, EventArgs.Empty);
     private void OnStopClick(object sender, RoutedEventArgs e) => StopRequested?.Invoke(this, EventArgs.Empty);
+    private void OnRestoreClick(object sender, RoutedEventArgs e) => RestoreRequested?.Invoke(this, EventArgs.Empty);
 }

@@ -60,29 +60,74 @@ public sealed class AiService(HttpClient httpClient)
         }
 
         AiProviderPreset preset = AiProviderRegistry.Get(configuration.Provider);
-        using var request = new HttpRequestMessage(
-            HttpMethod.Post,
-            $"{configuration.BaseUrl.TrimEnd('/')}/chat/completions");
-        request.Headers.TryAddWithoutValidation(
-            preset.AuthHeader,
-            $"{preset.AuthPrefix}{configuration.ApiKey.Trim()}");
-        request.Content = new StringContent(
-            JsonSerializer.Serialize(BuildPayload(question, configuration), _jsonOptions),
-            Encoding.UTF8,
-            "application/json");
-
-        using HttpResponseMessage response = await _httpClient.SendAsync(
-            request,
-            HttpCompletionOption.ResponseHeadersRead,
-            cancellationToken).ConfigureAwait(false);
-        string responseText = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-        if (!response.IsSuccessStatusCode)
+        object payload = BuildPayload(question, configuration);
+        for (int attempt = 0; ; attempt++)
         {
-            throw new AiHttpException((int)response.StatusCode, response.ReasonPhrase ?? "AI 请求失败");
-        }
+            using var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                $"{configuration.BaseUrl.TrimEnd('/')}/chat/completions");
+            request.Headers.TryAddWithoutValidation(
+                preset.AuthHeader,
+                $"{preset.AuthPrefix}{configuration.ApiKey.Trim()}");
+            request.Content = new StringContent(
+                JsonSerializer.Serialize(payload, _jsonOptions),
+                Encoding.UTF8,
+                "application/json");
 
-        using JsonDocument document = JsonDocument.Parse(responseText);
-        return ParseResponse(document.RootElement);
+            HttpResponseMessage? response = null;
+            try
+            {
+                response = await _httpClient.SendAsync(
+                    request,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (HttpRequestException) when (attempt < 3)
+            {
+                await Task.Delay(GetRetryDelay(attempt), cancellationToken).ConfigureAwait(false);
+                continue;
+            }
+
+            using (response)
+            {
+                if (!response.IsSuccessStatusCode)
+                {
+                    if (IsRetryable((int)response.StatusCode) && attempt < 3)
+                    {
+                        TimeSpan delay = GetRetryAfter(response) ?? GetRetryDelay(attempt);
+                        await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+                        continue;
+                    }
+
+                    throw new AiHttpException((int)response.StatusCode, response.ReasonPhrase ?? "AI 请求失败");
+                }
+
+                string responseText = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                using JsonDocument document = JsonDocument.Parse(responseText);
+                return ParseResponse(document.RootElement);
+            }
+        }
+    }
+
+    private static bool IsRetryable(int statusCode)
+        => statusCode is 408 or 429 or 500 or 502 or 503 or 504;
+
+    private static TimeSpan? GetRetryAfter(HttpResponseMessage response)
+    {
+        if (response.Headers.RetryAfter?.Delta is TimeSpan delta) return delta;
+        if (response.Headers.RetryAfter?.Date is DateTimeOffset date)
+        {
+            TimeSpan remaining = date - DateTimeOffset.UtcNow;
+            return remaining > TimeSpan.Zero ? remaining : TimeSpan.Zero;
+        }
+        return null;
+    }
+
+    private static TimeSpan GetRetryDelay(int attempt)
+    {
+        double[] delays = [0.5, 1.2, 2.5];
+        double jitter = Random.Shared.NextDouble() * 0.2;
+        return TimeSpan.FromSeconds(delays[Math.Min(attempt, delays.Length - 1)] + jitter);
     }
 
     public static AiResult ParseResponse(JsonElement root)

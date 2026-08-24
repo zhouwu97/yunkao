@@ -22,6 +22,7 @@
                  TextWrapping="Wrap"
                  Style="{StaticResource SecondaryTextStyle}" />
       <controls:LiquidButton x:Name="StartButton" Label="开始提取" Click="OnStartClick" Variant="Primary" BackdropMode="Inherited" />
+      <controls:LiquidButton x:Name="RestoreButton" Label="恢复上次" Click="OnRestoreClick" Variant="Ghost" BackdropMode="Inherited" Visibility="Collapsed" />
       <Grid ColumnSpacing="8">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />

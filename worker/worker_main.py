@@ -153,7 +153,11 @@ def _run_request(request, runtime):
             html = str(params.get("html") or "")
             result = parse_active_question(html, str(params.get("baseUrl") or ""))
             if result is None:
-                raise ValueError("active question was not found")
+                runtime.response(
+                    request_id,
+                    error={"code": "question_not_ready", "message": "active question was not found"},
+                )
+                return
             runtime.response(request_id, result)
         elif method == "export":
             runtime.response(request_id, _export(params, runtime, cancel_event, request_id))
@@ -165,7 +169,7 @@ def _run_request(request, runtime):
         print(f"worker request failed ({method}): {error}", file=sys.stderr, flush=True)
         runtime.response(
             request_id,
-            error={"code": "worker_error", "message": str(error)},
+            error={"code": "parser_error" if method == "parseQuestion" else "worker_error", "message": str(error)},
         )
     finally:
         runtime.remove_cancellation_event(request_id)

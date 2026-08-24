@@ -7,21 +7,26 @@ namespace YunKao.Views;
 
 public sealed partial class ExportPage : Page
 {
+    private DateTimeOffset? _cursor;
+    private bool _loading;
     public ExportPage()
     {
         InitializeComponent();
         Loaded += OnLoaded;
     }
 
-    private async void OnLoaded(object sender, RoutedEventArgs args) => await LoadAsync();
-    private async void OnRefreshClick(object sender, RoutedEventArgs args) => await LoadAsync();
+    private async void OnLoaded(object sender, RoutedEventArgs args) => await LoadAsync(reset: true);
+    private async void OnRefreshClick(object sender, RoutedEventArgs args) => await LoadAsync(reset: true);
+    private async void OnMoreClick(object sender, RoutedEventArgs args) => await LoadAsync(reset: false);
 
-    private async Task LoadAsync()
+    private async Task LoadAsync(bool reset)
     {
+        if (_loading) return;
+        _loading = true;
         try
         {
-            IReadOnlyList<ExportRecord> rows = await App.Services.History.GetExportsAsync();
-            ExportsList.Items.Clear();
+            if (reset) { _cursor = null; ExportsList.Items.Clear(); }
+            IReadOnlyList<ExportRecord> rows = await App.Services.History.GetExportsAsync(_cursor, 50);
             foreach (ExportRecord row in rows)
             {
                 var openButton = new Button
@@ -51,7 +56,9 @@ public sealed partial class ExportPage : Page
                 ExportsList.Items.Add(new ListViewItem { Content = grid });
             }
 
-            EmptyText.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            if (rows.Count > 0) _cursor = rows[^1].CreatedAt;
+            EmptyText.Visibility = ExportsList.Items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            MoreButton.IsEnabled = rows.Count == 50;
         }
         catch (Exception exception)
         {
@@ -59,6 +66,7 @@ public sealed partial class ExportPage : Page
             EmptyText.Visibility = Visibility.Visible;
             App.Services.Diagnostics.Error("导出记录读取失败", exception);
         }
+        finally { _loading = false; }
     }
 
     private void OnOpenClick(object sender, RoutedEventArgs args)

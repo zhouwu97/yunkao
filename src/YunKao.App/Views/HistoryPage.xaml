@@ -14,7 +14,10 @@
         <TextBlock Text="历史记录" Style="{StaticResource PageTitleStyle}" />
         <TextBlock Text="查看提取会话、题目数量和中断状态。" Style="{StaticResource SecondaryTextStyle}" />
       </StackPanel>
-      <controls:LiquidButton Label="刷新" Click="OnRefreshClick" HorizontalAlignment="Right" Variant="Soft" />
+       <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+         <controls:LiquidButton Label="刷新" Click="OnRefreshClick" Variant="Soft" />
+         <controls:LiquidButton x:Name="MoreButton" Label="加载更多" Click="OnMoreClick" Variant="Ghost" IsEnabled="False" />
+       </StackPanel>
     </Grid>
     <controls:LiquidCard Grid.Row="1" Padding="8">
       <Grid>

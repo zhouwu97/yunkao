@@ -14,7 +14,10 @@
         <TextBlock Text="导出记录" Style="{StaticResource PageTitleStyle}" />
         <TextBlock Text="最近生成的 PDF、DOCX、Markdown 和 TXT 文件。" Style="{StaticResource SecondaryTextStyle}" />
       </StackPanel>
-      <controls:LiquidButton Label="刷新" Click="OnRefreshClick" HorizontalAlignment="Right" Variant="Coral" />
+       <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+         <controls:LiquidButton Label="刷新" Click="OnRefreshClick" Variant="Coral" />
+         <controls:LiquidButton x:Name="MoreButton" Label="加载更多" Click="OnMoreClick" Variant="Ghost" IsEnabled="False" />
+       </StackPanel>
     </Grid>
     <controls:LiquidCard Grid.Row="1" Variant="Coral" Padding="8">
       <Grid>

@@ -76,7 +76,7 @@
       <controls:LiquidCard Padding="16">
         <StackPanel Spacing="12">
           <TextBlock Text="外观" Style="{StaticResource SectionTitleStyle}" />
-          <TextBlock Text="这一版先提供视觉入口；材质选择暂不写入业务配置。" Style="{StaticResource SecondaryTextStyle}" />
+           <TextBlock Text="材质、透明度和减少动画选项会保存到本地配置。" Style="{StaticResource SecondaryTextStyle}" />
           <Grid ColumnSpacing="24">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="*" />
@@ -84,15 +84,15 @@
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0" Spacing="5">
               <TextBlock Text="背景材质" Style="{StaticResource SmallLabelStyle}" />
-              <RadioButton Content="Liquid Acrylic" IsChecked="True" GroupName="BackdropMaterial" />
-              <RadioButton Content="Mica" GroupName="BackdropMaterial" />
-              <RadioButton Content="Solid" GroupName="BackdropMaterial" />
+               <RadioButton x:Name="AcrylicRadio" Content="Liquid Acrylic" IsChecked="True" GroupName="BackdropMaterial" />
+               <RadioButton x:Name="MicaRadio" Content="Mica" GroupName="BackdropMaterial" />
+               <RadioButton x:Name="SolidRadio" Content="Solid" GroupName="BackdropMaterial" />
             </StackPanel>
             <StackPanel Grid.Column="1" Spacing="5">
               <TextBlock Text="透明强度" Style="{StaticResource SmallLabelStyle}" />
-              <RadioButton Content="清晰" GroupName="BackdropClarity" />
-              <RadioButton Content="标准" IsChecked="True" GroupName="BackdropClarity" />
-              <RadioButton Content="通透" GroupName="BackdropClarity" />
+               <RadioButton x:Name="ClearRadio" Content="清晰" GroupName="BackdropClarity" />
+               <RadioButton x:Name="StandardRadio" Content="标准" IsChecked="True" GroupName="BackdropClarity" />
+               <RadioButton x:Name="TransparentRadio" Content="通透" GroupName="BackdropClarity" />
             </StackPanel>
           </Grid>
           <ToggleSwitch x:Name="ReduceMotionToggle" Header="减少动画" OffContent="标准动效" OnContent="已减少" Toggled="OnReduceMotionToggled" />

@@ -1,10 +1,13 @@
+using System.Diagnostics;
 using System.Numerics;
 using Microsoft.UI.Composition;
+using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Input;
 using Windows.System;
+using Windows.UI.Core;
 using YunKao.Services;
 
 namespace YunKao.Controls;
@@ -15,6 +18,8 @@ namespace YunKao.Controls;
 public sealed partial class BrowserShell : UserControl
 {
     private readonly WebViewService _service = new();
+    private CompositionRoundedRectangleGeometry? _webClipGeometry;
+    private CompositionGeometricClip? _webClip;
     private bool _loaded;
     private string _fullAddress = "https://www.cctrcloud.net/";
 
@@ -29,6 +34,7 @@ public sealed partial class BrowserShell : UserControl
 
     public WebViewService Service => _service;
     public event EventHandler<BridgeMessageEventArgs>? BridgeMessageReceived;
+    public event EventHandler<string>? ProcessFailed;
 
     private async void OnLoaded(object sender, RoutedEventArgs args)
     {
@@ -55,6 +61,11 @@ public sealed partial class BrowserShell : UserControl
 
     private void OnAddressDisplayTapped(object sender, TappedRoutedEventArgs args)
     {
+        BeginAddressEdit();
+    }
+
+    private void BeginAddressEdit()
+    {
         AddressDisplay.Visibility = Visibility.Collapsed;
         AddressBox.Visibility = Visibility.Visible;
         AddressBox.Text = _fullAddress;
@@ -64,6 +75,12 @@ public sealed partial class BrowserShell : UserControl
 
     private void OnAddressKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs args)
     {
+        if (args.Key == VirtualKey.Escape)
+        {
+            args.Handled = true;
+            OnAddressLostFocus(sender, args);
+            return;
+        }
         if (args.Key != VirtualKey.Enter) return;
         args.Handled = true;
         string input = AddressBox.Text.Trim();
@@ -75,8 +92,51 @@ public sealed partial class BrowserShell : UserControl
             return;
         }
 
-        try { _service.Navigate(uri); }
+        try
+        {
+            _service.Navigate(uri);
+            AddressBox.Visibility = Visibility.Collapsed;
+            AddressDisplay.Visibility = Visibility.Visible;
+            Focus(FocusState.Programmatic);
+        }
         catch (Exception exception) { StatusText.Text = "导航失败：" + exception.Message; }
+    }
+
+    private void OnRootKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs args)
+    {
+        if (args.Key == VirtualKey.L && args.KeyStatus.IsExtendedKey == false)
+        {
+            // Ctrl+L 是桌面浏览器约定的地址栏快捷键。
+            if (IsModifierDown(VirtualKey.Control))
+            {
+                BeginAddressEdit();
+                args.Handled = true;
+                return;
+            }
+        }
+
+        if (args.Key == VirtualKey.Left && args.KeyStatus.IsExtendedKey == false
+            && IsModifierDown(VirtualKey.Menu))
+        {
+            _service.Back();
+            args.Handled = true;
+            return;
+        }
+
+        if (args.Key == VirtualKey.F5
+            || (args.Key == VirtualKey.R
+                && IsModifierDown(VirtualKey.Control)))
+        {
+            _service.Refresh();
+            args.Handled = true;
+            return;
+        }
+
+        if (args.Key == VirtualKey.Escape && AddressBox.Visibility == Visibility.Visible)
+        {
+            OnAddressLostFocus(sender, args);
+            args.Handled = true;
+        }
     }
 
     private void OnNavigationChanged(object? sender, BrowserNavigationEventArgs args)
@@ -109,10 +169,11 @@ public sealed partial class BrowserShell : UserControl
 
         Visual visual = ElementCompositionPreview.GetElementVisual(WebView);
         Compositor compositor = visual.Compositor;
-        CompositionRoundedRectangleGeometry geometry = compositor.CreateRoundedRectangleGeometry();
-        geometry.Size = new Vector2((float)WebView.ActualWidth, (float)WebView.ActualHeight);
-        geometry.CornerRadius = new Vector2(17, 17);
-        visual.Clip = compositor.CreateGeometricClip(geometry);
+        _webClipGeometry ??= compositor.CreateRoundedRectangleGeometry();
+        _webClip ??= compositor.CreateGeometricClip(_webClipGeometry);
+        _webClipGeometry.Size = new Vector2((float)WebView.ActualWidth, (float)WebView.ActualHeight);
+        _webClipGeometry.CornerRadius = new Vector2(17, 17);
+        visual.Clip = _webClip;
     }
 
     private static string FormatAddress(Uri? uri)
@@ -127,10 +188,19 @@ public sealed partial class BrowserShell : UserControl
     }
 
     private void OnStatusChanged(object? sender, string message) => StatusText.Text = message;
-    private void OnProcessFailed(object? sender, string message) => StatusText.Text = message + "，可刷新恢复。";
+    private void OnProcessFailed(object? sender, string message)
+    {
+        StatusText.Text = message + "，正在重建 WebView2。";
+        ProcessFailed?.Invoke(this, message);
+    }
 
     private void OnBridgeMessageReceived(object? sender, BridgeMessageEventArgs args)
     {
         BridgeMessageReceived?.Invoke(this, args);
+    }
+
+    private static bool IsModifierDown(VirtualKey key)
+    {
+        return InputKeyboardSource.GetKeyStateForCurrentThread(key).HasFlag(CoreVirtualKeyStates.Down);
     }
 }

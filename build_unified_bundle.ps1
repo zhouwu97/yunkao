@@ -1,80 +1,58 @@
+param(
+    [switch]$SkipWorker
+)
+
 $ErrorActionPreference = "Stop"
+$projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$versionPath = Join-Path $projectRoot "VERSION"
+$version = (Get-Content -Raw -LiteralPath $versionPath).Trim()
+if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid VERSION: $version" }
 
-$yunkaoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$yunkaoPython = Join-Path $yunkaoRoot "venv\Scripts\python.exe"
-$yunkaoSpec = Join-Path $yunkaoRoot "yunkao_dev.spec"
+$artifactName = "yunkao-desktop-v$version-windows-x64"
+$distRoot = Join-Path $projectRoot "dist"
+$artifactDir = Join-Path $distRoot $artifactName
+$buildRoot = Join-Path $projectRoot "build\$artifactName"
+$publishDir = Join-Path $buildRoot "app"
+$zipPath = Join-Path $distRoot "$artifactName.zip"
 
-if (-not (Test-Path $yunkaoPython)) {
-    throw "未找到云考打包 Python: $yunkaoPython"
+$rootFullPath = [IO.Path]::GetFullPath($projectRoot).TrimEnd('\') + '\'
+foreach ($target in @($artifactDir, $buildRoot, $zipPath)) {
+    $targetFullPath = [IO.Path]::GetFullPath($target)
+    if (-not $targetFullPath.StartsWith($rootFullPath, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Refusing to clean path outside workspace: $targetFullPath"
+    }
 }
-if (-not (Test-Path $yunkaoSpec)) {
-    throw "未找到云考打包配置: $yunkaoSpec"
+
+foreach ($target in @($artifactDir, $buildRoot, $zipPath)) {
+    if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Recurse -Force }
+}
+New-Item -ItemType Directory -Path $publishDir -Force | Out-Null
+
+if (-not $SkipWorker) {
+    & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $projectRoot "tools\build-worker.ps1") -PackageForApp -OneFile
+    if ($LASTEXITCODE -ne 0) { throw "Worker bundle build failed: exit code $LASTEXITCODE" }
 }
 
-Push-Location $yunkaoRoot
-try {
-    $yunkaoVersion = (
-        & $yunkaoPython -c "from config.version import APP_VERSION; print(APP_VERSION)"
-    ).Trim()
-    if ($LASTEXITCODE -ne 0 -or $yunkaoVersion -notmatch '^\d+\.\d+\.\d+$') {
-        throw "无法读取有效的应用版本号: $yunkaoVersion"
-    }
+$appProject = Join-Path $projectRoot "src\YunKao.App\YunKao.App.csproj"
+& dotnet publish $appProject -c Release -r win-x64 --self-contained false -p:Platform=x64 -o $publishDir
+if ($LASTEXITCODE -ne 0) { throw "WinUI publish failed: exit code $LASTEXITCODE" }
 
-    $yunkaoArtifactName = "yunkao-v$yunkaoVersion"
-    $yunkaoDistRoot = Join-Path $yunkaoRoot "dist"
-    $yunkaoDistDir = Join-Path $yunkaoDistRoot $yunkaoArtifactName
-    $yunkaoBuildDir = Join-Path $yunkaoRoot "build\yunkao_dev_v$yunkaoVersion"
-    $yunkaoZipPath = Join-Path $yunkaoDistRoot "$yunkaoArtifactName-windows-x64.zip"
+$workerPath = Join-Path $projectRoot "worker\YunKao.Worker.exe"
+if (-not (Test-Path -LiteralPath $workerPath)) { throw "Worker bundle not found: $workerPath" }
+$publishedWorker = Join-Path $publishDir "worker\YunKao.Worker.exe"
+if (-not (Test-Path -LiteralPath $publishedWorker)) { throw "Published WinUI app does not contain Worker: $publishedWorker" }
+if (-not (Test-Path -LiteralPath (Join-Path $publishDir "Scripts\yunkao-bridge.js"))) { throw "Published WinUI app does not contain Bridge" }
 
-    $rootFullPath = [IO.Path]::GetFullPath($yunkaoRoot).TrimEnd('\') + '\'
-    foreach ($target in @($yunkaoDistDir, $yunkaoBuildDir, $yunkaoZipPath)) {
-        $targetFullPath = [IO.Path]::GetFullPath($target)
-        if (-not $targetFullPath.StartsWith($rootFullPath, [StringComparison]::OrdinalIgnoreCase)) {
-            throw "拒绝清理工作区外路径: $targetFullPath"
-        }
-    }
+Copy-Item -LiteralPath $publishDir -Destination $artifactDir -Recurse -Force
+$readmePath = (Get-ChildItem -LiteralPath $projectRoot -Filter "README_*.txt" | Select-Object -First 1).FullName
+if ([string]::IsNullOrWhiteSpace($readmePath)) { throw "Release README not found" }
+Copy-Item -LiteralPath $readmePath -Destination (Join-Path $artifactDir "README.txt") -Force
+Copy-Item -LiteralPath $versionPath -Destination (Join-Path $artifactDir "VERSION") -Force
 
-    if (Test-Path $yunkaoDistDir) {
-        Remove-Item $yunkaoDistDir -Recurse -Force
-    }
-    if (Test-Path $yunkaoBuildDir) {
-        Remove-Item $yunkaoBuildDir -Recurse -Force
-    }
-    if (Test-Path $yunkaoZipPath) {
-        Remove-Item $yunkaoZipPath -Force
-    }
+& tar.exe -a -c -f $zipPath -C $distRoot $artifactName
+if ($LASTEXITCODE -ne 0) { throw "Archive creation failed: exit code $LASTEXITCODE" }
 
-    & $yunkaoPython -m PyInstaller `
-        --noconfirm `
-        --clean `
-        --workpath $yunkaoBuildDir `
-        --distpath $yunkaoDistRoot `
-        $yunkaoSpec
-    if ($LASTEXITCODE -ne 0) {
-        throw "PyInstaller 打包失败，退出码: $LASTEXITCODE"
-    }
-
-    $builtYunkaoExe = Join-Path $yunkaoDistDir "$yunkaoArtifactName.exe"
-    if (-not (Test-Path $builtYunkaoExe)) {
-        throw "未找到最新构建的 yunkao.exe: $builtYunkaoExe"
-    }
-
-    Copy-Item `
-        (Join-Path $yunkaoRoot "README_使用说明.txt") `
-        (Join-Path $yunkaoDistDir "README.txt") `
-        -Force
-
-    & tar.exe -a -c -f $yunkaoZipPath -C $yunkaoDistRoot $yunkaoArtifactName
-    if ($LASTEXITCODE -ne 0) {
-        throw "版本压缩包生成失败，退出码: $LASTEXITCODE"
-    }
-
-    Write-Host ""
-    Write-Host "独立版云考 $yunkaoVersion 打包完成：" -ForegroundColor Green
-    Write-Host "  产出路径: $yunkaoDistDir"
-    Write-Host "  压缩包: $yunkaoZipPath"
-    Write-Host ""
-}
-finally {
-    Pop-Location
-}
+Write-Host ""
+Write-Host "YunKao Desktop $version release bundle built" -ForegroundColor Green
+Write-Host "Artifact directory: $artifactDir"
+Write-Host "Archive: $zipPath"

@@ -1,3 +1,4 @@
+using YunKao.Core.Models;
 using YunKao.Core.Services;
 
 namespace YunKao.Services;
@@ -19,7 +20,7 @@ public sealed class AppServices : IAsyncDisposable
         Ai = new AiService(_httpClient);
         AiQueue = new AiTaskQueue(Ai);
         Worker.LogReceived += (_, message) => Diagnostics.Warning(message);
-        Diagnostics.EntryAdded += (_, entry) => _ = History.AddDiagnosticAsync(entry);
+        Diagnostics.EntryAdded += (_, entry) => _ = History.QueueDiagnosticAsync(entry);
     }
 
     public SettingsService Settings { get; }
@@ -29,12 +30,18 @@ public sealed class AppServices : IAsyncDisposable
     public ExportService Exports { get; }
     public AiService Ai { get; }
     public AiTaskQueue AiQueue { get; }
+    public WorkspaceRuntime Workspace { get; } = new();
+    public IReadOnlyList<ExtractionSessionSnapshot> InterruptedSessions { get; private set; } = Array.Empty<ExtractionSessionSnapshot>();
+    public event EventHandler? Initialized;
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
-        _ = Settings.Load();
+        AppSettings settings = Settings.Load();
+        MotionService.SetReduceMotion(settings.ReduceMotion || MotionService.ReduceMotion);
         await History.InitializeAsync(cancellationToken).ConfigureAwait(false);
+        InterruptedSessions = await History.GetInterruptedSessionsAsync(cancellationToken).ConfigureAwait(false);
         Diagnostics.Info("应用服务已初始化");
+        Initialized?.Invoke(this, EventArgs.Empty);
     }
 
     public async ValueTask DisposeAsync()

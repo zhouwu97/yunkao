@@ -10,6 +10,18 @@ public sealed record ExtractionSessionRecord(
     int AiCount,
     string Course);
 
+public sealed record ExtractionSessionSnapshot(
+    string SessionId,
+    DateTimeOffset StartedAt,
+    string Status,
+    int QuestionCount,
+    int AiCount,
+    string Course,
+    IReadOnlyList<Question> Questions,
+    int Current = 0,
+    int Total = 0,
+    string LastQuestionMarker = "");
+
 public sealed record ExportRecord(
     long Id,
     string Format,

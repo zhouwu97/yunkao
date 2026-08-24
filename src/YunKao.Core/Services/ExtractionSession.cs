@@ -232,6 +232,68 @@ public sealed class ExtractionSession
         }
     }
 
+    public ExtractionSessionSnapshot Snapshot(string course = "")
+    {
+        lock (_gate)
+        {
+            return new ExtractionSessionSnapshot(
+                SessionId.ToString("N"),
+                StartedAt ?? DateTimeOffset.UtcNow,
+                Status.ToString(),
+                _questions.Count,
+                _questions.Count(question => question.AnswerSource == "ai"),
+                course,
+                _questions.Select(question => question.Clone()).ToArray(),
+                Current,
+                Total,
+                LastQuestionMarker);
+        }
+    }
+
+    public bool Restore(ExtractionSessionSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (!Guid.TryParse(snapshot.SessionId, out Guid sessionId)) return false;
+
+        lock (_gate)
+        {
+            SessionId = sessionId;
+            StartedAt = snapshot.StartedAt;
+            Status = Enum.TryParse(snapshot.Status, true, out ExtractionStatus status)
+                ? status
+                : ExtractionStatus.Idle;
+            Current = Math.Max(0, snapshot.Current);
+            Total = Math.Max(0, snapshot.Total);
+            AiPending = 0;
+            LastQuestionMarker = snapshot.LastQuestionMarker ?? "";
+            _questions.Clear();
+            _seenKeys.Clear();
+            foreach (Question question in snapshot.Questions)
+            {
+                Question clone = question.Clone();
+                _questions.Add(clone);
+                _seenKeys.Add(QuestionKeyBuilder.Build(clone));
+                LastQuestionMarker = clone.Marker;
+            }
+            Status = ExtractionStatus.Idle;
+        }
+
+        RaiseChanged();
+        return true;
+    }
+
+    public bool ResumeRestored()
+    {
+        lock (_gate)
+        {
+            if (Status != ExtractionStatus.Idle || SessionId == Guid.Empty || _questions.Count == 0) return false;
+            Status = ExtractionStatus.Running;
+        }
+
+        RaiseChanged();
+        return true;
+    }
+
     private void RaiseChanged()
     {
         Changed?.Invoke(this, EventArgs.Empty);

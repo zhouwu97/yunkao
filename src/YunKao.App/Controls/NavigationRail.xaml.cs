@@ -24,6 +24,7 @@ public sealed partial class NavigationRail : UserControl
 {
     private NavigationTarget _activeTarget = NavigationTarget.Workspace;
     private bool _isLoaded;
+    private readonly Dictionary<NavigationTarget, double> _buttonY = [];
     public event EventHandler<NavigationRequestEventArgs>? NavigationRequested;
 
     public NavigationRail()
@@ -60,21 +61,24 @@ public sealed partial class NavigationRail : UserControl
     {
         _isLoaded = true;
         MotionService.SetSoftShadow(SelectionShape, enabled: true);
+        CacheButtonPositions();
         MoveSelectionBlob(animate: false);
     }
 
     private void OnNavigationAreaSizeChanged(object sender, SizeChangedEventArgs args)
     {
-        if (_isLoaded) MoveSelectionBlob(animate: false);
+        if (_isLoaded)
+        {
+            CacheButtonPositions();
+            MoveSelectionBlob(animate: false);
+        }
     }
 
     private void MoveSelectionBlob(bool animate)
     {
-        NavigationArea.UpdateLayout();
-        Button target = GetButton(_activeTarget);
-        Button first = WorkspaceButton;
-        double firstY = first.TransformToVisual(NavigationArea).TransformPoint(new Point(0, 0)).Y;
-        double targetY = target.TransformToVisual(NavigationArea).TransformPoint(new Point(0, 0)).Y;
+        if (_buttonY.Count == 0) CacheButtonPositions();
+        double firstY = _buttonY.GetValueOrDefault(NavigationTarget.Workspace);
+        double targetY = _buttonY.GetValueOrDefault(_activeTarget, firstY);
         SelectionBlob.Margin = new Thickness(0, firstY, 0, 0);
         double translation = targetY - firstY;
         if (!animate)
@@ -90,6 +94,16 @@ public sealed partial class NavigationRail : UserControl
         SelectionScale.ScaleY = 1.20;
         MotionService.AnimateScaleXY(SelectionShape, 1.08, 0.94, 90, () =>
             MotionService.AnimateScaleXY(SelectionShape, 1, 1, 130));
+    }
+
+    private void CacheButtonPositions()
+    {
+        _buttonY.Clear();
+        foreach (NavigationTarget target in Enum.GetValues<NavigationTarget>())
+        {
+            Button button = GetButton(target);
+            _buttonY[target] = button.TransformToVisual(NavigationArea).TransformPoint(new Point(0, 0)).Y;
+        }
     }
 
     private Button GetButton(NavigationTarget target) => target switch

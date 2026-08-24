@@ -22,9 +22,11 @@ public sealed class ExportService(PythonWorkerClient worker) : IAsyncDisposable
 {
     private readonly PythonWorkerClient _worker = worker;
     private readonly object _gate = new();
+    private readonly SemaphoreSlim _exportGate = new(1, 1);
     private CancellationTokenSource? _activeCancellation;
 
     public event EventHandler<ExportProgress>? ProgressChanged;
+    public bool IsExporting => _exportGate.CurrentCount == 0;
 
     public async Task<ExportResult> ExportAsync(
         ExportRequest request,
@@ -35,18 +37,20 @@ public sealed class ExportService(PythonWorkerClient worker) : IAsyncDisposable
         if (request.Questions.Count == 0) throw new InvalidOperationException("没有可导出的题目。");
         if (string.IsNullOrWhiteSpace(request.FilePath)) throw new ArgumentException("导出路径不能为空。", nameof(request));
 
-        string? directory = Path.GetDirectoryName(request.FilePath);
-        if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
-
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        lock (_gate)
+        if (!await _exportGate.WaitAsync(0).ConfigureAwait(false))
         {
-            _activeCancellation?.Cancel();
-            _activeCancellation = linked;
+            throw new ExportAlreadyRunningException();
         }
 
+        CancellationTokenSource? linked = null;
         try
         {
+            string? directory = Path.GetDirectoryName(request.FilePath);
+            if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
+
+            linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            lock (_gate) _activeCancellation = linked;
+
             ProgressChanged?.Invoke(this, new ExportProgress(0, request.Questions.Count, "正在准备导出…"));
             JsonElement result = await _worker.CallAsync<JsonElement>(
                 "export",
@@ -77,6 +81,8 @@ public sealed class ExportService(PythonWorkerClient worker) : IAsyncDisposable
             {
                 if (ReferenceEquals(_activeCancellation, linked)) _activeCancellation = null;
             }
+            linked?.Dispose();
+            _exportGate.Release();
         }
     }
 
@@ -88,6 +94,7 @@ public sealed class ExportService(PythonWorkerClient worker) : IAsyncDisposable
     public ValueTask DisposeAsync()
     {
         CancelActive();
+        _exportGate.Dispose();
         return ValueTask.CompletedTask;
     }
 
@@ -121,3 +128,6 @@ public sealed class ExportService(PythonWorkerClient worker) : IAsyncDisposable
         };
     }
 }
+
+public sealed class ExportAlreadyRunningException()
+    : InvalidOperationException("已有导出任务正在进行，请等待当前导出完成。");

@@ -43,6 +43,13 @@ public sealed partial class SettingsPage : Page
             ClearAiKeyCheckBox.IsChecked = false;
             AiSupportsImagesCheckBox.IsChecked = settings.AiSupportsImages;
             AiKeyStatusText.Text = settings.AiKeySaved ? "Key 已保存" : "未保存 Key";
+            AcrylicRadio.IsChecked = settings.AppearanceMaterial == "acrylic";
+            MicaRadio.IsChecked = settings.AppearanceMaterial == "mica";
+            SolidRadio.IsChecked = settings.AppearanceMaterial == "solid";
+            ClearRadio.IsChecked = settings.AppearanceClarity == "clear";
+            StandardRadio.IsChecked = settings.AppearanceClarity == "standard";
+            TransparentRadio.IsChecked = settings.AppearanceClarity == "transparent";
+            ReduceMotionToggle.IsOn = settings.ReduceMotion;
             StatusText.Text = "";
         }
         finally
@@ -78,6 +85,11 @@ public sealed partial class SettingsPage : Page
             settings.AiBaseUrl = AiBaseUrlBox.Text.Trim();
             settings.AiModel = AiModelBox.Text.Trim();
             settings.AiSupportsImages = AiSupportsImagesCheckBox.IsChecked == true;
+            settings.AppearanceMaterial = AcrylicRadio.IsChecked == true ? "acrylic"
+                : MicaRadio.IsChecked == true ? "mica" : "solid";
+            settings.AppearanceClarity = ClearRadio.IsChecked == true ? "clear"
+                : TransparentRadio.IsChecked == true ? "transparent" : "standard";
+            settings.ReduceMotion = ReduceMotionToggle.IsOn;
 
             string? apiKey = ClearAiKeyCheckBox.IsChecked == true
                 ? ""
@@ -86,6 +98,7 @@ public sealed partial class SettingsPage : Page
                 ? YunKaoPasswordBox.Password
                 : settings.RememberYunKaoPassword ? null : "";
             App.Services.Settings.Save(settings, apiKey, password);
+            MotionService.SetReduceMotion(settings.ReduceMotion);
             AiKeyBox.Password = "";
             YunKaoPasswordBox.Password = "";
             AiKeyStatusText.Text = settings.AiKeySaved ? "Key 已保存" : "未保存 Key";

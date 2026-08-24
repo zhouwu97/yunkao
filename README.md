@@ -1,60 +1,45 @@
-# 融智云考题库导出桌面系统 (YunKao Desktop)
+# 融智云考桌面版
 
-基于 PySide6 + QWebEngine 构建的融智云考练习题提取与导出工具。通过内嵌 Chromium 浏览器引擎，实现自动化的题库爬取与一键导出。本软件为独立本地工具，不接入任何第三方后端，不上传云考账号密码。
+当前版本：**v2.0.0**。正式主线是 `feature/winui3-migration` 上的 WinUI 3 桌面版；Python 只作为本地 Parser/Exporter Worker，不再作为独立 UI 发布入口。
 
-当前版本：**v1.0.0**
+## 能力
 
-## 🌟 核心特性
+- WebView2 内置云考页面，登录凭据只保存到 Windows Credential Manager。
+- Bridge 题目 marker 单消费者队列，支持暂停、停止、恢复页面后继续。
+- 题目会话、AI 补全和导出使用独立取消生命周期；停止提取不会影响已保存题目的导出。
+- PDF、DOCX、Markdown、TXT 离线导出；登录态图片会先缓存为本地 data URI。
+- 历史记录使用 SQLite UPSERT、串行写入和 keyset 分页。
+- HTTP 401/403、WebView2 崩溃、空白页和常见弱网错误会分类提示。
 
-- **独立纯净运行**：不接入 SYLUlive 后端，不包含钱包、充值、官方模型代理或管理后台功能。
-- **本地硬件级安全存储**：您的融智云考密码仅保存在本机系统凭据中，用于本地网页登录自动填充，绝不上传云端。
-- **一键免密填充**：启动进入练习页面后，自动读取本地加密的云考密码并注入网页，实现免密登录。
-- **自动化循环提取**：包含**“自动进入下一题”**功能，彻底解放双手，自动模拟点击翻页并持续抓取题库。
-- **多格式离线导出**：提取完成后，支持一键将题库导出为 PDF、DOCX、Markdown (`.md`) 或 纯文本 (`.txt`) 文件。导出资料已增加“免费题库，禁止倒卖”的水印防诈骗保护。
+## 开发环境
 
----
+- Windows 10 1809 或更高版本，Windows 11 推荐。
+- .NET SDK 10.0.400。
+- WebView2 Evergreen Runtime。
+- Python 3.11+；Worker 构建依赖见 `requirements.txt`。
 
-## 🛠️ 环境准备与安装
+## 运行
 
-1. **Python 环境**：需要 Python 3.8+ (推荐 Python 3.11)。
-2. **安装依赖**：
-   在项目根目录下打开终端（或使用当前已经建好的 `venv` 虚拟环境），运行：
-   ```bash
-   pip install -r requirements.txt
-   ```
-   *(如果还没有 requirements.txt，请手动安装: `pip install PySide6 requests bs4 keyring python-docx PyMuPDF Pillow`)*
-
----
-
-## 🚀 使用指南
-
-### 1. 启动软件
-执行以下命令启动应用：
-```bash
-python main.py
-```
-或使用虚拟环境：
-```bash
-.\venv\Scripts\python.exe main.py
+```powershell
+dotnet run --project src/YunKao.App/YunKao.App.csproj -c Debug -p:Platform=x64
 ```
 
-### 2. 账号设置
-点击软件中的 **“⚙️ 设置”** 按钮，在设置界面中填写您的云考账号和密码，并勾选“记住密码”。该密码将保存在您的电脑本地凭据库中。
+本地没有 Worker 可执行文件时，应用会回退到 `python worker/worker_main.py`。可先运行：
 
-### 3. 开始提取题库
-1. 右侧浏览器加载出“融智云考”页面后，若之前配置了账密，将自动静默填充并登录。
-2. **全自动连续提取**：进入题库界面后，点击左侧的 **“▶ 开始自动提取”**。
-3. 软件会自动提取、翻页、再提取，直到本章节所有题目提取完毕。您可以随时点击暂停。
+```powershell
+powershell -ExecutionPolicy Bypass -File tools/build-worker.ps1 -PackageForApp -OneFile
+```
 
-### 4. 导出文件
-提取到您需要的题量后，点击左侧的 **“💾 导出”** 按钮。
-- 在弹出的保存窗口中，选择保存路径。
-- **格式选择**：您可以选择导出 Word 文档、PDF 文档、Markdown 或 普通文本。
-- 为防止资料被非法倒卖，导出的 PDF 和 DOCX 将包含反倒卖水印提示。
+## 发布
 
----
+发布入口只有根目录的 WinUI bundle 脚本：
 
-## 🔒 隐私与安全声明
+```powershell
+powershell -ExecutionPolicy Bypass -File build_unified_bundle.ps1
+```
 
-- **零云端记录**：本软件为独立本地工具，不接入任何服务器，**绝对不会**将您的融智云考密码发送给任何人。
-- **防倒卖倡议**：本资料免费开源，严禁任何人打包二次售卖。如果您是付费购买所得，请立即退款。
+脚本从根目录 `VERSION` 读取版本，构建 Worker、WinUI 应用并检查 Bridge/Worker 是否都进入最终包。不要再使用旧的 `yunkao_dev.spec` 作为正式发布入口。
+
+## 安全边界
+
+桌面版不包含钱包、充值、官方代理、管理后台或 admin API。Bridge 只注入 `cctrcloud.net` 的登录/练习路径；外部页面只作为普通 WebView 浏览，不接收题目提取消息。

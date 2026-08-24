@@ -34,6 +34,22 @@ public sealed partial class MainWindow : Window
 
     private void OnNavigationRequested(object? sender, NavigationRequestEventArgs args)
     {
+        Type targetPage = args.Target switch
+        {
+            NavigationTarget.Workspace => typeof(WorkspacePage),
+            NavigationTarget.History => typeof(HistoryPage),
+            NavigationTarget.Export => typeof(ExportPage),
+            NavigationTarget.Diagnostics => typeof(DiagnosticsPage),
+            NavigationTarget.Settings => typeof(SettingsPage),
+            _ => typeof(WorkspacePage),
+        };
+
+        if (RootFrame.CurrentSourcePageType == targetPage)
+        {
+            NavigationRail.SetActive(args.Target);
+            return;
+        }
+
         switch (args.Target)
         {
             case NavigationTarget.Workspace:
@@ -71,7 +87,8 @@ public sealed partial class MainWindow : Window
     {
         if (RootFrame.Content is Microsoft.UI.Xaml.FrameworkElement element)
         {
-            MotionService.AnimatePage(element);
+            // WebView2 原生 surface 不参与整页透明度/位移动画，避免切页时闪烁和重绘抖动。
+            if (element is not WorkspacePage) MotionService.AnimatePage(element);
         }
     }
 
