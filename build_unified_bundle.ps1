@@ -34,7 +34,7 @@ if (-not $SkipWorker) {
 }
 
 $appProject = Join-Path $projectRoot "src\YunKao.App\YunKao.App.csproj"
-& dotnet publish $appProject -c Release -r win-x64 --self-contained false -p:Platform=x64 -o $publishDir
+& dotnet publish $appProject -c Release -r win-x64 --self-contained true -p:Platform=x64 -p:WindowsAppSDKSelfContained=true -o $publishDir
 if ($LASTEXITCODE -ne 0) { throw "WinUI publish failed: exit code $LASTEXITCODE" }
 
 $workerPath = Join-Path $projectRoot "worker\YunKao.Worker.exe"

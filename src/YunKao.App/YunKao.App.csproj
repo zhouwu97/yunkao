@@ -9,6 +9,7 @@
     <Platforms>x64</Platforms>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PublishProfile>win-x64.pubxml</PublishProfile>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <UseWinUI>true</UseWinUI>
     <WinUISDKReferences>false</WinUISDKReferences>
     <EnableMsixTooling>true</EnableMsixTooling>
