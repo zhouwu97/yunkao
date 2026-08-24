@@ -2,37 +2,40 @@
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Liquid islands are intentionally small; the WebView stays on ContentSurfaceBrush. -->
   <Style x:Key="GlassCardStyle" TargetType="Border">
-    <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
-    <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+    <Setter Property="Background" Value="{StaticResource LiquidSurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource LiquidBorderBrush}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="16" />
-    <Setter Property="Padding" Value="16" />
+    <Setter Property="Padding" Value="14" />
   </Style>
   <Style x:Key="SubtleCardStyle" TargetType="Border">
-    <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
-    <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+    <Setter Property="Background" Value="{StaticResource LiquidSurfaceStrongBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource LiquidInnerBorderBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="13" />
-    <Setter Property="Padding" Value="13" />
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="Padding" Value="12" />
   </Style>
   <Style x:Key="ToolbarCardStyle" TargetType="Border">
-    <Setter Property="Background" Value="{StaticResource SurfaceBrush}" />
-    <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+    <Setter Property="Background" Value="{StaticResource LiquidSurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource LiquidBorderBrush}" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="13" />
-    <Setter Property="Padding" Value="7,8" />
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="Padding" Value="6" />
   </Style>
   <Style x:Key="NoticeCardStyle" TargetType="Border">
     <Setter Property="Background" Value="{StaticResource NoticeBrush}" />
-    <Setter Property="BorderBrush" Value="#40DDA84F" />
+    <Setter Property="BorderBrush" Value="#54D8A451" />
     <Setter Property="BorderThickness" Value="1" />
-    <Setter Property="CornerRadius" Value="10" />
-    <Setter Property="Padding" Value="10" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="Padding" Value="12" />
   </Style>
   <Style x:Key="StatusPillStyle" TargetType="Border">
-    <Setter Property="Background" Value="{StaticResource SuccessSoftBrush}" />
-    <Setter Property="CornerRadius" Value="20" />
-    <Setter Property="Padding" Value="10,5" />
+    <Setter Property="Background" Value="{StaticResource LiquidSurfaceStrongBrush}" />
+    <Setter Property="BorderBrush" Value="{StaticResource LiquidInnerBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="18" />
+    <Setter Property="Padding" Value="9,5" />
   </Style>
 </ResourceDictionary>

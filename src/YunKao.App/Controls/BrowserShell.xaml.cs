@@ -12,6 +12,7 @@ public sealed partial class BrowserShell : UserControl
 {
     private readonly WebViewService _service = new();
     private bool _loaded;
+    private string _fullAddress = "https://www.cctrcloud.net/";
 
     public BrowserShell()
     {
@@ -52,7 +53,9 @@ public sealed partial class BrowserShell : UserControl
     {
         if (args.Key != VirtualKey.Enter) return;
         args.Handled = true;
-        if (!Uri.TryCreate(AddressBox.Text.Trim(), UriKind.Absolute, out Uri? uri)
+        string input = AddressBox.Text.Trim();
+        if (!input.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) input = "https://" + input;
+        if (!Uri.TryCreate(input, UriKind.Absolute, out Uri? uri)
             || !uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
         {
             StatusText.Text = "地址必须是 HTTPS URL。";
@@ -65,8 +68,32 @@ public sealed partial class BrowserShell : UserControl
 
     private void OnNavigationChanged(object? sender, BrowserNavigationEventArgs args)
     {
-        AddressBox.Text = args.Uri?.AbsoluteUri ?? "";
+        _fullAddress = args.Uri?.AbsoluteUri ?? _fullAddress;
+        AddressBox.Text = FormatAddress(args.Uri);
+        ToolTipService.SetToolTip(AddressBox, _fullAddress);
         StatusText.Text = args.Message;
+    }
+
+    private void OnAddressGotFocus(object sender, RoutedEventArgs args)
+    {
+        AddressBox.Text = _fullAddress;
+        AddressBox.SelectAll();
+    }
+
+    private void OnAddressLostFocus(object sender, RoutedEventArgs args)
+    {
+        if (Uri.TryCreate(_fullAddress, UriKind.Absolute, out Uri? uri)) AddressBox.Text = FormatAddress(uri);
+    }
+
+    private static string FormatAddress(Uri? uri)
+    {
+        if (uri is null) return "cctrcloud.net";
+        string path = string.IsNullOrWhiteSpace(uri.AbsolutePath) || uri.AbsolutePath == "/"
+            ? ""
+            : uri.AbsolutePath.TrimEnd('/');
+        return string.IsNullOrWhiteSpace(path)
+            ? uri.Host
+            : $"{uri.Host} {path.Replace("/", " / ", StringComparison.Ordinal)}";
     }
 
     private void OnStatusChanged(object? sender, string message) => StatusText.Text = message;

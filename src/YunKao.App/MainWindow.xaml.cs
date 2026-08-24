@@ -21,10 +21,14 @@ public sealed partial class MainWindow : Window
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
         ConfigureWindow();
-        BackdropService.Apply(this, RootGrid, BackdropMaterial.DesktopAcrylic);
+        BackdropMaterial material = BackdropService.Apply(this, RootSurface, BackdropMaterial.DesktopAcrylic);
+        RootSurface.Background = material == BackdropMaterial.Solid
+            ? (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SolidWindowBackgroundBrush"]
+            : new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent);
 
         NavigationRail.NavigationRequested += OnNavigationRequested;
-        RootGrid.SizeChanged += OnRootGridSizeChanged;
+        RootFrame.Navigated += OnRootFrameNavigated;
+        RootSurface.SizeChanged += OnRootGridSizeChanged;
         RootFrame.Navigate(typeof(WorkspacePage));
     }
 
@@ -50,13 +54,25 @@ public sealed partial class MainWindow : Window
         }
 
         NavigationRail.SetActive(args.Target);
+        if (RootFrame.Content is WorkspacePage workspace) workspace.ApplyWindowWidth(RootSurface.ActualWidth);
     }
 
     private void OnRootGridSizeChanged(object sender, Microsoft.UI.Xaml.SizeChangedEventArgs args)
     {
-        bool compact = args.NewSize.Width < 1120;
-        NavigationColumn.Width = new GridLength(compact ? 76 : 220);
+        double width = args.NewSize.Width;
+        double railWidth = width >= 1180 ? 68 : width >= 960 ? 64 : 60;
+        NavigationColumn.Width = new GridLength(railWidth);
+        bool compact = width < 1180;
         NavigationRail.SetCompact(compact);
+        if (RootFrame.Content is WorkspacePage workspace) workspace.ApplyWindowWidth(width);
+    }
+
+    private void OnRootFrameNavigated(object sender, Microsoft.UI.Xaml.Navigation.NavigationEventArgs args)
+    {
+        if (RootFrame.Content is Microsoft.UI.Xaml.FrameworkElement element)
+        {
+            MotionService.AnimatePage(element);
+        }
     }
 
     private void ConfigureWindow()

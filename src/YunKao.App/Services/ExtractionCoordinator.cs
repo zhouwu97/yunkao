@@ -16,6 +16,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
     private readonly BrowserShell _browser;
     private readonly ExtractionPanel _panel;
     private readonly ProgressCard _progress;
+    private readonly ExportCard _export;
     private readonly AiStatusCard _aiStatus;
     private readonly EventList _events;
     private readonly SemaphoreSlim _questionGate = new(1, 1);
@@ -31,6 +32,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         BrowserShell browser,
         ExtractionPanel panel,
         ProgressCard progress,
+        ExportCard export,
         AiStatusCard aiStatus,
         EventList events)
     {
@@ -38,12 +40,13 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         _browser = browser;
         _panel = panel;
         _progress = progress;
+        _export = export;
         _aiStatus = aiStatus;
         _events = events;
         _panel.StartRequested += (_, _) => Track(StartAsync());
         _panel.PauseRequested += (_, _) => TogglePause();
         _panel.StopRequested += (_, _) => Stop();
-        _panel.ExportRequested += (_, format) => _ = ExportAsync(format);
+        _export.ExportRequested += (_, format) => Track(ExportAsync(format));
         _browser.BridgeMessageReceived += OnBridgeMessageReceived;
         _session.Changed += OnSessionChanged;
         _services.Exports.ProgressChanged += OnExportProgress;
@@ -367,7 +370,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
                 ExtractionStatus.Error => "异常",
                 _ => "等待开始",
             }, running, paused);
-            _progress.SetProgress(_session.Current, _session.Total, $"已保存 {_session.SavedCount} 题 · AI 待处理 {_session.AiPending}");
+            _progress.SetProgress(_session.Current, _session.Total, $"已保存 {_session.SavedCount} 题 · AI 待处理 {_session.AiPending}", _session.SavedCount, _session.AiPending);
         }
 
         if (!_panel.DispatcherQueue.TryEnqueue(Render)) Render();

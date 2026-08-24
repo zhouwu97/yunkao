@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="YunKao.Controls.ExportCard"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:YunKao.Controls">
+  <controls:LiquidCard Variant="Coral" Padding="14">
+    <StackPanel Spacing="10">
+      <Grid>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <FontIcon Glyph="&#xE74E;" FontSize="16" Foreground="{StaticResource CoralPrimaryBrush}" />
+          <TextBlock Text="快捷导出" Style="{StaticResource CardTitleStyle}" />
+        </StackPanel>
+        <TextBlock Text="READY" HorizontalAlignment="Right" Style="{StaticResource CaptionTextStyle}" />
+      </Grid>
+      <Grid ColumnSpacing="7">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <controls:LiquidButton Grid.Column="0" Label="PDF" Variant="Soft" Click="OnPdfClick" />
+        <controls:LiquidButton Grid.Column="1" Label="DOCX" Variant="Violet" Click="OnDocxClick" />
+        <controls:LiquidButton Grid.Column="2" Label="更多" Variant="Coral" Click="OnMoreClick" />
+      </Grid>
+    </StackPanel>
+  </controls:LiquidCard>
+</UserControl>

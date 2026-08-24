@@ -2,8 +2,9 @@
 <UserControl
     x:Class="YunKao.Controls.ExtractionPanel"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-  <Border Style="{StaticResource GlassCardStyle}">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:YunKao.Controls">
+  <controls:LiquidCard Variant="Blue" Padding="15">
     <StackPanel Spacing="12">
       <StackPanel Orientation="Horizontal" Spacing="10">
         <Border Width="34" Height="34" CornerRadius="11" Background="{StaticResource IceBlueSoftBrush}">
@@ -11,37 +12,23 @@
                     HorizontalAlignment="Center" VerticalAlignment="Center" />
         </Border>
         <StackPanel>
-          <TextBlock Text="提取控制" Style="{StaticResource CardTitleStyle}" />
-          <TextBlock x:Name="StateText" Text="等待开始" Style="{StaticResource CaptionTextStyle}" />
+          <TextBlock Text="提取任务" Style="{StaticResource CardTitleStyle}" />
+          <TextBlock x:Name="StateText" Text="待机 · 等待进入练习页面" Style="{StaticResource CaptionTextStyle}" />
         </StackPanel>
       </StackPanel>
 
       <TextBlock Text="MutationObserver 驱动，稳定 100ms 后读取当前题。"
                  TextWrapping="Wrap"
                  Style="{StaticResource SecondaryTextStyle}" />
+      <controls:LiquidButton x:Name="StartButton" Label="开始提取" Click="OnStartClick" Variant="Primary" />
       <Grid ColumnSpacing="8">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />
           <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
-        <Button x:Name="StartButton" Grid.Column="0" Content="开始提取" Click="OnStartClick" Style="{StaticResource PrimaryButtonStyle}" />
-        <Button x:Name="PauseButton" Grid.Column="1" Content="暂停" Click="OnPauseClick" Style="{StaticResource SecondaryButtonStyle}" IsEnabled="False" />
+        <controls:LiquidButton x:Name="PauseButton" Grid.Column="0" Label="暂停" Click="OnPauseClick" Variant="Soft" IsEnabled="False" />
+        <controls:LiquidButton x:Name="StopButton" Grid.Column="1" Label="停止" Click="OnStopClick" Variant="Coral" IsEnabled="False" />
       </Grid>
-      <Button x:Name="StopButton" Content="停止" Click="OnStopClick" Style="{StaticResource QuietButtonStyle}" IsEnabled="False" />
-      <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,0">
-        <StackPanel Spacing="8">
-          <TextBlock Text="快捷导出" Style="{StaticResource SmallLabelStyle}" />
-          <Grid ColumnSpacing="6">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="*" />
-              <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
-            <Button Grid.Column="0" Content="PDF" Click="OnPdfClick" Style="{StaticResource SecondaryButtonStyle}" />
-            <Button Grid.Column="1" Content="DOCX" Click="OnDocxClick" Style="{StaticResource SecondaryButtonStyle}" />
-          </Grid>
-          <Button Content="更多格式 · MD / TXT" Click="OnMoreExportClick" Style="{StaticResource QuietButtonStyle}" />
-        </StackPanel>
-      </Border>
     </StackPanel>
-  </Border>
+  </controls:LiquidCard>
 </UserControl>

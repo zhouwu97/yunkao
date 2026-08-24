@@ -2,27 +2,34 @@
 <UserControl
     x:Class="YunKao.Controls.EventList"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-  <Border Style="{StaticResource GlassCardStyle}">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:YunKao.Controls">
+  <controls:LiquidCard Padding="14">
     <StackPanel Spacing="10">
       <Grid>
-        <TextBlock Text="运行事件" Style="{StaticResource CardTitleStyle}" />
-        <TextBlock Text="LIVE" HorizontalAlignment="Right" Style="{StaticResource CaptionTextStyle}" />
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <TextBlock Text="运行动态" Style="{StaticResource CardTitleStyle}" />
+          <Border Background="{StaticResource SuccessSoftBrush}" CornerRadius="8" Padding="5,2">
+            <TextBlock Text="LIVE" Foreground="{StaticResource CyanPrimaryBrush}" FontSize="9" />
+          </Border>
+        </StackPanel>
+        <TextBlock Text="最近 5 条" HorizontalAlignment="Right" Style="{StaticResource CaptionTextStyle}" />
       </Grid>
-      <ListView x:Name="Events" IsItemClickEnabled="False" MaxHeight="150" BorderThickness="0" Background="Transparent">
+      <ListView x:Name="Events" IsItemClickEnabled="False" MaxHeight="178" BorderThickness="0" Background="Transparent" Padding="0">
         <ListViewItem>
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Ellipse Width="6" Height="6" Fill="{StaticResource CyanBrush}" VerticalAlignment="Center" />
-            <TextBlock Text="UI 骨架已加载" Style="{StaticResource SecondaryTextStyle}" />
+            <TextBlock Text="刚刚  ·  UI 工作区已加载" Style="{StaticResource SecondaryTextStyle}" />
           </StackPanel>
         </ListViewItem>
         <ListViewItem>
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Ellipse Width="6" Height="6" Fill="{StaticResource AmberBrush}" VerticalAlignment="Center" />
-            <TextBlock Text="等待 WebView2 / Worker" Style="{StaticResource SecondaryTextStyle}" />
+            <TextBlock Text="刚刚  ·  等待 WebView2 / Worker" Style="{StaticResource SecondaryTextStyle}" />
           </StackPanel>
         </ListViewItem>
       </ListView>
+      <Button Content="查看全部" HorizontalAlignment="Left" Style="{StaticResource GhostButtonStyle}" />
     </StackPanel>
-  </Border>
+  </controls:LiquidCard>
 </UserControl>

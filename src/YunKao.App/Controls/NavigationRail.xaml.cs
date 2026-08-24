@@ -32,33 +32,23 @@ public sealed partial class NavigationRail : UserControl
     {
         var active = (Brush)Application.Current.Resources["ActiveNavigationBrush"];
         var inactive = (Brush)Application.Current.Resources["TransparentBrush"];
+        var activeBorder = (Brush)Application.Current.Resources["LiquidBorderBrush"];
 
         WorkspaceButton.Background = target == NavigationTarget.Workspace ? active : inactive;
         HistoryButton.Background = target == NavigationTarget.History ? active : inactive;
         ExportButton.Background = target == NavigationTarget.Export ? active : inactive;
         DiagnosticsButton.Background = target == NavigationTarget.Diagnostics ? active : inactive;
         SettingsButton.Background = target == NavigationTarget.Settings ? active : inactive;
+        WorkspaceButton.BorderBrush = target == NavigationTarget.Workspace ? activeBorder : inactive;
+        HistoryButton.BorderBrush = target == NavigationTarget.History ? activeBorder : inactive;
+        ExportButton.BorderBrush = target == NavigationTarget.Export ? activeBorder : inactive;
+        DiagnosticsButton.BorderBrush = target == NavigationTarget.Diagnostics ? activeBorder : inactive;
+        SettingsButton.BorderBrush = target == NavigationTarget.Settings ? activeBorder : inactive;
     }
 
     public void SetCompact(bool compact)
     {
-        HeaderLabel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-        BrandLabel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-        SubtitleLabel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-        BaselineLabel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-        BaselineDescription.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-        WorkspaceLabel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-        HistoryLabel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-        ExportLabel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-        DiagnosticsLabel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-        SettingsLabel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-
-        Thickness padding = compact ? new Thickness(0, 10, 0, 10) : new Thickness(12, 10, 12, 10);
-        foreach (Button button in new[] { WorkspaceButton, HistoryButton, ExportButton, DiagnosticsButton, SettingsButton })
-        {
-            button.Padding = padding;
-            button.HorizontalContentAlignment = compact ? HorizontalAlignment.Center : HorizontalAlignment.Left;
-        }
+        // 68/64/60px rail 都使用同一套图标模式，避免在阈值附近抖动布局。
     }
 
     private void OnWorkspaceClick(object sender, RoutedEventArgs e)

@@ -4,7 +4,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:YunKao.Controls">
-  <Grid Padding="18,16,18,18" RowSpacing="14">
+  <Grid x:Name="PageRoot" Padding="14,12,14,14" RowSpacing="10">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
@@ -13,33 +13,46 @@
     <Grid Grid.Row="0">
       <StackPanel Spacing="3">
         <TextBlock Text="工作台" Style="{StaticResource PageTitleStyle}" />
-        <TextBlock Text="把浏览、提取和导出放在同一个安静的工作区。"
+        <TextBlock Text="浏览、提取和导出都在这里完成。"
                    Style="{StaticResource SecondaryTextStyle}" />
       </StackPanel>
-      <Border HorizontalAlignment="Right" Style="{StaticResource StatusPillStyle}">
+      <controls:StatusPill HorizontalAlignment="Right" Variant="Cyan">
         <StackPanel Orientation="Horizontal" Spacing="7">
-          <Ellipse Width="7" Height="7" Fill="{StaticResource CyanBrush}" />
-          <TextBlock Text="本地模式" />
+          <Ellipse Width="6" Height="6" Fill="{StaticResource CyanPrimaryBrush}" />
+          <TextBlock Text="本地运行" FontSize="11" />
         </StackPanel>
-      </Border>
+      </controls:StatusPill>
     </Grid>
 
-    <Grid Grid.Row="1" ColumnSpacing="14">
+    <Grid x:Name="ContentGrid" Grid.Row="1" ColumnSpacing="12">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" />
-        <ColumnDefinition Width="304" />
+        <ColumnDefinition x:Name="ControlColumn" Width="328" />
       </Grid.ColumnDefinitions>
 
       <controls:BrowserShell x:Name="Browser" Grid.Column="0" />
 
-      <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+      <Grid x:Name="ControlPanel" Grid.Column="1">
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Spacing="12">
           <controls:ExtractionPanel x:Name="Extraction" />
           <controls:ProgressCard x:Name="Progress" />
+          <controls:ExportCard x:Name="Export" />
           <controls:AiStatusCard x:Name="AiStatus" />
           <controls:EventList x:Name="Events" />
         </StackPanel>
-      </ScrollViewer>
+        </ScrollViewer>
+      </Grid>
+
+      <controls:LiquidButton x:Name="DrawerToggle"
+                             Grid.ColumnSpan="2"
+                             Label="任务状态"
+                             Variant="Primary"
+                             HorizontalAlignment="Right"
+                             VerticalAlignment="Bottom"
+                             Click="OnDrawerToggleClick"
+                             Visibility="Collapsed"
+                             Margin="0,0,8,8" />
     </Grid>
   </Grid>
 </Page>

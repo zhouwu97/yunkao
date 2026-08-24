@@ -2,32 +2,70 @@
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-  <Color x:Key="IceBlueColor">#6EA8FF</Color>
-  <Color x:Key="LavenderColor">#8B7EE8</Color>
-  <Color x:Key="CoralColor">#E8897C</Color>
-  <Color x:Key="AmberColor">#DDA84F</Color>
-  <Color x:Key="PinkMistColor">#D98FB5</Color>
-  <Color x:Key="CyanColor">#65B8DD</Color>
+  <!-- PR 1.5 palette: blue is the working color; violet, coral and amber are small accents. -->
+  <Color x:Key="BluePrimary">#6C9FFF</Color>
+  <Color x:Key="BlueBright">#8DBBFF</Color>
+  <Color x:Key="BlueDeep">#4E78C8</Color>
+  <Color x:Key="VioletPrimary">#8C7BE8</Color>
+  <Color x:Key="CoralPrimary">#EA8D7C</Color>
+  <Color x:Key="AmberPrimary">#D8A451</Color>
+  <Color x:Key="CyanPrimary">#62B7D8</Color>
+  <Color x:Key="PinkPrimary">#D792B7</Color>
 
-  <SolidColorBrush x:Key="IceBlueBrush" Color="{StaticResource IceBlueColor}" />
-  <SolidColorBrush x:Key="IceBlueSoftBrush" Color="#316EA8FF" />
-  <SolidColorBrush x:Key="LavenderBrush" Color="{StaticResource LavenderColor}" />
-  <SolidColorBrush x:Key="CoralBrush" Color="{StaticResource CoralColor}" />
-  <SolidColorBrush x:Key="AmberBrush" Color="{StaticResource AmberColor}" />
-  <SolidColorBrush x:Key="PinkMistBrush" Color="{StaticResource PinkMistColor}" />
-  <SolidColorBrush x:Key="CyanBrush" Color="{StaticResource CyanColor}" />
+  <!-- Compatibility aliases used by the existing extraction and history views. -->
+  <Color x:Key="IceBlueColor">{StaticResource BluePrimary}</Color>
+  <Color x:Key="LavenderColor">{StaticResource VioletPrimary}</Color>
+  <Color x:Key="CoralColor">{StaticResource CoralPrimary}</Color>
+  <Color x:Key="AmberColor">{StaticResource AmberPrimary}</Color>
+  <Color x:Key="PinkMistColor">{StaticResource PinkPrimary}</Color>
+  <Color x:Key="CyanColor">{StaticResource CyanPrimary}</Color>
 
+  <Color x:Key="TextPrimary">#203145</Color>
+  <Color x:Key="TextSecondary">#65798E</Color>
+  <Color x:Key="TextTertiary">#91A0B0</Color>
+
+  <SolidColorBrush x:Key="BluePrimaryBrush" Color="{StaticResource BluePrimary}" />
+  <SolidColorBrush x:Key="BlueBrightBrush" Color="{StaticResource BlueBright}" />
+  <SolidColorBrush x:Key="BlueDeepBrush" Color="{StaticResource BlueDeep}" />
+  <SolidColorBrush x:Key="VioletPrimaryBrush" Color="{StaticResource VioletPrimary}" />
+  <SolidColorBrush x:Key="CoralPrimaryBrush" Color="{StaticResource CoralPrimary}" />
+  <SolidColorBrush x:Key="AmberPrimaryBrush" Color="{StaticResource AmberPrimary}" />
+  <SolidColorBrush x:Key="CyanPrimaryBrush" Color="{StaticResource CyanPrimary}" />
+
+  <SolidColorBrush x:Key="IceBlueBrush" Color="{StaticResource BluePrimary}" />
+  <SolidColorBrush x:Key="IceBlueSoftBrush" Color="#2E6C9FFF" />
+  <SolidColorBrush x:Key="LavenderBrush" Color="{StaticResource VioletPrimary}" />
+  <SolidColorBrush x:Key="CoralBrush" Color="{StaticResource CoralPrimary}" />
+  <SolidColorBrush x:Key="AmberBrush" Color="{StaticResource AmberPrimary}" />
+  <SolidColorBrush x:Key="PinkMistBrush" Color="{StaticResource PinkPrimary}" />
+  <SolidColorBrush x:Key="CyanBrush" Color="{StaticResource CyanPrimary}" />
+
+  <!-- Level 0: the window material is owned by BackdropService. -->
   <SolidColorBrush x:Key="WindowBackgroundBrush" Color="Transparent" />
-  <SolidColorBrush x:Key="SolidWindowBackgroundBrush" Color="#EAF1F8" />
-  <SolidColorBrush x:Key="TitleBarBrush" Color="#C9DEF1" Opacity="0.58" />
-  <SolidColorBrush x:Key="SurfaceBrush" Color="#C8EFF6FC" />
-  <SolidColorBrush x:Key="WebViewSurfaceBrush" Color="#FBFDFF" />
-  <SolidColorBrush x:Key="TextPrimaryBrush" Color="#1D2B3A" />
-  <SolidColorBrush x:Key="TextSecondaryBrush" Color="#65788B" />
-  <SolidColorBrush x:Key="TextTertiaryBrush" Color="#8EA0B0" />
-  <SolidColorBrush x:Key="BorderBrush" Color="#FFFFFF" Opacity="0.78" />
-  <SolidColorBrush x:Key="ActiveNavigationBrush" Color="#5F9BF0" Opacity="0.18" />
+  <SolidColorBrush x:Key="SolidWindowBackgroundBrush" Color="#EDF4FA" />
+  <SolidColorBrush x:Key="TitleBarBrush" Color="#B8E8F3" Opacity="0.26" />
+
+  <!-- Level 1: small, translucent liquid islands. -->
+  <SolidColorBrush x:Key="LiquidSurfaceBrush" Color="#BCF7FAFE" />
+  <SolidColorBrush x:Key="LiquidSurfaceStrongBrush" Color="#D8F8FBFE" />
+  <SolidColorBrush x:Key="LiquidSurfaceSoftBrush" Color="#8FF8FBFE" />
+  <SolidColorBrush x:Key="LiquidBorderBrush" Color="#BFFFFFFF" />
+  <SolidColorBrush x:Key="LiquidInnerBorderBrush" Color="#52FFFFFF" />
+  <SolidColorBrush x:Key="LiquidShadowBrush" Color="#190F2D58" />
+
+  <!-- Level 2: content remains opaque and readable. -->
+  <SolidColorBrush x:Key="ContentSurfaceBrush" Color="#FAFBFD" />
+  <SolidColorBrush x:Key="WebViewSurfaceBrush" Color="{StaticResource ContentSurfaceBrush}" />
+
+  <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimary}" />
+  <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondary}" />
+  <SolidColorBrush x:Key="TextTertiaryBrush" Color="{StaticResource TextTertiary}" />
+  <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource LiquidBorderBrush}" />
+  <SolidColorBrush x:Key="ActiveNavigationBrush" Color="#4279D6" Opacity="0.18" />
   <SolidColorBrush x:Key="TransparentBrush" Color="Transparent" />
-  <SolidColorBrush x:Key="NoticeBrush" Color="#FFF4E1" Opacity="0.82" />
-  <SolidColorBrush x:Key="SuccessSoftBrush" Color="#DDF4F5" />
+  <SolidColorBrush x:Key="NoticeBrush" Color="#FFF3D6" Opacity="0.84" />
+  <SolidColorBrush x:Key="SuccessSoftBrush" Color="#CDEFF2" />
+
+  <!-- Legacy name kept for controls that have not yet moved to LiquidCard. -->
+  <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource LiquidSurfaceBrush}" />
 </ResourceDictionary>

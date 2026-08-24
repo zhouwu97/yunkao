@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using YunKao.Core.Models;
 using YunKao.Core.Services;
+using YunKao.Services;
 
 namespace YunKao.Views;
 
@@ -95,6 +96,11 @@ public sealed partial class SettingsPage : Page
             StatusText.Text = "保存失败：" + exception.Message;
             App.Services.Diagnostics.Error("设置保存失败", exception);
         }
+    }
+
+    private void OnReduceMotionToggled(object sender, RoutedEventArgs args)
+    {
+        MotionService.SetReduceMotion(ReduceMotionToggle.IsOn);
     }
 
     private static void SelectByTag(ComboBox comboBox, string value)
