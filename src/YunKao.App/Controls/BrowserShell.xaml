@@ -15,8 +15,10 @@
     </Grid.RowDefinitions>
 
     <controls:LiquidCard Grid.Row="0" Padding="5">
-      <Grid ColumnSpacing="8">
+      <Grid ColumnSpacing="6">
         <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="*" />
@@ -25,46 +27,77 @@
         <Button Grid.Column="0" Click="OnBackClick" ToolTipService.ToolTip="后退" Style="{StaticResource IconButtonStyle}">
           <FontIcon Glyph="&#xE72B;" />
         </Button>
-        <Button Grid.Column="1" Click="OnRefreshClick" ToolTipService.ToolTip="刷新" Style="{StaticResource IconButtonStyle}">
+        <Button Grid.Column="1" Click="OnForwardClick" ToolTipService.ToolTip="前进" Style="{StaticResource IconButtonStyle}">
+          <FontIcon Glyph="&#xE72A;" />
+        </Button>
+        <Button Grid.Column="2" Click="OnRefreshClick" ToolTipService.ToolTip="刷新" Style="{StaticResource IconButtonStyle}">
           <FontIcon Glyph="&#xE72C;" />
         </Button>
-        <Grid Grid.Column="2" ColumnSpacing="6">
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="*" />
-          </Grid.ColumnDefinitions>
-          <FontIcon Grid.Column="0" Glyph="&#xE72E;" FontSize="13" Foreground="{StaticResource CyanPrimaryBrush}" VerticalAlignment="Center" />
-          <Grid Grid.Column="1">
-            <TextBlock x:Name="AddressDisplay"
-                       Text="cctrcloud.net"
-                       VerticalAlignment="Center"
-                       TextTrimming="CharacterEllipsis"
-                       Tapped="OnAddressDisplayTapped"
-                       ToolTipService.ToolTip="点击编辑 HTTPS 地址"
-                       Style="{StaticResource SecondaryTextStyle}" />
-            <TextBox x:Name="AddressBox"
-                     Visibility="Collapsed"
-                     PlaceholderText="输入 HTTPS 地址"
-                     KeyDown="OnAddressKeyDown"
-                     LostFocus="OnAddressLostFocus"
-                     ToolTipService.ToolTip="完整地址"
-                     Style="{StaticResource AddressBarStyle}" />
+        <Button Grid.Column="3" Click="OnHomeClick" ToolTipService.ToolTip="云考首页" Style="{StaticResource IconButtonStyle}">
+          <FontIcon Glyph="&#xE80F;" />
+        </Button>
+        <Border Grid.Column="4"
+                Background="{StaticResource LiquidInnerBorderBrush}"
+                CornerRadius="8"
+                Padding="8,4"
+                Margin="2,0">
+          <Grid ColumnSpacing="6">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <FontIcon Grid.Column="0" Glyph="&#xE72E;" FontSize="12" Foreground="{StaticResource CyanPrimaryBrush}" VerticalAlignment="Center" />
+            <Grid Grid.Column="1">
+              <TextBlock x:Name="AddressDisplay"
+                         Text="https://www.cctrcloud.net/"
+                         VerticalAlignment="Center"
+                         TextTrimming="CharacterEllipsis"
+                         Tapped="OnAddressDisplayTapped"
+                         ToolTipService.ToolTip="点击编辑网址"
+                         Style="{StaticResource SecondaryTextStyle}" />
+              <TextBox x:Name="AddressBox"
+                       Visibility="Collapsed"
+                       PlaceholderText="输入 HTTPS 地址"
+                       KeyDown="OnAddressKeyDown"
+                       LostFocus="OnAddressLostFocus"
+                       ToolTipService.ToolTip="完整地址"
+                       Style="{StaticResource AddressBarStyle}" />
+            </Grid>
           </Grid>
-        </Grid>
-        <Button Grid.Column="3" Click="OnExternalClick" ToolTipService.ToolTip="在浏览器中打开" Style="{StaticResource IconButtonStyle}">
+        </Border>
+        <Button Grid.Column="5" Click="OnExternalClick" ToolTipService.ToolTip="在系统浏览器中打开" Style="{StaticResource IconButtonStyle}">
           <FontIcon Glyph="&#xE8A7;" />
         </Button>
       </Grid>
     </controls:LiquidCard>
 
-    <Border Grid.Row="1"
-            Background="{StaticResource ContentSurfaceBrush}"
-            BorderBrush="{StaticResource LiquidInnerBorderBrush}"
-            BorderThickness="1"
-            CornerRadius="18"
-            Padding="1">
-      <wv2:WebView2 x:Name="WebView" SizeChanged="OnWebViewSurfaceSizeChanged" />
-    </Border>
+    <Grid Grid.Row="1">
+      <Border Background="{StaticResource ContentSurfaceBrush}"
+              BorderBrush="{StaticResource LiquidInnerBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="18"
+              Padding="1">
+        <wv2:WebView2 x:Name="WebView" SizeChanged="OnWebViewSurfaceSizeChanged" />
+      </Border>
+
+      <Border x:Name="WebViewErrorOverlay"
+              Background="{StaticResource ContentSurfaceBrush}"
+              BorderBrush="{StaticResource LiquidInnerBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="18"
+              Padding="24"
+              Visibility="Collapsed">
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16" MaxWidth="420">
+          <FontIcon Glyph="&#xE783;" FontSize="48" Foreground="{StaticResource CoralBrush}" HorizontalAlignment="Center" />
+          <TextBlock x:Name="ErrorTitleText" Text="浏览器组件未就绪" Style="{StaticResource CardTitleStyle}" HorizontalAlignment="Center" />
+          <TextBlock x:Name="ErrorMessageText" Text="融智云考需要 Microsoft Edge WebView2 Runtime 支持。若未安装，请点击下方按钮获取安装。" TextWrapping="Wrap" HorizontalAlignment="Center" TextAlignment="Center" Style="{StaticResource SecondaryTextStyle}" />
+          <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+            <Button Content="安装 WebView2" Click="OnInstallWebView2Click" Style="{StaticResource AccentButtonStyle}" />
+            <Button Content="重新检测" Click="OnRetryWebView2Click" Style="{StaticResource DefaultButtonStyle}" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+    </Grid>
 
     <TextBlock x:Name="StatusText"
                Grid.Row="2"

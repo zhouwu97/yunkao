@@ -21,7 +21,7 @@ public sealed partial class ExtractionPanel : UserControl
     /// <summary>
     /// 按唯一任务状态派生所有按钮，控件本身不维护第二套运行标记。
     /// </summary>
-    public void SetState(ExtractionStatus status, int savedCount)
+    public void SetState(ExtractionStatus status, int savedCount, bool isPracticeReady = false)
     {
         bool running = status == ExtractionStatus.Running;
         bool paused = status == ExtractionStatus.Paused;
@@ -34,14 +34,14 @@ public sealed partial class ExtractionPanel : UserControl
             ExtractionStatus.Completed => "已完成 · 可导出",
             ExtractionStatus.Error => "异常 · 可重新开始",
             _ when savedCount > 0 => "已停止 · 可导出",
-            _ => "待机 · 等待进入练习页面",
+            _ => isPracticeReady ? "就绪 · 点击开始提取" : "待机 · 请先进入练习页面",
         };
         HintText.Text = status switch
         {
             ExtractionStatus.Running => "正在等待下一题内容稳定…",
             ExtractionStatus.Paused => "已暂停，不会自动推进下一题",
             ExtractionStatus.Completing => "题目已完成，正在等待 AI 补全",
-            _ => "进入练习后可自动连续提取",
+            _ => isPracticeReady ? "已检测到练习题目，点击开始提取" : "进入练习后可自动连续提取",
         };
         StartButton.IsEnabled = !active;
         PauseButton.IsEnabled = running || paused;

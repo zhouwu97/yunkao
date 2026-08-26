@@ -24,7 +24,21 @@
     return { marker, questionId, current: currentText, total: totalText };
   }
 
+  function checkPracticeState() {
+    const isLogin = !!document.querySelector("input[type='password'], input[name='password'], #password");
+    const active = document.querySelector(".swiper-slide-active, .practice_slide_content, .question-content, .exam-item");
+    const isPractice = !!active;
+    post({
+      type: "pageState",
+      isLogin: isLogin,
+      isPractice: isPractice,
+      url: window.location.href,
+      title: document.title
+    });
+  }
+
   function emitReady() {
+    checkPracticeState();
     const state = readMarker();
     if (!state || !state.marker || state.marker === lastMarker) return;
     lastMarker = state.marker;

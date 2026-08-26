@@ -99,9 +99,22 @@ public sealed class WebViewService : IAsyncDisposable
         _core.Navigate(uri.AbsoluteUri);
     }
 
+    public bool CanGoBack => _core?.CanGoBack == true;
+    public bool CanGoForward => _core?.CanGoForward == true;
+
     public void Back()
     {
         if (_core?.CanGoBack == true) _core.GoBack();
+    }
+
+    public void Forward()
+    {
+        if (_core?.CanGoForward == true) _core.GoForward();
+    }
+
+    public void GoHome()
+    {
+        Navigate(new Uri("https://www.cctrcloud.net/"));
     }
 
     public void Refresh() => _core?.Reload();
@@ -110,6 +123,37 @@ public sealed class WebViewService : IAsyncDisposable
     {
         if (CurrentUri is null) return;
         Process.Start(new ProcessStartInfo(CurrentUri.AbsoluteUri) { UseShellExecute = true });
+    }
+
+    public async Task<bool> IsPracticePageAsync(CancellationToken cancellationToken = default)
+    {
+        if (_core is null) return false;
+        try
+        {
+            string script = "(() => { const active = document.querySelector('.swiper-slide-active, .practice_slide_content, .question-content, .exam-item'); return !!active; })();";
+            string result = await ExecuteScriptAsync(script, cancellationToken).ConfigureAwait(true);
+            return DeserializeScriptBoolean(result);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public async Task<string> ProbePageStateAsync(CancellationToken cancellationToken = default)
+    {
+        if (_core is null) return "Initializing";
+        try
+        {
+            string script = "(() => { if (document.querySelector('input[type=\"password\"], input[name=\"password\"], #password')) return 'LoginRequired'; if (document.querySelector('.swiper-slide-active, .practice_slide_content, .question-content, .exam-item')) return 'PracticeReady'; return 'Browsing'; })();";
+            string result = await ExecuteScriptAsync(script, cancellationToken).ConfigureAwait(true);
+            string state = DeserializeScriptString(result);
+            return string.IsNullOrWhiteSpace(state) ? "Browsing" : state;
+        }
+        catch
+        {
+            return "Browsing";
+        }
     }
 
     public async Task<string> GetActiveQuestionHtmlAsync(CancellationToken cancellationToken = default)

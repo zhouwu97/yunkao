@@ -12,9 +12,10 @@
     <Grid>
       <StackPanel Spacing="3">
         <TextBlock Text="历史记录" Style="{StaticResource PageTitleStyle}" />
-        <TextBlock Text="查看提取会话、题目数量和中断状态。" Style="{StaticResource SecondaryTextStyle}" />
+        <TextBlock Text="查看提取会话、题目数量和历史任务，可恢复为当前工作台任务。" Style="{StaticResource SecondaryTextStyle}" />
       </StackPanel>
-       <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+       <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
+         <TextBlock x:Name="StatusText" VerticalAlignment="Center" Style="{StaticResource SecondaryTextStyle}" />
          <controls:LiquidButton Label="刷新" Click="OnRefreshClick" Variant="Soft" />
          <controls:LiquidButton x:Name="MoreButton" Label="加载更多" Click="OnMoreClick" Variant="Ghost" IsEnabled="False" />
        </StackPanel>

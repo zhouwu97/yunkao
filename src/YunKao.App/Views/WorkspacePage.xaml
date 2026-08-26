@@ -15,7 +15,23 @@
         <ColumnDefinition x:Name="ControlColumn" Width="328" />
       </Grid.ColumnDefinitions>
 
-      <controls:BrowserShell x:Name="Browser" Grid.Column="0" />
+      <Grid Grid.Column="0" RowSpacing="8">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <InfoBar x:Name="ActionBanner"
+                 Grid.Row="0"
+                 IsOpen="False"
+                 IsClosable="True"
+                 CornerRadius="12"
+                 Canvas.ZIndex="10">
+          <InfoBar.ActionButton>
+            <Button x:Name="BannerActionButton" Content="操作" Click="OnBannerActionButtonClick" />
+          </InfoBar.ActionButton>
+        </InfoBar>
+        <controls:BrowserShell x:Name="Browser" Grid.Row="1" />
+      </Grid>
 
       <Border x:Name="DrawerScrim"
               Grid.ColumnSpan="2"

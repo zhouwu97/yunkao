@@ -32,7 +32,16 @@
       <controls:LiquidCard Variant="Coral" Padding="16">
         <StackPanel Spacing="14">
           <TextBlock Text="导出" Style="{StaticResource SectionTitleStyle}" />
-          <TextBox x:Name="ExportDirectoryBox" Header="默认目录" PlaceholderText="留空使用文档目录" />
+          <Grid ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBox x:Name="ExportDirectoryBox" Grid.Column="0" Header="默认导出目录" PlaceholderText="留空使用系统文档目录" />
+            <Button Grid.Column="1" Content="选择文件夹" Click="OnBrowseExportFolderClick" VerticalAlignment="Bottom" Height="36" Style="{StaticResource QuietButtonStyle}" />
+            <Button Grid.Column="2" Content="打开" Click="OnOpenExportFolderClick" VerticalAlignment="Bottom" Height="36" Style="{StaticResource QuietButtonStyle}" />
+          </Grid>
           <TextBox x:Name="ExportPrefixBox" Header="文件名前缀" />
           <ComboBox x:Name="ExportFormatCombo" Header="默认格式">
             <ComboBoxItem Tag="PDF" Content="PDF" />
@@ -40,7 +49,7 @@
             <ComboBoxItem Tag="MD" Content="Markdown" />
             <ComboBoxItem Tag="TXT" Content="TXT" />
           </ComboBox>
-          <CheckBox x:Name="AutoOpenCheckBox" Content="导出后打开文件" />
+          <CheckBox x:Name="AutoOpenCheckBox" Content="导出后自动打开文件" />
           <CheckBox x:Name="ExportWithoutAnswersCheckBox" Content="导出练习版（隐藏答案和解析）" />
         </StackPanel>
       </controls:LiquidCard>
@@ -66,10 +75,28 @@
           <TextBox x:Name="AiBaseUrlBox" Header="Base URL" PlaceholderText="https://.../v1" />
           <TextBox x:Name="AiModelBox" Header="Model" PlaceholderText="模型名称" />
           <PasswordBox x:Name="AiKeyBox" Header="API Key" PlaceholderText="留空保持已保存的 Key" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <controls:LiquidButton Label="测试连接" Click="OnTestAiConnectionClick" Variant="Soft" />
+            <controls:LiquidButton Label="获取模型" Click="OnGetAiModelsClick" Variant="Ghost" />
+            <controls:LiquidButton x:Name="ApplyPresetButton" Label="应用推荐配置" Click="OnApplyPresetClick" Variant="Ghost" Visibility="Collapsed" />
+          </StackPanel>
+          <TextBlock x:Name="AiTestResultText" Visibility="Collapsed" TextWrapping="Wrap" Style="{StaticResource SecondaryTextStyle}" />
           <CheckBox x:Name="ClearAiKeyCheckBox" Content="清除已保存的 API Key" />
           <CheckBox x:Name="AiSupportsImagesCheckBox" Content="允许把题目中的远程图片交给支持视觉的模型" />
-          <TextBlock Text="AI 返回仅用于辅助，导出时会标记 AI 来源和置信度。"
+          <TextBlock Text="AI 返回仅用于辅助补全，导出时会标明 AI 来源和置信度。"
                      TextWrapping="Wrap" Style="{StaticResource CaptionTextStyle}" />
+        </StackPanel>
+      </controls:LiquidCard>
+
+      <controls:LiquidCard Padding="16">
+        <StackPanel Spacing="12">
+          <TextBlock Text="数据与诊断" Style="{StaticResource SectionTitleStyle}" />
+          <TextBlock Text="管理本地存储的数据目录与运行日志。" Style="{StaticResource SecondaryTextStyle}" />
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <controls:LiquidButton Label="打开数据目录" Click="OnOpenDataFolderClick" Variant="Soft" />
+            <controls:LiquidButton Label="打开日志目录" Click="OnOpenLogFolderClick" Variant="Soft" />
+            <controls:LiquidButton Label="一键复制诊断" Click="OnCopyDiagnosticsClick" Variant="Ghost" />
+          </StackPanel>
         </StackPanel>
       </controls:LiquidCard>
 
@@ -101,8 +128,8 @@
 
       <Border Style="{StaticResource NoticeCardStyle}">
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <FontIcon Glyph="&#xE946;" Foreground="{StaticResource AmberBrush}" />
-          <TextBlock Text="首次使用前请确认 WebView2 Evergreen Runtime、Python Worker 依赖以及 PDF 所需的 Word/WPS 组件已经安装。"
+          <FontIcon Glyph="&#xE946;" Foreground="{StaticResource IceBlueBrush}" />
+          <TextBlock Text="融智云考已内置独立 Worker 协议引擎与本地数据库；导出文档无需安装额外后台服务。"
                      TextWrapping="Wrap" Style="{StaticResource SecondaryTextStyle}" />
         </StackPanel>
       </Border>

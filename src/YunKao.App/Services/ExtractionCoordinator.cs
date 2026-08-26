@@ -8,6 +8,13 @@ using YunKao.Core.Services;
 
 namespace YunKao.Services;
 
+public sealed record WorkspaceBannerInfo(
+    string Title,
+    string Message,
+    Microsoft.UI.Xaml.Controls.InfoBarSeverity Severity,
+    string? ActionLabel,
+    Action? ActionCallback);
+
 /// <summary>
 /// 工作台提取控制器。Bridge 事件进入单消费者队列，页面生命周期不再决定业务会话生命周期。
 /// </summary>
@@ -35,6 +42,8 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
     private bool _restoredSessionPending;
     private bool _workerRestarted;
     private bool _disposed;
+
+    public event EventHandler<WorkspaceBannerInfo>? BannerRequested;
 
     public ExtractionCoordinator(
         AppServices services,
@@ -68,12 +77,34 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         _browser.BridgeMessageReceived += OnBridgeMessageReceived;
         _browser.ProcessFailed += OnBrowserProcessFailed;
         _browser.Service.HttpStatusChanged += OnHttpStatusChanged;
+        _browser.Service.NavigationChanged += OnBrowserNavigationChanged;
         _session.Changed += OnSessionChanged;
         _services.Exports.ProgressChanged += OnExportProgress;
         _services.Initialized += OnServicesInitialized;
         if (_browser.Service.IsBridgeInstalled) Track(FillCredentialsOnBridgeReadyAsync());
         _export.SetPracticeMode(_services.Settings.Load().ExportWithoutAnswers);
         RenderInterruptedPrompt();
+    }
+
+    private void OnBrowserNavigationChanged(object? sender, BrowserNavigationEventArgs args)
+    {
+        Track(UpdatePageReadinessAsync());
+    }
+
+    private async Task UpdatePageReadinessAsync()
+    {
+        try
+        {
+            bool ready = await _browser.Service.IsPracticePageAsync(_lifetimeCancellation.Token).ConfigureAwait(true);
+            if (_session.Status is not (ExtractionStatus.Running or ExtractionStatus.Paused))
+            {
+                _panel.DispatcherQueue.TryEnqueue(() =>
+                {
+                    _panel.SetState(_session.Status, _session.SavedCount, ready);
+                });
+            }
+        }
+        catch { }
     }
 
     public ExtractionSession Session => _session;
@@ -85,6 +116,20 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         {
             if (_session.Status == ExtractionStatus.Running
                 || (_session.Status == ExtractionStatus.Paused && !_restoredSessionPending)) return;
+
+            bool isPractice = await _browser.Service.IsPracticePageAsync(_lifetimeCancellation.Token).ConfigureAwait(true);
+            if (!isPractice && !_restoredSessionPending)
+            {
+                _events.Add("当前页面未检测到可解析的练习题，请先进入练习/题库页面", warning: true);
+                BannerRequested?.Invoke(this, new WorkspaceBannerInfo(
+                    "请先进入练习页面",
+                    "当前页面未检测到考试/练习题。请在左侧浏览器导航至具体练习或刷题页面后，再点击开始提取。",
+                    Microsoft.UI.Xaml.Controls.InfoBarSeverity.Warning,
+                    "前往首页",
+                    () => _browser.Service.GoHome()));
+                return;
+            }
+
             _extractionCancellation?.Dispose();
             _aiCancellation?.Dispose();
             _extractionCancellation = new CancellationTokenSource();
@@ -102,7 +147,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
             _workerRestarted = false;
             _services.Workspace.AuthExpired = false;
             _services.Workspace.PermissionDenied = false;
-            _panel.SetState(ExtractionStatus.Running, _session.SavedCount);
+            _panel.SetState(ExtractionStatus.Running, _session.SavedCount, true);
             _events.Add("开始提取：准备 Worker");
 
             try
@@ -200,7 +245,17 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
             : settings.DefaultExportDirectory;
         Directory.CreateDirectory(directory);
         string extension = format == "docx" ? "docx" : format == "pdf" ? "pdf" : format == "txt" ? "txt" : "md";
-        string path = Path.Combine(directory, $"{settings.ExportPrefix}_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid():N}.{extension}");
+        string cleanPrefix = string.IsNullOrWhiteSpace(settings.ExportPrefix) ? "云考题库导出" : settings.ExportPrefix.Trim();
+        string baseName = $"{cleanPrefix}_{DateTime.Now:yyyyMMdd_HHmmss}";
+        string path = Path.Combine(directory, $"{baseName}.{extension}");
+        if (File.Exists(path))
+        {
+            for (int i = 2; i <= 999; i++)
+            {
+                string candidate = Path.Combine(directory, $"{baseName}_{i}.{extension}");
+                if (!File.Exists(candidate)) { path = candidate; break; }
+            }
+        }
 
         try
         {
@@ -310,15 +365,50 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
 
     private void OnHttpStatusChanged(object? sender, BrowserHttpEventArgs args)
     {
-        if (args.StatusCode is not (401 or 403)) return;
-        if (args.StatusCode == 401) _services.Workspace.AuthExpired = true;
-        if (args.StatusCode == 403) _services.Workspace.PermissionDenied = true;
-        if (_session.Status is ExtractionStatus.Running or ExtractionStatus.Paused)
+        if (args.StatusCode is not (401 or 403 or 429 or 500 or 502 or 503)) return;
+        if (args.StatusCode == 401)
         {
-            _session.Pause();
-            _events.Add(args.StatusCode == 401
-                ? "登录状态已失效，提取已暂停；已保存题目不会丢失"
-                : "当前页面无访问权限，提取已暂停", warning: true);
+            _services.Workspace.AuthExpired = true;
+            if (_session.Status is ExtractionStatus.Running or ExtractionStatus.Paused)
+            {
+                _session.Pause();
+                _events.Add("登录状态已失效，提取已暂停；已保存题目不会丢失", warning: true);
+            }
+            BannerRequested?.Invoke(this, new WorkspaceBannerInfo(
+                "登录已失效",
+                $"登录状态已过期，提取已暂停；已保存的 {_session.SavedCount} 道题目不会丢失。",
+                Microsoft.UI.Xaml.Controls.InfoBarSeverity.Warning,
+                "重新登录",
+                () => _browser.Service.Navigate(new Uri("https://www.cctrcloud.net/"))));
+        }
+        else if (args.StatusCode == 403)
+        {
+            _services.Workspace.PermissionDenied = true;
+            if (_session.Status is ExtractionStatus.Running or ExtractionStatus.Paused)
+            {
+                _session.Pause();
+                _events.Add("当前页面无访问权限，提取已暂停", warning: true);
+            }
+            BannerRequested?.Invoke(this, new WorkspaceBannerInfo(
+                "无访问权限",
+                "当前账号没有访问此题库的权限，提取已暂停。",
+                Microsoft.UI.Xaml.Controls.InfoBarSeverity.Error,
+                "返回首页",
+                () => _browser.Service.GoHome()));
+        }
+        else if (args.StatusCode is 500 or 502 or 503)
+        {
+            if (_session.Status is ExtractionStatus.Running or ExtractionStatus.Paused)
+            {
+                _session.Pause();
+                _events.Add($"云考服务暂时不可用 (HTTP {args.StatusCode})，提取已暂停", warning: true);
+            }
+            BannerRequested?.Invoke(this, new WorkspaceBannerInfo(
+                "服务暂时不可用",
+                $"云考服务器返回 HTTP {args.StatusCode}，提取已暂停；请检查网络或稍后重试。",
+                Microsoft.UI.Xaml.Controls.InfoBarSeverity.Error,
+                "刷新页面",
+                () => _browser.Service.Refresh()));
         }
     }
 
@@ -330,6 +420,12 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
             _events.Add("WebView2 已崩溃，提取已暂停；页面重建后请点击继续", warning: true);
         }
         _services.Diagnostics.Warning(message);
+        BannerRequested?.Invoke(this, new WorkspaceBannerInfo(
+            "页面组件异常退出",
+            $"页面组件已自动恢复；已提取的 {_session.SavedCount} 道题目完好。",
+            Microsoft.UI.Xaml.Controls.InfoBarSeverity.Informational,
+            "继续提取",
+            () => TogglePause()));
     }
 
     private void OnServicesInitialized(object? sender, EventArgs args) => RenderInterruptedPrompt();
@@ -408,6 +504,16 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
                 catch (WorkerCallException exception) when (exception.Code is "question_unsupported" or "question_not_ready")
                 {
                     _events.Add("当前页面还没有可解析题目，已暂停等待页面稳定", warning: true);
+                    if (_session.Status == ExtractionStatus.Running)
+                    {
+                        _session.Pause();
+                        BannerRequested?.Invoke(this, new WorkspaceBannerInfo(
+                            "题目解析暂停",
+                            "当前页面尚未检测到可解析的题目内容，已自动暂停；请确认页面题目已加载完全。",
+                            Microsoft.UI.Xaml.Controls.InfoBarSeverity.Warning,
+                            "重新提取",
+                            () => QueueCurrentQuestion()));
+                    }
                 }
                 catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested)
                 {

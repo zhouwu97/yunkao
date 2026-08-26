@@ -63,6 +63,53 @@ public sealed class AiServiceTests
         }
     }
 
+    [Fact]
+    public async Task TestConnectionAsync_returns_success_on_valid_response()
+    {
+        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("{\"choices\":[{\"message\":{\"content\":\"pong\"}}]}"),
+        });
+        using var httpClient = new HttpClient(handler);
+        var service = new AiService(httpClient);
+        var config = new AiRequestConfiguration
+        {
+            Provider = "openai",
+            BaseUrl = "https://api.openai.com/v1",
+            Model = "gpt-4o-mini",
+            ApiKey = "sk-test",
+        };
+
+        AiConnectionTestResult result = await service.TestConnectionAsync(config);
+        Assert.True(result.Success);
+        Assert.Contains("连接成功", result.Message);
+        Assert.Equal("Bearer sk-test", handler.LastRequest!.Headers.Authorization!.ToString());
+    }
+
+    [Fact]
+    public async Task GetModelsAsync_parses_model_list_correctly()
+    {
+        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("{\"data\":[{\"id\":\"gpt-4o\"},{\"id\":\"gpt-4o-mini\"},{\"id\":\"o3-mini\"}]}"),
+        });
+        using var httpClient = new HttpClient(handler);
+        var service = new AiService(httpClient);
+        var config = new AiRequestConfiguration
+        {
+            Provider = "openai",
+            BaseUrl = "https://api.openai.com/v1",
+            Model = "",
+            ApiKey = "sk-test",
+        };
+
+        AiModelsResult result = await service.GetModelsAsync(config);
+        Assert.True(result.Success);
+        Assert.Equal(3, result.Models.Count);
+        Assert.Equal("gpt-4o", result.Models[0]);
+        Assert.Equal("gpt-4o-mini", result.Models[1]);
+    }
+
     private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> handler) : HttpMessageHandler
     {
         public HttpRequestMessage? LastRequest { get; private set; }
@@ -71,7 +118,10 @@ public sealed class AiServiceTests
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             LastRequest = request;
-            LastBody = System.Text.Json.JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken)).RootElement.Clone();
+            if (request.Content is not null)
+            {
+                LastBody = System.Text.Json.JsonDocument.Parse(await request.Content.ReadAsStringAsync(cancellationToken)).RootElement.Clone();
+            }
             return handler(request);
         }
     }

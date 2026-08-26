@@ -40,8 +40,14 @@ public sealed partial class BrowserShell : UserControl
     {
         if (_loaded) return;
         _loaded = true;
+        await InitializeBrowserAsync();
+    }
+
+    private async Task InitializeBrowserAsync()
+    {
         try
         {
+            WebViewErrorOverlay.Visibility = Visibility.Collapsed;
             await _service.InitializeAsync(WebView);
             App.Services.Workspace.WebViewInitialized = true;
             App.Services.Workspace.BrowserVersion = _service.BrowserVersion;
@@ -52,17 +58,33 @@ public sealed partial class BrowserShell : UserControl
         {
             StatusText.Text = exception.Message + "，请安装 Evergreen Runtime。";
             App.Services.Workspace.BrowserStatus = StatusText.Text;
+            ErrorMessageText.Text = "融智云考需要 Microsoft Edge WebView2 Runtime。当前系统尚未安装或版本过低，请点击下方按钮下载安装。";
+            WebViewErrorOverlay.Visibility = Visibility.Visible;
         }
         catch (Exception exception)
         {
             StatusText.Text = "浏览器启动失败：" + exception.Message;
             App.Services.Workspace.BrowserStatus = StatusText.Text;
+            ErrorMessageText.Text = "浏览器启动失败：" + exception.Message;
+            WebViewErrorOverlay.Visibility = Visibility.Visible;
         }
     }
 
     private void OnBackClick(object sender, RoutedEventArgs args) => _service.Back();
+    private void OnForwardClick(object sender, RoutedEventArgs args) => _service.Forward();
     private void OnRefreshClick(object sender, RoutedEventArgs args) => _service.Refresh();
+    private void OnHomeClick(object sender, RoutedEventArgs args) => _service.GoHome();
     private void OnExternalClick(object sender, RoutedEventArgs args) => _service.OpenExternal();
+
+    private void OnInstallWebView2Click(object sender, RoutedEventArgs args)
+    {
+        Process.Start(new ProcessStartInfo("https://go.microsoft.com/fwlink/p/?LinkId=2124703") { UseShellExecute = true });
+    }
+
+    private async void OnRetryWebView2Click(object sender, RoutedEventArgs args)
+    {
+        await InitializeBrowserAsync();
+    }
 
     private void OnAddressDisplayTapped(object sender, TappedRoutedEventArgs args)
     {

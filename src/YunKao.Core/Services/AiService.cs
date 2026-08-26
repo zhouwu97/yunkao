@@ -36,6 +36,9 @@ public static class AiProviderRegistry
     public static IReadOnlyDictionary<string, AiProviderPreset> All => Presets;
 }
 
+public sealed record AiConnectionTestResult(bool Success, string Message, TimeSpan Latency);
+public sealed record AiModelsResult(bool Success, string Message, IReadOnlyList<string> Models);
+
 public sealed class AiService(HttpClient httpClient)
 {
     private readonly HttpClient _httpClient = httpClient;
@@ -111,6 +114,113 @@ public sealed class AiService(HttpClient httpClient)
                 using JsonDocument document = JsonDocument.Parse(responseText);
                 return ParseResponse(document.RootElement);
             }
+        }
+    }
+
+    public async Task<AiConnectionTestResult> TestConnectionAsync(
+        AiRequestConfiguration configuration,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(configuration.ApiKey)
+            || string.IsNullOrWhiteSpace(configuration.BaseUrl))
+        {
+            return new AiConnectionTestResult(false, "API Key 或 Base URL 未填写", TimeSpan.Zero);
+        }
+
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        AiProviderPreset preset = AiProviderRegistry.Get(configuration.Provider);
+        try
+        {
+            using var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                $"{configuration.BaseUrl.TrimEnd('/')}/chat/completions");
+            request.Headers.TryAddWithoutValidation(
+                preset.AuthHeader,
+                $"{preset.AuthPrefix}{configuration.ApiKey.Trim()}");
+
+            var payload = new
+            {
+                model = string.IsNullOrWhiteSpace(configuration.Model) ? "gpt-4o-mini" : configuration.Model,
+                max_tokens = 5,
+                messages = new object[]
+                {
+                    new { role = "user", content = "ping" }
+                }
+            };
+            request.Content = new StringContent(
+                JsonSerializer.Serialize(payload, _jsonOptions),
+                Encoding.UTF8,
+                "application/json");
+
+            using HttpResponseMessage response = await _httpClient.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken).ConfigureAwait(false);
+
+            stopwatch.Stop();
+            if (response.IsSuccessStatusCode)
+            {
+                return new AiConnectionTestResult(true, $"连接成功，延时 {stopwatch.ElapsedMilliseconds} ms", stopwatch.Elapsed);
+            }
+
+            string errorDetail = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            return new AiConnectionTestResult(false, $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase} ({errorDetail})", stopwatch.Elapsed);
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            return new AiConnectionTestResult(false, $"连接失败：{ex.Message}", stopwatch.Elapsed);
+        }
+    }
+
+    public async Task<AiModelsResult> GetModelsAsync(
+        AiRequestConfiguration configuration,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(configuration.ApiKey)
+            || string.IsNullOrWhiteSpace(configuration.BaseUrl))
+        {
+            return new AiModelsResult(false, "API Key 或 Base URL 未填写", []);
+        }
+
+        AiProviderPreset preset = AiProviderRegistry.Get(configuration.Provider);
+        try
+        {
+            using var request = new HttpRequestMessage(
+                HttpMethod.Get,
+                $"{configuration.BaseUrl.TrimEnd('/')}/models");
+            request.Headers.TryAddWithoutValidation(
+                preset.AuthHeader,
+                $"{preset.AuthPrefix}{configuration.ApiKey.Trim()}");
+
+            using HttpResponseMessage response = await _httpClient.SendAsync(
+                request,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken).ConfigureAwait(false);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return new AiModelsResult(false, $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}", []);
+            }
+
+            string json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            using JsonDocument doc = JsonDocument.Parse(json);
+            var models = new List<string>();
+            if (doc.RootElement.TryGetProperty("data", out JsonElement data) && data.ValueKind == JsonValueKind.Array)
+            {
+                foreach (JsonElement item in data.EnumerateArray())
+                {
+                    if (item.TryGetProperty("id", out JsonElement idElem) && idElem.GetString() is string id && !string.IsNullOrWhiteSpace(id))
+                    {
+                        models.Add(id);
+                    }
+                }
+            }
+            return new AiModelsResult(true, $"成功获取 {models.Count} 个模型", models);
+        }
+        catch (Exception ex)
+        {
+            return new AiModelsResult(false, $"获取模型失败：{ex.Message}", []);
         }
     }
 

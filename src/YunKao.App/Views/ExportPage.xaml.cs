@@ -31,25 +31,63 @@ public sealed partial class ExportPage : Page
             IReadOnlyList<ExportRecord> rows = await App.Services.History.GetExportsAsync(_cursor, 50);
             foreach (ExportRecord row in rows)
             {
-                var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
-                actions.Children.Add(CreateActionButton("打开", row, OnOpenClick));
-                actions.Children.Add(CreateActionButton("文件夹", row, OnOpenFolderClick));
-                actions.Children.Add(CreateActionButton("复制路径", row, OnCopyPathClick));
+                bool fileExists = File.Exists(row.FilePath);
+                string fileName = Path.GetFileName(row.FilePath);
+                if (string.IsNullOrWhiteSpace(fileName)) fileName = row.FilePath;
+
+                var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
+                
+                var openBtn = CreateActionButton("打开", row, OnOpenClick);
+                openBtn.IsEnabled = fileExists;
+                actions.Children.Add(openBtn);
+
+                var folderBtn = CreateActionButton("文件夹", row, OnOpenFolderClick);
+                actions.Children.Add(folderBtn);
+
+                var moreFlyout = new MenuFlyout();
+                var copyPathItem = new MenuFlyoutItem { Text = "复制完整路径", Tag = row };
+                copyPathItem.Click += OnCopyPathClick;
+                moreFlyout.Items.Add(copyPathItem);
+
                 if (!string.IsNullOrWhiteSpace(row.SessionId))
                 {
-                    actions.Children.Add(CreateActionButton("重新导出", row, OnReExportClick));
+                    var reExportItem = new MenuFlyoutItem { Text = "重新导出", Tag = row };
+                    reExportItem.Click += OnReExportClick;
+                    moreFlyout.Items.Add(reExportItem);
                 }
-                actions.Children.Add(CreateActionButton("删除记录", row, OnDeleteRecordClick));
+
+                var deleteItem = new MenuFlyoutItem { Text = "删除记录", Tag = row };
+                deleteItem.Click += OnDeleteRecordClick;
+                moreFlyout.Items.Add(deleteItem);
+
+                var moreBtn = new Button
+                {
+                    Content = "⋯",
+                    Style = (Style)Application.Current.Resources["QuietButtonStyle"],
+                    Flyout = moreFlyout,
+                };
+                actions.Children.Add(moreBtn);
+
                 var grid = new Grid { ColumnSpacing = 10 };
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                string statusExtra = fileExists ? "" : " · ⚠️ 文件已移动或删除";
+                var fileText = new TextBlock
+                {
+                    Text = fileName,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    Style = (Style)Application.Current.Resources["SecondaryTextStyle"]
+                };
+                ToolTipService.SetToolTip(fileText, row.FilePath);
+
                 var text = new StackPanel
                 {
                     Spacing = 3,
                     Children =
                     {
-                        new TextBlock { Text = $"{row.CreatedAt.LocalDateTime:yyyy-MM-dd HH:mm:ss} · {row.Format} · {row.Status}", Style = (Style)Application.Current.Resources["CardTitleStyle"] },
-                        new TextBlock { Text = $"{row.QuestionCount} 题 · {row.FilePath}", TextTrimming = TextTrimming.CharacterEllipsis, Style = (Style)Application.Current.Resources["SecondaryTextStyle"] },
+                        new TextBlock { Text = $"{row.CreatedAt.LocalDateTime:yyyy-MM-dd HH:mm:ss} · {row.Format} · {row.QuestionCount} 题 · {row.Status}{statusExtra}", Style = (Style)Application.Current.Resources["CardTitleStyle"] },
+                        fileText,
                     },
                 };
                 Grid.SetColumn(text, 0);
@@ -193,6 +231,11 @@ public sealed partial class ExportPage : Page
         if (sender is Button { Tag: ExportRecord item })
         {
             record = item;
+            return true;
+        }
+        if (sender is MenuFlyoutItem { Tag: ExportRecord flyoutItem })
+        {
+            record = flyoutItem;
             return true;
         }
         record = default!;

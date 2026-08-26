@@ -11,6 +11,7 @@ public sealed partial class WorkspacePage : Page
     private ExtractionCoordinator? _coordinator;
     private bool _drawerOpen;
     private bool _narrow;
+    private Action? _currentBannerAction;
 
     public WorkspacePage()
     {
@@ -21,21 +22,45 @@ public sealed partial class WorkspacePage : Page
 
     private void OnLoaded(object sender, Microsoft.UI.Xaml.RoutedEventArgs args)
     {
-        _coordinator ??= new ExtractionCoordinator(
-            App.Services,
-            Browser,
-            Extraction,
-            Progress,
-            Export,
-            AiStatus,
-            Events);
+        if (_coordinator is null)
+        {
+            _coordinator = new ExtractionCoordinator(
+                App.Services,
+                Browser,
+                Extraction,
+                Progress,
+                Export,
+                AiStatus,
+                Events);
+            _coordinator.BannerRequested += OnBannerRequested;
+        }
+    }
+
+    private void OnBannerRequested(object? sender, WorkspaceBannerInfo info)
+    {
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            ActionBanner.Title = info.Title;
+            ActionBanner.Message = info.Message;
+            ActionBanner.Severity = info.Severity;
+            _currentBannerAction = info.ActionCallback;
+            BannerActionButton.Content = info.ActionLabel ?? "确定";
+            BannerActionButton.Visibility = string.IsNullOrWhiteSpace(info.ActionLabel) ? Visibility.Collapsed : Visibility.Visible;
+            ActionBanner.IsOpen = true;
+        });
+    }
+
+    private void OnBannerActionButtonClick(object sender, RoutedEventArgs e)
+    {
+        ActionBanner.IsOpen = false;
+        _currentBannerAction?.Invoke();
     }
 
     public void ApplyWindowWidth(double windowWidth)
     {
         if (windowWidth <= 0) return;
 
-        if (windowWidth >= 1440)
+        if (windowWidth >= 1180)
         {
             _narrow = false;
             _drawerOpen = false;
@@ -43,6 +68,24 @@ public sealed partial class WorkspacePage : Page
             ControlColumn.Width = new GridLength(328);
             Grid.SetColumn(ControlPanel, 1);
             Grid.SetColumnSpan(ControlPanel, 1);
+            ControlPanel.Width = double.NaN;
+            ControlPanel.HorizontalAlignment = HorizontalAlignment.Stretch;
+            ControlPanel.Visibility = Visibility.Visible;
+            MotionService.SetTranslateX(ControlPanel, 0);
+            ControlPanel.Opacity = 1;
+            DrawerToggle.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        if (windowWidth >= 900)
+        {
+            _narrow = false;
+            _drawerOpen = false;
+            ConfigureDrawerSurface(narrow: false);
+            ControlColumn.Width = new GridLength(280);
+            Grid.SetColumn(ControlPanel, 1);
+            Grid.SetColumnSpan(ControlPanel, 1);
+            ControlPanel.Width = double.NaN;
             ControlPanel.HorizontalAlignment = HorizontalAlignment.Stretch;
             ControlPanel.Visibility = Visibility.Visible;
             MotionService.SetTranslateX(ControlPanel, 0);
@@ -163,6 +206,6 @@ public sealed partial class WorkspacePage : Page
         double availableWidth = PageRoot.ActualWidth > 0
             ? PageRoot.ActualWidth - 76
             : 328;
-        return Math.Clamp(availableWidth, 280, 328);
+        return Math.Clamp(availableWidth, 260, 328);
     }
 }
