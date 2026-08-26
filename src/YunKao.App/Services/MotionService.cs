@@ -180,7 +180,7 @@ public static class MotionService
         FrameworkElement element,
         double translateX,
         double opacity,
-        double durationMs = 180,
+        double durationMs = 200,
         Action? completed = null)
     {
         TranslateTransform transform = element.RenderTransform as TranslateTransform ?? new TranslateTransform();

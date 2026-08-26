@@ -23,7 +23,7 @@ public sealed partial class MainWindow : Window
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
         ConfigureWindow();
-        BackdropMaterial material = BackdropService.Apply(this, RootSurface, BackdropMaterial.DesktopAcrylic);
+        BackdropMaterial material = BackdropService.Apply(this, RootSurface, BackdropMaterial.Mica);
         RootSurface.Background = material == BackdropMaterial.Solid
             ? (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SolidWindowBackgroundBrush"]
             : new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent);
@@ -72,7 +72,7 @@ public sealed partial class MainWindow : Window
         }
 
         NavigationRail.SetActive(args.Target);
-        if (RootFrame.Content is WorkspacePage workspace) workspace.ApplyWindowWidth(RootSurface.ActualWidth);
+        if (RootFrame.Content is WorkspacePage workspace) workspace.ApplyResponsiveLayout();
     }
 
     private void OnRootGridSizeChanged(object sender, Microsoft.UI.Xaml.SizeChangedEventArgs args)
@@ -82,7 +82,7 @@ public sealed partial class MainWindow : Window
         NavigationColumn.Width = new GridLength(railWidth);
         bool compact = width < 1440;
         NavigationRail.SetCompact(compact);
-        if (RootFrame.Content is WorkspacePage workspace) workspace.ApplyWindowWidth(width);
+        if (RootFrame.Content is WorkspacePage workspace) workspace.ApplyResponsiveLayout();
     }
 
     private void OnRootFrameNavigated(object sender, Microsoft.UI.Xaml.Navigation.NavigationEventArgs args)

@@ -46,11 +46,6 @@
       </Grid.ColumnDefinitions>
 
       <Grid x:Name="NavigationSurface" Grid.Column="0">
-        <SystemBackdropElement x:Name="NavigationBackdrop" CornerRadius="20">
-          <SystemBackdropElement.SystemBackdrop>
-          <DesktopAcrylicBackdrop />
-          </SystemBackdropElement.SystemBackdrop>
-        </SystemBackdropElement>
         <Border Background="{StaticResource RailSurfaceBrush}"
                 BorderBrush="{StaticResource LiquidInnerBorderBrush}"
                 BorderThickness="1"

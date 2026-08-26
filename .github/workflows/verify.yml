@@ -31,7 +31,10 @@ jobs:
         run: dotnet test YunKao.sln --no-restore
 
       - name: Build WinUI app
-        run: dotnet build src\YunKao.App\YunKao.App.csproj --no-restore -p:Platform=x64
+        run: dotnet build src\YunKao.App\YunKao.App.csproj --no-restore -c Release -p:Platform=x64
 
       - name: Run bridge tests
         run: node --test tests\bridge.test.js
+
+      - name: Check bridge syntax
+        run: node --check src\YunKao.App\Scripts\yunkao-bridge.js

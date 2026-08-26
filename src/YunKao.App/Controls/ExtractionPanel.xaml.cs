@@ -4,8 +4,21 @@ using YunKao.Core.Services;
 
 namespace YunKao.Controls;
 
+public enum PanelPrimaryAction
+{
+    DisabledWait,
+    Start,
+    Pause,
+    Resume,
+    Export,
+    Restart,
+}
+
 public sealed partial class ExtractionPanel : UserControl
 {
+    private PanelPrimaryAction _currentPrimaryAction = PanelPrimaryAction.DisabledWait;
+    private int _interruptedCount = 0;
+
     public ExtractionPanel()
     {
         InitializeComponent();
@@ -17,9 +30,10 @@ public sealed partial class ExtractionPanel : UserControl
     public event EventHandler? ClearRequested;
     public event EventHandler? RestartRequested;
     public event EventHandler? RestoreRequested;
+    public event EventHandler? ExportTriggerRequested;
 
     /// <summary>
-    /// 按唯一任务状态派生所有按钮，控件本身不维护第二套运行标记。
+    /// 按唯一任务状态派生所有按钮文案、样式与可见性，确保始终只有一个明确的 Primary Action。
     /// </summary>
     public void SetState(
         ExtractionStatus status,
@@ -28,55 +42,203 @@ public sealed partial class ExtractionPanel : UserControl
         bool isBrowserRecovering,
         bool isLoginPage)
     {
-        bool running = status == ExtractionStatus.Running;
-        bool paused = status == ExtractionStatus.Paused;
-        bool active = status is ExtractionStatus.Running or ExtractionStatus.Paused or ExtractionStatus.Completing;
-        bool canStart = ExtractionControlPolicy.CanStart(status, isPracticeReady, isBrowserRecovering);
-        StateText.Text = isBrowserRecovering
-            ? "页面恢复中"
-            : status switch
-            {
-                ExtractionStatus.Running => "提取中",
-                ExtractionStatus.Paused => "已暂停",
-                ExtractionStatus.Completing => "等待 AI 完成",
-                ExtractionStatus.Completed => "已完成 · 可导出",
-                ExtractionStatus.Error => "异常 · 可重新开始",
-                _ when savedCount > 0 => "已停止 · 可导出",
-                _ when isLoginPage => "待机 · 请先登录",
-                _ => isPracticeReady ? "就绪 · 点击开始提取" : "待机 · 请先进入练习页面",
-            };
-        HintText.Text = isBrowserRecovering
-            ? "正在重建页面组件，恢复完成前不能继续提取"
-            : status switch
-            {
-                ExtractionStatus.Running => "正在等待下一题内容稳定…",
-                ExtractionStatus.Paused => "已暂停，不会自动推进下一题",
-                ExtractionStatus.Completing => "题目已完成，正在等待 AI 补全",
-                _ when isLoginPage => "登录完成并进入练习后可开始提取",
-                _ => isPracticeReady ? "已检测到练习题目，点击开始提取" : "进入练习后可自动连续提取",
-            };
-        StartButton.IsEnabled = canStart;
-        StartButton.Label = isBrowserRecovering
-            ? "正在恢复…"
-            : !active && isLoginPage ? "请先登录"
-            : !active && !isPracticeReady ? "请先进入练习"
-            : "开始提取";
-        PauseButton.IsEnabled = running
-            || ExtractionControlPolicy.CanResume(status, isPracticeReady, isBrowserRecovering);
-        PauseButton.Label = isBrowserRecovering ? "正在恢复…" : paused ? "继续提取" : "暂停提取";
-        StopButton.IsEnabled = running || paused;
-        MoreButton.IsEnabled = active || savedCount > 0;
+        if (isBrowserRecovering)
+        {
+            SetStateVisual(
+                icon: "\uE895",
+                state: "页面恢复中",
+                step: "正在恢复",
+                hint: "正在重建页面组件，恢复完成前暂不能提取",
+                actionLabel: "正在恢复…",
+                action: PanelPrimaryAction.DisabledWait,
+                primaryVariant: LiquidButtonVariant.Soft,
+                showSecondary: false);
+            return;
+        }
+
+        switch (status)
+        {
+            case ExtractionStatus.Running:
+                SetStateVisual(
+                    icon: "\uE768",
+                    state: $"提取中 · 已保存 {savedCount} 题",
+                    step: "正在连续提取",
+                    hint: "保持页面打开即可，提取完成将自动提示",
+                    actionLabel: "暂停提取",
+                    action: PanelPrimaryAction.Pause,
+                    primaryVariant: LiquidButtonVariant.Soft,
+                    showSecondary: true,
+                    secondaryPauseLabel: "暂停");
+                break;
+
+            case ExtractionStatus.Paused:
+                SetStateVisual(
+                    icon: "\uE769",
+                    state: $"已暂停 · 已存 {savedCount} 题",
+                    step: "任务暂停中",
+                    hint: "当前不会自动跳转下一题，点击可随时继续",
+                    actionLabel: "继续提取",
+                    action: PanelPrimaryAction.Resume,
+                    primaryVariant: LiquidButtonVariant.Primary,
+                    showSecondary: true,
+                    secondaryPauseLabel: "继续");
+                break;
+
+            case ExtractionStatus.Completing:
+                SetStateVisual(
+                    icon: "\uE946",
+                    state: "等待 AI 补全",
+                    step: "题目已提取完毕",
+                    hint: "正在等待后台 AI 补全解析，请稍候…",
+                    actionLabel: "AI 处理中…",
+                    action: PanelPrimaryAction.DisabledWait,
+                    primaryVariant: LiquidButtonVariant.Soft,
+                    showSecondary: false);
+                break;
+
+            case ExtractionStatus.Completed:
+                SetStateVisual(
+                    icon: "\uE73E",
+                    state: "提取完成 · 题库就绪",
+                    step: "下一步：导出题库",
+                    hint: $"{savedCount} 道题目已完整保存在本机，可直接导出",
+                    actionLabel: "导出题库",
+                    action: PanelPrimaryAction.Export,
+                    primaryVariant: LiquidButtonVariant.Primary,
+                    showSecondary: false);
+                break;
+
+            case ExtractionStatus.Error:
+                SetStateVisual(
+                    icon: "\uE783",
+                    state: "提取异常 · 可重试",
+                    step: "遇到异常",
+                    hint: "提取过程中断，点击重新开始或检查网页状态",
+                    actionLabel: "重新开始",
+                    action: PanelPrimaryAction.Restart,
+                    primaryVariant: LiquidButtonVariant.Coral,
+                    showSecondary: false);
+                break;
+
+            default: // Idle
+                if (savedCount > 0)
+                {
+                    SetStateVisual(
+                        icon: "\uE73E",
+                        state: $"已就绪 · 本地 {savedCount} 题",
+                        step: isPracticeReady ? "可以继续提取" : "可直接导出",
+                        hint: isPracticeReady ? "当前页面为练习页，可继续提取新题" : "可直接在下方导出，或进入练习页继续提取",
+                        actionLabel: isPracticeReady ? "开始提取" : "导出题库",
+                        action: isPracticeReady ? PanelPrimaryAction.Start : PanelPrimaryAction.Export,
+                        primaryVariant: LiquidButtonVariant.Primary,
+                        showSecondary: false);
+                }
+                else if (isLoginPage)
+                {
+                    SetStateVisual(
+                        icon: "\uE77B",
+                        state: "待机 · 请先登录",
+                        step: "第一步：登录系统",
+                        hint: "在左侧网页中完成登录后，进入练习页面即可提取",
+                        actionLabel: "请先登录",
+                        action: PanelPrimaryAction.DisabledWait,
+                        primaryVariant: LiquidButtonVariant.Ghost,
+                        showSecondary: false);
+                }
+                else if (isPracticeReady)
+                {
+                    SetStateVisual(
+                        icon: "\uE768",
+                        state: "页面已就绪",
+                        step: "下一步：可以开始提取",
+                        hint: "当前页面已识别为练习页面，点击开始提取",
+                        actionLabel: "开始提取",
+                        action: PanelPrimaryAction.Start,
+                        primaryVariant: LiquidButtonVariant.Primary,
+                        showSecondary: false);
+                }
+                else
+                {
+                    SetStateVisual(
+                        icon: "\uE8A5",
+                        state: "待机 · 等待进入练习页面",
+                        step: "下一步：进入练习页",
+                        hint: "检测到练习页面后才能开始连续提取",
+                        actionLabel: "等待进入练习页",
+                        action: PanelPrimaryAction.DisabledWait,
+                        primaryVariant: LiquidButtonVariant.Ghost,
+                        showSecondary: false);
+                }
+                break;
+        }
+
+        ClearMenuItem.IsEnabled = savedCount > 0;
+        RestartMenuItem.IsEnabled = savedCount > 0 || status == ExtractionStatus.Error;
+    }
+
+    private void SetStateVisual(
+        string icon,
+        string state,
+        string step,
+        string hint,
+        string actionLabel,
+        PanelPrimaryAction action,
+        LiquidButtonVariant primaryVariant,
+        bool showSecondary,
+        string secondaryPauseLabel = "暂停")
+    {
+        StatusIcon.Glyph = icon;
+        StateText.Text = state;
+        StepLabel.Text = step;
+        HintText.Text = hint;
+
+        _currentPrimaryAction = action;
+        PrimaryActionButton.Label = actionLabel;
+        PrimaryActionButton.IsEnabled = action != PanelPrimaryAction.DisabledWait;
+        PrimaryActionButton.Variant = primaryVariant;
+
+        SecondaryActionsGrid.Visibility = showSecondary ? Visibility.Visible : Visibility.Collapsed;
+        if (showSecondary)
+        {
+            SecondaryPauseButton.Label = secondaryPauseLabel;
+        }
     }
 
     public void SetInterrupted(int questionCount)
     {
-        RestoreButton.Label = $"恢复上次 · {questionCount} 题";
-        RestoreButton.Visibility = Visibility.Visible;
+        _interruptedCount = questionCount;
+        RestoreSeparator.Visibility = Visibility.Visible;
+        RestoreMenuItem.Visibility = Visibility.Visible;
+        RestoreMenuItem.Text = $"恢复上次任务 ({questionCount} 题)";
     }
 
-    public void ClearInterrupted() => RestoreButton.Visibility = Visibility.Collapsed;
+    public void ClearInterrupted()
+    {
+        _interruptedCount = 0;
+        RestoreSeparator.Visibility = Visibility.Collapsed;
+        RestoreMenuItem.Visibility = Visibility.Collapsed;
+    }
 
-    private void OnStartClick(object sender, RoutedEventArgs e) => StartRequested?.Invoke(this, EventArgs.Empty);
+    private void OnPrimaryActionClick(object sender, RoutedEventArgs e)
+    {
+        switch (_currentPrimaryAction)
+        {
+            case PanelPrimaryAction.Start:
+                StartRequested?.Invoke(this, EventArgs.Empty);
+                break;
+            case PanelPrimaryAction.Pause:
+            case PanelPrimaryAction.Resume:
+                PauseRequested?.Invoke(this, EventArgs.Empty);
+                break;
+            case PanelPrimaryAction.Export:
+                ExportTriggerRequested?.Invoke(this, EventArgs.Empty);
+                break;
+            case PanelPrimaryAction.Restart:
+                RestartRequested?.Invoke(this, EventArgs.Empty);
+                break;
+        }
+    }
+
     private void OnPauseClick(object sender, RoutedEventArgs e) => PauseRequested?.Invoke(this, EventArgs.Empty);
     private void OnStopClick(object sender, RoutedEventArgs e) => StopRequested?.Invoke(this, EventArgs.Empty);
     private void OnClearClick(object sender, RoutedEventArgs e) => ClearRequested?.Invoke(this, EventArgs.Empty);

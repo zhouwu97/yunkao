@@ -25,13 +25,13 @@
     </Grid>
     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
       <StackPanel Spacing="12">
-        <controls:LiquidCard Variant="Blue" Padding="14">
+        <controls:LiquidCard Padding="14">
           <StackPanel Spacing="8">
             <TextBlock Text="运行摘要" Style="{StaticResource CardTitleStyle}" />
             <TextBlock x:Name="ReportText" TextWrapping="Wrap" Style="{StaticResource SecondaryTextStyle}" />
           </StackPanel>
         </controls:LiquidCard>
-        <controls:LiquidCard Variant="Amber" Padding="8">
+        <controls:LiquidCard Padding="8">
           <Grid MinHeight="180">
             <ListView x:Name="DiagnosticsList" BorderThickness="0" Background="Transparent" />
             <TextBlock x:Name="EmptyText" Text="暂无诊断事件" HorizontalAlignment="Center" VerticalAlignment="Center"

@@ -9,10 +9,11 @@
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
 
-    <Grid x:Name="ContentGrid" Grid.Row="0" ColumnSpacing="12">
+    <Grid x:Name="ContentGrid" Grid.Row="0" ColumnSpacing="0" SizeChanged="OnContentGridSizeChanged">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="*" />
-        <ColumnDefinition x:Name="ControlColumn" Width="328" />
+        <!-- Browser-first：在完成实际测量前不预留右栏，避免首帧把网页压成窄列。 -->
+        <ColumnDefinition x:Name="ControlColumn" Width="0" />
       </Grid.ColumnDefinitions>
 
       <Grid Grid.Column="0" RowSpacing="8">
@@ -35,30 +36,22 @@
 
       <Border x:Name="DrawerScrim"
               Grid.ColumnSpan="2"
-              Background="#141E2E"
+              Background="#0F172A"
               Opacity="0"
               Visibility="Collapsed"
               Canvas.ZIndex="1"
               Tapped="OnDrawerScrimTapped" />
 
-      <Grid x:Name="ControlPanel" Grid.Column="1" Canvas.ZIndex="2">
-        <SystemBackdropElement x:Name="DrawerBackdrop"
-                               CornerRadius="18"
-                               Opacity="0.90"
-                               Visibility="Collapsed">
-          <SystemBackdropElement.SystemBackdrop>
-            <DesktopAcrylicBackdrop />
-          </SystemBackdropElement.SystemBackdrop>
-        </SystemBackdropElement>
+      <Grid x:Name="ControlPanel" Grid.Column="1" Canvas.ZIndex="2" Visibility="Collapsed">
         <Border x:Name="DrawerShell"
-                Background="Transparent"
-                BorderBrush="Transparent"
-                BorderThickness="0"
-                CornerRadius="18"
+                Background="{StaticResource DrawerSurfaceBrush}"
+                BorderBrush="{StaticResource DrawerBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="16"
                 Padding="0">
           <ScrollViewer VerticalScrollBarVisibility="Auto">
             <StackPanel Spacing="12">
-              <controls:LiquidCard x:Name="TaskCard" Variant="Blue" Padding="15">
+              <controls:LiquidCard x:Name="TaskCard" Padding="15">
                 <StackPanel Spacing="14">
                   <controls:ExtractionPanel x:Name="Extraction" />
                   <Border Height="1" Background="{StaticResource LiquidInnerBorderBrush}" />
@@ -66,7 +59,7 @@
                 </StackPanel>
               </controls:LiquidCard>
 
-              <controls:LiquidCard x:Name="ToolsCard" Variant="Violet" Padding="14">
+              <controls:LiquidCard x:Name="ToolsCard" Padding="14">
                 <controls:ExportCard x:Name="Export" />
               </controls:LiquidCard>
 

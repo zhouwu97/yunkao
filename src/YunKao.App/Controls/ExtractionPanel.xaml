@@ -5,43 +5,78 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:YunKao.Controls">
   <Grid>
-    <StackPanel Spacing="10">
-      <StackPanel Orientation="Horizontal" Spacing="10">
-        <Border Width="34" Height="34" CornerRadius="11" Background="{StaticResource IceBlueSoftBrush}">
-          <FontIcon Glyph="&#xE8A5;" Foreground="{StaticResource IceBlueBrush}"
+    <StackPanel Spacing="12">
+      <!-- 头部状态指示 -->
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0" Width="36" Height="36" CornerRadius="12" Background="{StaticResource IceBlueSoftBrush}" Margin="0,0,10,0">
+          <FontIcon x:Name="StatusIcon" Glyph="&#xE8A5;" Foreground="{StaticResource BlueDeepBrush}" FontSize="16"
                     HorizontalAlignment="Center" VerticalAlignment="Center" />
         </Border>
-        <StackPanel>
+
+        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
           <TextBlock Text="提取任务" Style="{StaticResource CardTitleStyle}" />
           <TextBlock x:Name="StateText" Text="待机 · 等待进入练习页面" Style="{StaticResource CaptionTextStyle}" />
         </StackPanel>
-      </StackPanel>
 
-      <TextBlock x:Name="HintText"
-                 Text="进入练习后可自动连续提取"
-                 TextWrapping="Wrap"
-                 Style="{StaticResource SecondaryTextStyle}" />
-      <controls:LiquidButton x:Name="StartButton" Label="开始提取" Click="OnStartClick" Variant="Primary" BackdropMode="Inherited" />
-      <Button x:Name="MoreButton"
-              Content="更多"
-              HorizontalAlignment="Left"
-              Style="{StaticResource QuietButtonStyle}">
-        <Button.Flyout>
-          <MenuFlyout>
-            <MenuFlyoutItem Text="清空本次题目" Click="OnClearClick" />
-            <MenuFlyoutItem Text="重新开始" Click="OnRestartClick" />
-          </MenuFlyout>
-        </Button.Flyout>
-      </Button>
-      <controls:LiquidButton x:Name="RestoreButton" Label="恢复上次" Click="OnRestoreClick" Variant="Ghost" BackdropMode="Inherited" Visibility="Collapsed" />
-      <Grid ColumnSpacing="8">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*" />
-          <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-        <controls:LiquidButton x:Name="PauseButton" Grid.Column="0" Label="暂停提取" Click="OnPauseClick" Variant="Soft" BackdropMode="Inherited" IsEnabled="False" />
-        <controls:LiquidButton x:Name="StopButton" Grid.Column="1" Label="停止" Click="OnStopClick" Variant="Coral" BackdropMode="Inherited" IsEnabled="False" />
+        <Button x:Name="MoreButton"
+                Grid.Column="2"
+                Content="···"
+                FontSize="16"
+                FontWeight="Bold"
+                Padding="0"
+                Width="32"
+                Height="32"
+                Style="{StaticResource IconButtonStyle}">
+          <Button.Flyout>
+            <MenuFlyout>
+              <MenuFlyoutItem x:Name="ClearMenuItem" Text="清空本次题目" Click="OnClearClick" />
+              <MenuFlyoutItem x:Name="RestartMenuItem" Text="重新开始" Click="OnRestartClick" />
+              <MenuFlyoutSeparator x:Name="RestoreSeparator" Visibility="Collapsed" />
+              <MenuFlyoutItem x:Name="RestoreMenuItem" Text="恢复历史任务" Click="OnRestoreClick" Visibility="Collapsed" />
+            </MenuFlyout>
+          </Button.Flyout>
+        </Button>
       </Grid>
+
+      <!-- 引导提示卡片 -->
+      <Border Background="{StaticResource LiquidSurfaceSubtleBrush}"
+              BorderBrush="{StaticResource LiquidInnerBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="10"
+              Padding="10,8">
+        <StackPanel Spacing="2">
+          <TextBlock x:Name="StepLabel" Text="下一步" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" />
+          <TextBlock x:Name="HintText"
+                     Text="检测到练习页面后才能开始连续提取"
+                     TextWrapping="Wrap"
+                     FontSize="12"
+                     Foreground="{StaticResource TextPrimaryBrush}" />
+        </StackPanel>
+      </Border>
+
+      <!-- 动态 Primary Action 与辅助操作 -->
+      <StackPanel x:Name="ActionsContainer" Spacing="8">
+        <controls:LiquidButton x:Name="PrimaryActionButton"
+                               Label="等待进入练习页"
+                               Click="OnPrimaryActionClick"
+                               Variant="Primary"
+                               BackdropMode="Inherited" />
+
+        <Grid x:Name="SecondaryActionsGrid" ColumnSpacing="8" Visibility="Collapsed">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <controls:LiquidButton x:Name="SecondaryPauseButton" Grid.Column="0" Label="暂停" Click="OnPauseClick" Variant="Soft" BackdropMode="Inherited" />
+          <controls:LiquidButton x:Name="SecondaryStopButton" Grid.Column="1" Label="停止" Click="OnStopClick" Variant="Coral" BackdropMode="Inherited" />
+        </Grid>
+      </StackPanel>
     </StackPanel>
   </Grid>
 </UserControl>

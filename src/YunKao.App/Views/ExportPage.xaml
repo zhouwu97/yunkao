@@ -20,7 +20,7 @@
          <controls:LiquidButton x:Name="MoreButton" Label="加载更多" Click="OnMoreClick" Variant="Ghost" IsEnabled="False" />
        </StackPanel>
     </Grid>
-    <controls:LiquidCard Grid.Row="1" Variant="Coral" Padding="8">
+    <controls:LiquidCard Grid.Row="1" Padding="8">
       <Grid>
         <ListView x:Name="ExportsList" BorderThickness="0" Background="Transparent" />
         <TextBlock x:Name="EmptyText" Text="还没有导出记录" HorizontalAlignment="Center" VerticalAlignment="Center"

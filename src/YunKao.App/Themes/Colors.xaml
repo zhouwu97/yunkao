@@ -42,32 +42,38 @@
 
   <!-- Level 0: the window material is owned by BackdropService. -->
   <SolidColorBrush x:Key="WindowBackgroundBrush" Color="Transparent" />
-  <SolidColorBrush x:Key="SolidWindowBackgroundBrush" Color="#EDF4FA" />
-  <SolidColorBrush x:Key="TitleBarBrush" Color="#B8E8F3" Opacity="0.26" />
+  <SolidColorBrush x:Key="SolidWindowBackgroundBrush" Color="#EEF2F6" />
+  <SolidColorBrush x:Key="TitleBarBrush" Color="#B8E8F3" Opacity="0.22" />
 
-  <!-- Level 1: small, translucent liquid islands. -->
-  <SolidColorBrush x:Key="LiquidSurfaceBrush" Color="#BCF7FAFE" />
-  <SolidColorBrush x:Key="LiquidSurfaceStrongBrush" Color="#D8F8FBFE" />
-  <SolidColorBrush x:Key="LiquidSurfaceSoftBrush" Color="#8FF8FBFE" />
-  <SolidColorBrush x:Key="LiquidBorderBrush" Color="#BFFFFFFF" />
-  <SolidColorBrush x:Key="LiquidInnerBorderBrush" Color="#52FFFFFF" />
-  <SolidColorBrush x:Key="LiquidShadowBrush" Color="#190F2D58" />
-  <SolidColorBrush x:Key="RailSurfaceBrush" Color="#24F8FBFE" />
-  <SolidColorBrush x:Key="DrawerSurfaceBrush" Color="#54F8FBFE" />
-  <SolidColorBrush x:Key="DrawerBorderBrush" Color="#72FFFFFF" />
+  <!-- Level 1: clean, calm Fluent surfaces. -->
+  <SolidColorBrush x:Key="LiquidSurfaceBrush" Color="#F2F8FBFE" />
+  <SolidColorBrush x:Key="LiquidSurfaceStrongBrush" Color="#F8FBFEFF" />
+  <SolidColorBrush x:Key="LiquidSurfaceSubtleBrush" Color="#EAF2F9FD" />
+  <SolidColorBrush x:Key="LiquidSurfaceSoftBrush" Color="#E4F0F9FE" />
+  <SolidColorBrush x:Key="LiquidBorderBrush" Color="#44DCE5EF" />
+  <SolidColorBrush x:Key="LiquidInnerBorderBrush" Color="#30DCE5EF" />
+  <SolidColorBrush x:Key="LiquidShadowBrush" Color="#120F2D58" />
+  <SolidColorBrush x:Key="RailSurfaceBrush" Color="#EEF4FAFD" />
+  <SolidColorBrush x:Key="DrawerSurfaceBrush" Color="#F6F8FCFE" />
+  <SolidColorBrush x:Key="DrawerBorderBrush" Color="#80DCE5EF" />
 
   <!-- Level 2: content remains opaque and readable. -->
   <SolidColorBrush x:Key="ContentSurfaceBrush" Color="#FAFBFD" />
-  <SolidColorBrush x:Key="WebViewSurfaceBrush" Color="{StaticResource ContentSurfaceBrush}" />
+  <SolidColorBrush x:Key="WebViewSurfaceBrush" Color="#FFFFFF" />
 
   <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimary}" />
   <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondary}" />
   <SolidColorBrush x:Key="TextTertiaryBrush" Color="{StaticResource TextTertiary}" />
   <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource LiquidBorderBrush}" />
-  <SolidColorBrush x:Key="ActiveNavigationBrush" Color="#6E9DFF" Opacity="0.34" />
+  <SolidColorBrush x:Key="ActiveNavigationBrush" Color="#4E78C8" Opacity="0.16" />
   <SolidColorBrush x:Key="TransparentBrush" Color="Transparent" />
-  <SolidColorBrush x:Key="NoticeBrush" Color="#FFF3D6" Opacity="0.84" />
-  <SolidColorBrush x:Key="SuccessSoftBrush" Color="#CDEFF2" />
+  <SolidColorBrush x:Key="NoticeBrush" Color="#FFFBEB" Opacity="0.92" />
+  <SolidColorBrush x:Key="SuccessSoftBrush" Color="#DCFCE7" />
+  <SolidColorBrush x:Key="SuccessTextBrush" Color="#166534" />
+  <SolidColorBrush x:Key="WarningSoftBrush" Color="#FEF3C7" />
+  <SolidColorBrush x:Key="WarningTextBrush" Color="#92400E" />
+  <SolidColorBrush x:Key="DangerSoftBrush" Color="#FEE2E2" />
+  <SolidColorBrush x:Key="DangerTextBrush" Color="#991B1B" />
 
   <!-- Legacy name kept for controls that have not yet moved to LiquidCard. -->
   <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource LiquidSurfaceBrush}" />

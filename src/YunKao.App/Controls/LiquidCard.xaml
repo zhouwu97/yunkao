@@ -7,31 +7,43 @@
   <Grid x:Name="GlassRoot">
     <Border x:Name="Surface"
             Background="Transparent"
-            BorderBrush="{StaticResource LiquidBorderBrush}"
+            BorderBrush="Transparent"
             BorderThickness="1"
             CornerRadius="18">
       <Grid>
-        <SystemBackdropElement x:Name="BackdropLayer"
+        <SystemBackdropElement x:Name="SystemBackdropLayer"
                                CornerRadius="18"
-                               Opacity="0.86">
+                               Opacity="0.62"
+                               Visibility="Collapsed">
           <SystemBackdropElement.SystemBackdrop>
-            <DesktopAcrylicBackdrop />
+          <DesktopAcrylicBackdrop />
           </SystemBackdropElement.SystemBackdrop>
         </SystemBackdropElement>
+        <Border x:Name="CompositionBackdropLayer"
+                CornerRadius="18"
+                Visibility="Collapsed"
+                IsHitTestVisible="False" />
         <Border x:Name="TintLayer"
                 CornerRadius="17"
                 IsHitTestVisible="False"
-                Opacity="0.52" />
-        <Border Margin="1"
-                CornerRadius="17"
-                BorderBrush="{StaticResource LiquidInnerBorderBrush}"
+                Opacity="0.68" />
+        <Border x:Name="OuterRim"
+                CornerRadius="18"
                 BorderThickness="1"
-                IsHitTestVisible="False" />
-        <Border Height="1"
-                Margin="16,1,16,0"
-                VerticalAlignment="Top"
-                Background="#E0FFFFFF"
-                CornerRadius="1"
+                IsHitTestVisible="False">
+          <Border.BorderBrush>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+              <GradientStop Color="#86FFFFFF" Offset="0" />
+              <GradientStop Color="#42FFFFFF" Offset="0.32" />
+              <GradientStop Color="#18FFFFFF" Offset="0.72" />
+              <GradientStop Color="#2AFFFFFF" Offset="1" />
+            </LinearGradientBrush>
+          </Border.BorderBrush>
+        </Border>
+        <Border x:Name="InnerRim"
+                Margin="1"
+                CornerRadius="17"
+                BorderThickness="1"
                 IsHitTestVisible="False" />
         <ContentPresenter Margin="{Binding Padding, ElementName=Root}"
                           Content="{Binding Content, ElementName=Root}"

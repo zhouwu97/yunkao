@@ -2,6 +2,7 @@ using Microsoft.UI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
+using YunKao.Services;
 using Windows.UI;
 
 namespace YunKao.Controls;
@@ -16,7 +17,7 @@ public enum LiquidCardVariant
 }
 
 /// <summary>
-/// 使用局部 Desktop Acrylic 采样、色彩 tint、内描边和镜面高光组成的液态玻璃卡片。
+/// 使用 Composition backdrop、弱 tint、双层 rim 和软阴影组成的中性玻璃卡片。
 /// </summary>
 public sealed partial class LiquidCard : UserControl
 {
@@ -40,6 +41,7 @@ public sealed partial class LiquidCard : UserControl
         {
             ApplyVariant();
             ApplyBackdropMode();
+            MotionService.SetSoftShadow(GlassRoot, enabled: true);
         };
     }
 
@@ -67,8 +69,14 @@ public sealed partial class LiquidCard : UserControl
 
     private void ApplyBackdropMode()
     {
-        if (BackdropLayer is null) return;
-        BackdropLayer.Visibility = BackdropMode == LiquidBackdropMode.System
+        if (CompositionBackdropLayer is null || SystemBackdropLayer is null) return;
+
+        bool wantsBackdrop = BackdropMode == LiquidBackdropMode.System;
+        CompositionBackdropLayer.Visibility = wantsBackdrop ? Visibility.Visible : Visibility.Collapsed;
+        bool compositionReady = wantsBackdrop
+            && CompositionBackdropService.TryAttach(CompositionBackdropLayer, blurAmount: 7.0f, saturation: 1.03f, cornerRadius: 18.0f);
+        CompositionBackdropService.SetVisible(CompositionBackdropLayer, compositionReady);
+        SystemBackdropLayer.Visibility = wantsBackdrop && !compositionReady
             ? Visibility.Visible
             : Visibility.Collapsed;
     }
@@ -77,24 +85,25 @@ public sealed partial class LiquidCard : UserControl
     {
         if (TintLayer is null) return;
 
-        (Color start, Color end) = Variant switch
+        Color tint = Variant switch
         {
-            LiquidCardVariant.Blue => (Color.FromArgb(0x26, 0x6C, 0x9F, 0xFF), Color.FromArgb(0x16, 0x62, 0xB7, 0xD8)),
-            LiquidCardVariant.Violet => (Color.FromArgb(0x28, 0x8C, 0x7B, 0xE8), Color.FromArgb(0x12, 0xD7, 0x92, 0xB7)),
-            LiquidCardVariant.Coral => (Color.FromArgb(0x28, 0xEA, 0x8D, 0x7C), Color.FromArgb(0x10, 0xD8, 0xA4, 0x51)),
-            LiquidCardVariant.Amber => (Color.FromArgb(0x2A, 0xD8, 0xA4, 0x51), Color.FromArgb(0x12, 0xEA, 0x8D, 0x7C)),
-            _ => (Color.FromArgb(0x1E, 0xFF, 0xFF, 0xFF), Color.FromArgb(0x0C, 0x62, 0xB7, 0xD8)),
+            LiquidCardVariant.Blue => Color.FromArgb(0x12, 0x6C, 0x9F, 0xFF),
+            LiquidCardVariant.Violet => Color.FromArgb(0x12, 0x8C, 0x7B, 0xE8),
+            LiquidCardVariant.Coral => Color.FromArgb(0x12, 0xEA, 0x8D, 0x7C),
+            LiquidCardVariant.Amber => Color.FromArgb(0x14, 0xD8, 0xA4, 0x51),
+            _ => Color.FromArgb(0x0E, 0xFF, 0xFF, 0xFF),
         };
 
-        TintLayer.Background = new LinearGradientBrush
+        TintLayer.Background = new SolidColorBrush(tint);
+        InnerRim.BorderBrush = new LinearGradientBrush
         {
             StartPoint = new Windows.Foundation.Point(0, 0),
             EndPoint = new Windows.Foundation.Point(1, 1),
             GradientStops =
             {
-                new GradientStop { Color = start, Offset = 0 },
-                new GradientStop { Color = Color.FromArgb(0x08, 0xFF, 0xFF, 0xFF), Offset = 0.48 },
-                new GradientStop { Color = end, Offset = 1 },
+                new GradientStop { Color = Color.FromArgb(0x38, 0xFF, 0xFF, 0xFF), Offset = 0 },
+                new GradientStop { Color = Color.FromArgb(0x22, 0x0C, 0x2A, 0x42), Offset = 0.55 },
+                new GradientStop { Color = Color.FromArgb(0x2A, 0x0C, 0x2A, 0x42), Offset = 1 },
             },
         };
     }

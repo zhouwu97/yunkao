@@ -57,59 +57,58 @@ public sealed partial class WorkspacePage : Page
         _currentBannerAction?.Invoke();
     }
 
-    public void ApplyWindowWidth(double windowWidth)
+    private void OnContentGridSizeChanged(object sender, SizeChangedEventArgs args)
     {
-        if (windowWidth <= 0) return;
+        ApplyResponsiveLayout();
+    }
 
-        WorkspaceLayoutMode layoutMode = WorkspaceLayoutBreakpoints.GetMode(windowWidth);
-        if (layoutMode == WorkspaceLayoutMode.Wide)
+    /// <summary>
+    /// 使用扣除导航栏和内边距的内容区宽度做预算。
+    /// 只有保证浏览器最低舒适宽度 (>=1040px) 时才允许 Dock 右栏，
+    /// 否则一律使用 Overlay Drawer，此时 ControlColumn.Width 为 0，打开/关闭面板完全不改变 WebView 宽度。
+    /// </summary>
+    public void ApplyResponsiveLayout()
+    {
+        if (ContentGrid.ActualWidth <= 0) return;
+
+        WorkspaceLayoutMode layoutMode = WorkspaceLayoutBreakpoints.GetMode(ContentGrid.ActualWidth);
+        if (layoutMode != WorkspaceLayoutMode.Narrow)
         {
             _narrow = false;
             _drawerOpen = false;
-            ConfigureDrawerSurface(narrow: false);
-            ControlColumn.Width = new GridLength(328);
+            double controlWidth = WorkspaceLayoutBreakpoints.GetControlWidth(layoutMode);
+            ContentGrid.ColumnSpacing = WorkspaceLayoutBreakpoints.BrowserColumnSpacing;
+            ControlColumn.Width = new GridLength(controlWidth);
             Grid.SetColumn(ControlPanel, 1);
             Grid.SetColumnSpan(ControlPanel, 1);
-            ControlPanel.Width = double.NaN;
+            ControlPanel.Width = controlWidth;
             ControlPanel.HorizontalAlignment = HorizontalAlignment.Stretch;
             ControlPanel.Visibility = Visibility.Visible;
+            DrawerScrim.Visibility = Visibility.Collapsed;
+            DrawerScrim.Opacity = 0;
             MotionService.SetTranslateX(ControlPanel, 0);
             ControlPanel.Opacity = 1;
             DrawerToggle.Visibility = Visibility.Collapsed;
-            return;
-        }
-
-        if (layoutMode == WorkspaceLayoutMode.Medium)
-        {
-            _narrow = false;
-            _drawerOpen = false;
             ConfigureDrawerSurface(narrow: false);
-            ControlColumn.Width = new GridLength(280);
-            Grid.SetColumn(ControlPanel, 1);
-            Grid.SetColumnSpan(ControlPanel, 1);
-            ControlPanel.Width = double.NaN;
-            ControlPanel.HorizontalAlignment = HorizontalAlignment.Stretch;
-            ControlPanel.Visibility = Visibility.Visible;
-            MotionService.SetTranslateX(ControlPanel, 0);
-            ControlPanel.Opacity = 1;
-            DrawerToggle.Visibility = Visibility.Collapsed;
             return;
         }
 
         bool enteringNarrowMode = !_narrow;
         _narrow = true;
-        ConfigureDrawerSurface(narrow: true);
-        ControlColumn.Width = new GridLength(0);
+        ContentGrid.ColumnSpacing = 0;
+        ControlColumn.Width = new GridLength(0); // 浏览器全宽，不被右栏挤压
         Grid.SetColumn(ControlPanel, 0);
         Grid.SetColumnSpan(ControlPanel, 2);
         ControlPanel.Width = GetDrawerWidth();
         ControlPanel.HorizontalAlignment = HorizontalAlignment.Right;
         DrawerToggle.Visibility = Visibility.Visible;
+        ConfigureDrawerSurface(narrow: true);
+
         if (enteringNarrowMode)
         {
             _drawerOpen = false;
             ControlPanel.Visibility = Visibility.Collapsed;
-            MotionService.SetTranslateX(ControlPanel, 32);
+            MotionService.SetTranslateX(ControlPanel, 24);
             ControlPanel.Opacity = 0;
         }
         UpdateDrawerVisual();
@@ -136,10 +135,10 @@ public sealed partial class WorkspacePage : Page
             ControlPanel.Visibility = Visibility.Visible;
             if (wasHidden)
             {
-                MotionService.SetTranslateX(ControlPanel, 32);
+                MotionService.SetTranslateX(ControlPanel, 24);
                 ControlPanel.Opacity = 0;
             }
-            MotionService.AnimateTranslateAndOpacity(ControlPanel, 0, 1, 220);
+            MotionService.AnimateTranslateAndOpacity(ControlPanel, 0, 1, 200);
         }
         else
         {
@@ -157,14 +156,14 @@ public sealed partial class WorkspacePage : Page
             }
             if (ControlPanel.Visibility != Visibility.Visible)
             {
-                MotionService.SetTranslateX(ControlPanel, 32);
+                MotionService.SetTranslateX(ControlPanel, 24);
                 ControlPanel.Opacity = 0;
                 return;
             }
 
             MotionService.AnimateTranslateAndOpacity(
                 ControlPanel,
-                32,
+                24,
                 0,
                 180,
                 () =>
@@ -183,7 +182,6 @@ public sealed partial class WorkspacePage : Page
 
     private void ConfigureDrawerSurface(bool narrow)
     {
-        DrawerBackdrop.Visibility = narrow ? Visibility.Visible : Visibility.Collapsed;
         DrawerScrim.Visibility = narrow && _drawerOpen ? Visibility.Visible : Visibility.Collapsed;
         if (!narrow) DrawerScrim.Opacity = 0;
         DrawerShell.Background = narrow
@@ -206,8 +204,8 @@ public sealed partial class WorkspacePage : Page
     private double GetDrawerWidth()
     {
         double availableWidth = PageRoot.ActualWidth > 0
-            ? PageRoot.ActualWidth - 76
-            : 328;
-        return Math.Clamp(availableWidth, 260, 328);
+            ? PageRoot.ActualWidth - 48
+            : 344;
+        return Math.Clamp(availableWidth, 280, 344);
     }
 }

@@ -18,7 +18,7 @@
         </StackPanel>
       </Grid>
 
-      <controls:LiquidCard Variant="Blue" Padding="16">
+      <controls:LiquidCard Padding="16">
         <StackPanel Spacing="14">
           <TextBlock Text="云考账号" Style="{StaticResource SectionTitleStyle}" />
           <TextBox x:Name="YunKaoUserBox" Header="学号 / 用户名" PlaceholderText="例如 20260001" />
@@ -29,7 +29,7 @@
         </StackPanel>
       </controls:LiquidCard>
 
-      <controls:LiquidCard Variant="Coral" Padding="16">
+      <controls:LiquidCard Padding="16">
         <StackPanel Spacing="14">
           <TextBlock Text="导出" Style="{StaticResource SectionTitleStyle}" />
           <Grid ColumnSpacing="8">
@@ -54,7 +54,7 @@
         </StackPanel>
       </controls:LiquidCard>
 
-      <controls:LiquidCard Variant="Violet" Padding="16">
+      <controls:LiquidCard Padding="16">
         <StackPanel Spacing="14">
           <Grid>
             <TextBlock Text="AI 辅助" Style="{StaticResource SectionTitleStyle}" />

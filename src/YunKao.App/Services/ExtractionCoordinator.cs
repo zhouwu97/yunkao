@@ -78,6 +78,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         _panel.ClearRequested += (_, _) => ClearCurrentSession();
         _panel.RestartRequested += (_, _) => RestartCurrentSession();
         _panel.RestoreRequested += (_, _) => RestoreInterruptedSession();
+        _panel.ExportTriggerRequested += (_, _) => _export.TriggerDefaultExport();
         _export.ExportRequested += (_, format) => Track(ExportAsync(format));
         _export.PracticeModeChanged += OnPracticeModeChanged;
         _browser.BridgeMessageReceived += OnBridgeMessageReceived;
@@ -91,6 +92,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         _services.Initialized += OnServicesInitialized;
         if (_browser.Service.IsBridgeInstalled) Track(FillCredentialsOnBridgeReadyAsync());
         _export.SetPracticeMode(_services.Settings.Load().ExportWithoutAnswers);
+        _export.SetSavedCount(_session.SavedCount);
         _panel.SetState(_session.Status, _session.SavedCount, isPracticeReady: false, isBrowserRecovering: false, isLoginPage: false);
         RenderInterruptedPrompt();
     }
@@ -849,6 +851,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
                 _practiceReady,
                 _browserRecovering,
                 _loginPage);
+            _export.SetSavedCount(_session.SavedCount);
             _progress.SetProgress(_session.Current, _session.Total,
                 $"已保存 {_session.SavedCount} 题 · AI 待处理 {_session.AiPending}", _session.SavedCount, _session.AiPending);
         }

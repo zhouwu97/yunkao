@@ -4,44 +4,61 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:YunKao.Controls">
-  <Border Background="#24EA8D7C"
-          BorderBrush="#48FFFFFF"
+  <Border Background="{StaticResource LiquidSurfaceSubtleBrush}"
+          BorderBrush="{StaticResource LiquidInnerBorderBrush}"
           BorderThickness="1"
           CornerRadius="12"
-          Padding="10">
+          Padding="12,10">
     <StackPanel Spacing="10">
+      <!-- 标题栏 -->
       <Grid>
         <StackPanel Orientation="Horizontal" Spacing="8">
-          <FontIcon Glyph="&#xE74E;" FontSize="16" Foreground="{StaticResource CoralPrimaryBrush}" />
+          <FontIcon Glyph="&#xE74E;" FontSize="15" Foreground="{StaticResource BlueDeepBrush}" VerticalAlignment="Center" />
           <TextBlock Text="快捷导出" Style="{StaticResource CardTitleStyle}" />
         </StackPanel>
-        <TextBlock x:Name="StateText" Text="READY" HorizontalAlignment="Right" Style="{StaticResource CaptionTextStyle}" />
+        <TextBlock x:Name="StateText" Text="待机" HorizontalAlignment="Right" VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" />
       </Grid>
-      <ToggleSwitch x:Name="PracticeModeToggle"
-                    Header="练习版"
-                    OffContent="答案版"
-                    OnContent="隐藏答案和解析"
-                    Toggled="OnPracticeModeToggled" />
-      <Grid ColumnSpacing="7">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*" />
-          <ColumnDefinition Width="*" />
-          <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-        <controls:LiquidButton x:Name="PdfButton" Grid.Column="0" Label="PDF" Variant="Soft" BackdropMode="Inherited" Click="OnPdfClick" />
-        <controls:LiquidButton x:Name="DocxButton" Grid.Column="1" Label="DOCX" Variant="Violet" BackdropMode="Inherited" Click="OnDocxClick" />
-        <Button x:Name="MoreButton"
-                Grid.Column="2"
-                Content="更多"
-                Style="{StaticResource QuietButtonStyle}">
-          <Button.Flyout>
-            <MenuFlyout>
-              <MenuFlyoutItem Text="Markdown" Tag="md" Click="OnMoreFormatClick" />
-              <MenuFlyoutItem Text="TXT" Tag="txt" Click="OnMoreFormatClick" />
-            </MenuFlyout>
-          </Button.Flyout>
-        </Button>
-      </Grid>
+
+      <!-- 无题时的安静空状态 -->
+      <Border x:Name="EmptyPrompt"
+              Background="Transparent"
+              Padding="4,8"
+              HorizontalAlignment="Center"
+              Visibility="Visible">
+        <TextBlock Text="提取到题目后可在此快速导出"
+                   FontSize="12"
+                   Foreground="{StaticResource TextTertiaryBrush}"
+                   HorizontalAlignment="Center" />
+      </Border>
+
+      <!-- 有题时展开的导出控制区 -->
+      <StackPanel x:Name="ExportControlsPanel" Spacing="10" Visibility="Collapsed">
+        <ToggleSwitch x:Name="PracticeModeToggle"
+                      Header="练习版"
+                      OffContent="答案版"
+                      OnContent="隐藏答案和解析"
+                      Toggled="OnPracticeModeToggled" />
+        <Grid ColumnSpacing="7">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <controls:LiquidButton x:Name="PdfButton" Grid.Column="0" Label="PDF" Variant="Soft" BackdropMode="Inherited" Click="OnPdfClick" />
+          <controls:LiquidButton x:Name="DocxButton" Grid.Column="1" Label="DOCX" Variant="Soft" BackdropMode="Inherited" Click="OnDocxClick" />
+          <Button x:Name="MoreButton"
+                  Grid.Column="2"
+                  Content="更多"
+                  Style="{StaticResource QuietButtonStyle}">
+            <Button.Flyout>
+              <MenuFlyout>
+                <MenuFlyoutItem Text="Markdown (.md)" Tag="md" Click="OnMoreFormatClick" />
+                <MenuFlyoutItem Text="纯文本 (.txt)" Tag="txt" Click="OnMoreFormatClick" />
+              </MenuFlyout>
+            </Button.Flyout>
+          </Button>
+        </Grid>
+      </StackPanel>
     </StackPanel>
   </Border>
 </UserControl>

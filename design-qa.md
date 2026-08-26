@@ -1,51 +1,53 @@
-# 悬浮窗展示完整性设计 QA
+# WinUI 3 工作台设计 QA 与验收规范
 
-- source visual truth path: `C:\Users\haha\AppData\Local\Temp\codex-clipboard-3ab43bc5-19a3-429a-a6e4-24c55fb3f567.png`
-- implementation screenshot path: `C:\Users\haha\AppData\Local\Temp\yunkao-overlay-after.png`
-- comparison image path: `C:\Users\haha\AppData\Local\Temp\yunkao-overlay-comparison.png`
-- viewport: 悬浮窗展开态，逻辑宽度 320 px
-- source pixels: 548 × 364；其中悬浮窗裁切区域约 401 × 281
-- implementation pixels: 320 × 248
-- CSS size: 不适用，界面为 PySide6 原生桌面组件
-- density normalization: 源截图约为 1.25 倍系统缩放；比较图按面板宽度对齐，保留各自纵横比
-- state: 登录页、练习版关闭、导出按钮禁用、底部操作栏可见
+- framework: WinUI 3 / Windows App SDK (C# + XAML)
+- design system: Windows 11 Fluent Design System
+- primary material: Mica (Window background) + Content Surface (Navigation Rail & Cards)
+- responsive model: Browser-first (Overlay Drawer < 1396px content width; Docked Sidebar >= 1396px)
 
-## Findings
+## 核心设计验收基线
 
-- [P1] 展开态固定高度导致底部操作栏被压缩
-  - Location: `TampermonkeyFloatingWindow` / `ui/main_window.py`
-  - Evidence: 修复前面板写死为 320 × 226；源截图中按钮底边贴近窗口边缘，底部留白和圆角区域被裁切。修复后高度按布局计算为 248 px，三个按钮和底部边距完整显示。
-  - Impact: 高 DPI、字体度量或状态文字变长时，主要操作区可能显示不全。
-  - Fix: 取消展开态固定高度，保留固定宽度；根据布局 `sizeHint()` 与最小高度动态调整，并在首次显示、进度更新和状态更新后重新计算。
+### 1. 视区与布局响应式矩阵
 
-## Required Fidelity Surfaces
+| 窗口分辨率 | 预期布局模式 | 抽屉行为 | WebView 宽度保护 |
+| :--- | :--- | :--- | :--- |
+| **1024 × 768** | Narrow | Overlay Drawer | 占满全宽（~950px），不因抽屉展开而变化 |
+| **1280 × 800** | **Narrow (核心基线)** | **Overlay Drawer** | **ActualWidth 恒定保持约 1170px，网页无横向滚动条** |
+| **1366 × 768** | Narrow | Overlay Drawer | 占满全宽（~1250px），抽屉平滑浮层覆盖 |
+| **1440 × 900** | Narrow | Overlay Drawer | 占满全宽（~1320px），无网页排版抖动 |
+| **1600 × 900** | Wide (Docked) | 344px 常驻右栏 | 浏览器宽度仍稳定保留 >= 1150px |
+| **1920 × 1080** | ExtraWide (Docked) | 344px 常驻右栏 | 浏览器宽度保留 >= 1470px 宽广视区 |
 
-- Fonts and typography: 字体族、字号、字重及层级保持不变；状态和进度文字增加自动换行，不再被高度裁切。
-- Spacing and layout rhythm: 底部按钮下方恢复完整边距，圆角轮廓闭合；展开态最小高度为 248 px，并允许内容继续增长。
-- Colors and visual tokens: 白色面板、灰色边框、钴蓝主按钮、绿色成功状态均保持原主题。
-- Image quality and asset fidelity: 此组件没有图片资产；截图中边框、阴影和文字均清晰。
-- Copy and content: 标题、返回、设置、进度、练习版及三个操作按钮文案均完整保留。
+### 2. 1280×800 核心基准测试要求 (P0)
 
-## Full-view comparison evidence
+1. **WebView 几何尺寸恒定**：
+   - 打开/关闭任务面板时，`Browser` 的 `ActualWidth` 不得发生任何改变。
+   - 打开任务抽屉不得触发云考网页（登录页、宣传横幅、练习题库）产生横向滚动条或重排抖动。
+2. **动效隔离**：
+   - 抽屉展开仅执行 `TranslateX: 24 → 0` 与 `Opacity: 0 → 1`（200ms），关闭执行 `TranslateX: 0 → 24`（180ms）。
+   - 网页容器绝不参与 Scale/Blur/Opacity 动效。
 
-对照图同时包含修复前和修复后完整悬浮窗。修复后底部操作栏不再触碰窗口下边缘，所有按钮轮廓、圆角和底部留白均可见。
+### 3. Fluent 材质与对比度规范 (P0)
 
-## Focused region comparison evidence
+1. **主窗背景**：默认优先使用 `Mica` 材质；系统不支持时优雅降级为 `Solid` (`#EEF2F6`)。
+2. **左侧 Rail**：纯净 `RailSurfaceBrush`（~95% 不透明度），不嵌套独立 DesktopAcrylicBackdrop。
+3. **任务抽屉**：
+   - Overlay 态：使用 `DrawerSurfaceBrush`（高 Tint 不透明度），背底网页文字只能轻微透出轮廓，不得干扰按钮与状态标签阅读。
+   - Docked 态：使用透明/实体卡片 Surface，不使用 Acrylic 穿透。
+4. **网页容器**：保持 `#FFFFFF` / 实色白底，确保 WebView2 网页对比度与清晰度。
 
-无需单独裁切：悬浮窗仅 320 逻辑像素宽，对照图中的底部操作区以可读尺寸完整呈现，按钮边界和留白可直接判断。
+### 4. 状态机与操作焦点规范 (P1)
 
-## Comparison history
+- **Idle（待机）**：Primary 按钮禁用显示“等待进入练习页”，辅助操作全部收进 `···` 菜单。
+- **Ready（就绪）**：唯一的蓝色 Primary 按钮“开始提取”。
+- **Running（提取中）**：Primary 按钮动态变为“暂停提取”，显示已保存/AI待补/平均速度三项关键指标。
+- **Paused（暂停）**：Primary 按钮变为“继续提取”，右侧提供“停止”动作。
+- **Completed（已完成）**：Primary 按钮变为“导出题库”，导出卡片自动激活可用。
+- **Error（异常）**：Primary 按钮提示“重新开始”。
+- **ExportCard 联动**：题目数 = 0 时显示安静空状态“提取到题目后可在此快速导出”，不展示多余禁用按钮；题目数 > 0 时激活 PDF/DOCX/更多及练习版开关。
 
-1. 初次对照发现 P1：固定 226 px 高度无法容纳当前按钮最小高度、行间距和 DPI 字体度量。
-2. 修复：展开态改为内容自适应，新增首次显示及文字变化后的高度刷新；进度和状态标签允许换行。
-3. 修复后证据：实现截图为 320 × 248，底部三个按钮与面板下边缘之间留有完整空间；回归测试验证按钮底部始终位于悬浮窗内容区域内。
+### 5. 无障碍与降级
 
-## Implementation Checklist
-
-- [x] 展开态按内容和 DPI 计算高度
-- [x] 折叠与展开尺寸约束正确恢复
-- [x] 长进度和状态文字可换行
-- [x] 底部操作栏几何边界回归测试
-- [x] 12 项自动化测试通过
-
-final result: passed
+- **DPI 适配**：125% 与 150% 系统缩放下，按钮文字、图标与圆角完整闭合，无裁剪截断。
+- **Reduced Motion**：当系统开启“关闭动画”时，抽屉和页面立即切换，不执行位移动画。
+- **High Contrast**：高对比度模式下自动停用所有半透明材质并降级为实体 Solid 背景。
