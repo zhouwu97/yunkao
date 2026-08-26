@@ -110,6 +110,26 @@ public sealed class AiServiceTests
         Assert.Equal("gpt-4o-mini", result.Models[1]);
     }
 
+    [Fact]
+    public async Task GetModelsAsync_returns_friendly_message_on_404()
+    {
+        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.NotFound));
+        using var httpClient = new HttpClient(handler);
+        var service = new AiService(httpClient);
+        var config = new AiRequestConfiguration
+        {
+            Provider = "custom",
+            BaseUrl = "https://api.example.com/v1",
+            Model = "",
+            ApiKey = "sk-test",
+        };
+
+        AiModelsResult result = await service.GetModelsAsync(config);
+        Assert.False(result.Success);
+        Assert.Contains("不支持自动获取模型列表", result.Message);
+        Assert.Empty(result.Models);
+    }
+
     private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> handler) : HttpMessageHandler
     {
         public HttpRequestMessage? LastRequest { get; private set; }

@@ -52,6 +52,7 @@ public sealed class WebViewService : IAsyncDisposable
     public event EventHandler<string>? ProcessFailed;
     public event EventHandler<BrowserHttpEventArgs>? HttpStatusChanged;
     public event EventHandler? RecoveryCompleted;
+    public event EventHandler<string>? RecoveryFailed;
 
     public async Task InitializeAsync(WebView2 view, CancellationToken cancellationToken = default)
     {
@@ -99,6 +100,8 @@ public sealed class WebViewService : IAsyncDisposable
         _core.Navigate(uri.AbsoluteUri);
     }
 
+    public const string QuestionRootSelector = ".swiper-slide-active, .practice_slide_content, .question-content, .exam-item, .exam_question, .subject_item";
+
     public bool CanGoBack => _core?.CanGoBack == true;
     public bool CanGoForward => _core?.CanGoForward == true;
 
@@ -130,7 +133,7 @@ public sealed class WebViewService : IAsyncDisposable
         if (_core is null) return false;
         try
         {
-            string script = "(() => { const active = document.querySelector('.swiper-slide-active, .practice_slide_content, .question-content, .exam-item'); return !!active; })();";
+            string script = $"(() => {{ const active = document.querySelector('{QuestionRootSelector}'); return !!active; }})();";
             string result = await ExecuteScriptAsync(script, cancellationToken).ConfigureAwait(true);
             return DeserializeScriptBoolean(result);
         }
@@ -145,7 +148,7 @@ public sealed class WebViewService : IAsyncDisposable
         if (_core is null) return "Initializing";
         try
         {
-            string script = "(() => { if (document.querySelector('input[type=\"password\"], input[name=\"password\"], #password')) return 'LoginRequired'; if (document.querySelector('.swiper-slide-active, .practice_slide_content, .question-content, .exam-item')) return 'PracticeReady'; return 'Browsing'; })();";
+            string script = $"(() => {{ if (document.querySelector('input[type=\"password\"], input[name=\"password\"], #password')) return 'LoginRequired'; if (document.querySelector('{QuestionRootSelector}')) return 'PracticeReady'; return 'Browsing'; }})();";
             string result = await ExecuteScriptAsync(script, cancellationToken).ConfigureAwait(true);
             string state = DeserializeScriptString(result);
             return string.IsNullOrWhiteSpace(state) ? "Browsing" : state;
@@ -159,7 +162,7 @@ public sealed class WebViewService : IAsyncDisposable
     public async Task<string> GetActiveQuestionHtmlAsync(CancellationToken cancellationToken = default)
     {
         EnsureAllowedPage();
-        string script = "(() => { const x = document.querySelector('.swiper-slide-active, .practice_slide_content'); return x ? x.outerHTML : ''; })();";
+        string script = $"(() => {{ const x = document.querySelector('{QuestionRootSelector}'); return x ? x.outerHTML : ''; }})();";
         string result = await ExecuteScriptAsync(script, cancellationToken).ConfigureAwait(true);
         return DeserializeScriptString(result);
     }
@@ -174,9 +177,9 @@ public sealed class WebViewService : IAsyncDisposable
     public async Task<string> ReadQuestionMarkerAsync(CancellationToken cancellationToken = default)
     {
         EnsureAllowedPage();
-        string result = await ExecuteScriptAsync(
-            "(() => { const a = document.querySelector('.swiper-slide-active, .practice_slide_content'); if (!a) return ''; const id = a.dataset.questionid || a.dataset.questionId || a.dataset.id || ''; const c = document.querySelector('.swiper-pagination-current')?.textContent?.trim() || ''; const t = document.querySelector('#swiper-total')?.textContent?.trim() || ''; const title = a.querySelector('.practice_slide_title, .title, .txt')?.textContent?.replace(/\\s+/g, ' ').trim() || ''; return id || `${c}/${t}|${title}`; })();",
-            cancellationToken).ConfigureAwait(true);
+        string script =
+            $"(() => {{ const a = document.querySelector('{QuestionRootSelector}'); if (!a) return ''; const id = a.dataset.questionid || a.dataset.questionId || a.dataset.id || ''; const c = document.querySelector('.swiper-pagination-current')?.textContent?.trim() || ''; const t = document.querySelector('#swiper-total')?.textContent?.trim() || ''; const title = a.querySelector('.practice_slide_title, .title, .txt')?.textContent?.replace(/\\s+/g, ' ').trim() || ''; return id || `${{c}}/${{t}}|${{title}}`; }})();";
+        string result = await ExecuteScriptAsync(script, cancellationToken).ConfigureAwait(true);
         return DeserializeScriptString(result);
     }
 
@@ -242,6 +245,7 @@ public sealed class WebViewService : IAsyncDisposable
         catch (Exception exception)
         {
             StatusChanged?.Invoke(this, "WebView2 重建失败：" + exception.Message);
+            RecoveryFailed?.Invoke(this, exception.Message);
             return false;
         }
     }
@@ -327,6 +331,17 @@ public sealed class WebViewService : IAsyncDisposable
         int statusCode = args.Response.StatusCode;
         if (statusCode is not (401 or 403 or 408 or 429 or 500 or 502 or 503 or 504)) return;
         Uri? uri = TryGetUri(args.Request.Uri);
+        if (!IsAllowedHost(uri)) return;
+
+        string path = uri?.AbsolutePath.ToLowerInvariant() ?? "";
+        if (path.EndsWith(".png") || path.EndsWith(".jpg") || path.EndsWith(".jpeg")
+            || path.EndsWith(".gif") || path.EndsWith(".svg") || path.EndsWith(".css")
+            || path.EndsWith(".woff") || path.EndsWith(".woff2") || path.EndsWith(".ttf")
+            || path.EndsWith(".ico"))
+        {
+            return;
+        }
+
         string context = "response";
         HttpStatusChanged?.Invoke(this, new BrowserHttpEventArgs(uri, statusCode, context));
         string message = statusCode switch

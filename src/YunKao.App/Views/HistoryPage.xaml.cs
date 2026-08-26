@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using YunKao.Core.Models;
+using YunKao.Core.Services;
 
 namespace YunKao.Views;
 
@@ -109,14 +110,45 @@ public sealed partial class HistoryPage : Page
                 return;
             }
 
-            bool restored = App.Services.Workspace.Session.Restore(snapshot);
-            if (restored)
+            var currentSession = App.Services.Workspace.Session;
+            bool currentActive = currentSession.Status is ExtractionStatus.Running or ExtractionStatus.Paused or ExtractionStatus.Completing
+                || currentSession.SavedCount > 0;
+
+            if (currentActive)
             {
-                StatusText.Text = $"已恢复任务 ({snapshot.Questions.Count} 题) 至工作台，可切回工作台查看或导出。";
+                var dialog = new ContentDialog
+                {
+                    XamlRoot = XamlRoot,
+                    Title = "恢复历史任务？",
+                    Content = $"当前工作台任务已有 {currentSession.SavedCount} 道题目。恢复历史任务将安全停止并保存当前任务，载入此历史快照 ({snapshot.Questions.Count} 题)。是否继续？",
+                    PrimaryButtonText = "确认恢复",
+                    CloseButtonText = "取消",
+                    DefaultButton = ContentDialogButton.Primary,
+                };
+                if (await dialog.ShowAsync() != ContentDialogResult.Primary)
+                {
+                    StatusText.Text = "已取消恢复历史任务。";
+                    return;
+                }
+            }
+
+            bool restored = false;
+            if (App.Services.Coordinator is not null)
+            {
+                restored = await App.Services.Coordinator.RestoreHistoricalSessionAsync(snapshot, force: true);
             }
             else
             {
-                StatusText.Text = "恢复失败，当前工作台可能已有正在运行的任务。";
+                restored = currentSession.Restore(snapshot);
+            }
+
+            if (restored)
+            {
+                StatusText.Text = $"已恢复任务 ({snapshot.Questions.Count} 题) 至工作台（处于暂停待机状态），可切回工作台确认页面后继续。";
+            }
+            else
+            {
+                StatusText.Text = "恢复失败，请重试。";
             }
         }
         catch (Exception ex)

@@ -103,4 +103,43 @@ public sealed class ExtractionSessionTests
         Assert.Equal(1, session.AiFailedCount);
         Assert.NotNull(session.EndedAt);
     }
+
+    [Fact]
+    public void Restore_and_ResumeRestored_maintains_consistent_session_id_and_rejects_old_callbacks()
+    {
+        var session = new ExtractionSession();
+        Guid oldId = session.Start();
+        session.TryAddQuestion(oldId, new Question { QuestionId = "q-old", Title = "旧题目" });
+
+        Guid restoredId = Guid.NewGuid();
+        var snapshot = new ExtractionSessionSnapshot(
+            restoredId.ToString("N"),
+            DateTimeOffset.Now.AddHours(-1),
+            "paused",
+            2,
+            0,
+            "测试课程",
+            [new Question { QuestionId = "q-hist-1", Title = "历史题1" }, new Question { QuestionId = "q-hist-2", Title = "历史题2" }],
+            Current: 2,
+            Total: 10,
+            LastQuestionMarker: "marker-2",
+            SourceUrl: "https://www.cctrcloud.net/practice/1");
+
+        Assert.True(session.Restore(snapshot));
+        Assert.Equal(ExtractionStatus.Paused, session.Status);
+        Assert.Equal(2, session.SavedCount);
+        Assert.Equal(restoredId, session.SessionId);
+
+        // Old callbacks must be rejected
+        Assert.False(session.TryAddQuestion(oldId, new Question { QuestionId = "q-old-late", Title = "旧回调" }));
+
+        // Resume restored session
+        Assert.True(session.ResumeRestored());
+        Assert.Equal(ExtractionStatus.Running, session.Status);
+        Assert.Equal(restoredId, session.SessionId);
+
+        // New questions under restoredId are accepted
+        Assert.True(session.TryAddQuestion(restoredId, new Question { QuestionId = "q-new", Title = "新题" }));
+        Assert.Equal(3, session.SavedCount);
+    }
 }

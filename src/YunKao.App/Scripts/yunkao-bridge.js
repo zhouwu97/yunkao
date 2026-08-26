@@ -9,10 +9,17 @@
   let readyTimer = null;
   let lastMarker = "";
 
+  const QUESTION_ROOT_SELECTOR =
+    ".swiper-slide-active, .practice_slide_content, .question-content, .exam-item, .exam_question, .subject_item";
+
+  function findActiveQuestionRoot() {
+    return document.querySelector(QUESTION_ROOT_SELECTOR);
+  }
+
   function readMarker() {
     const current = document.querySelector(".swiper-pagination-current");
     const total = document.querySelector("#swiper-total");
-    const active = document.querySelector(".swiper-slide-active, .practice_slide_content");
+    const active = findActiveQuestionRoot();
     if (!active) return null;
 
     const questionId = active.dataset.questionid || active.dataset.questionId || active.dataset.id || "";
@@ -26,7 +33,7 @@
 
   function checkPracticeState() {
     const isLogin = !!document.querySelector("input[type='password'], input[name='password'], #password");
-    const active = document.querySelector(".swiper-slide-active, .practice_slide_content, .question-content, .exam-item");
+    const active = findActiveQuestionRoot();
     const isPractice = !!active;
     post({
       type: "pageState",

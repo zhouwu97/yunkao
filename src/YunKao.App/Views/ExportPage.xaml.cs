@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.ApplicationModel.DataTransfer;
 using YunKao.Core.Models;
+using YunKao.Core.Services;
 using YunKao.Services;
 
 namespace YunKao.Views;
@@ -170,13 +171,10 @@ public sealed partial class ExportPage : Page
 
             AppSettings settings = App.Services.Settings.Load();
             string format = NormalizeFormat(record.Format);
-            string extension = format;
             string directory = string.IsNullOrWhiteSpace(settings.DefaultExportDirectory)
                 ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
                 : settings.DefaultExportDirectory;
-            Directory.CreateDirectory(directory);
-            string path = Path.Combine(directory,
-                $"{settings.ExportPrefix}_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid():N}.{extension}");
+            string path = ExportPathGenerator.CreateUniquePath(directory, settings.ExportPrefix, format);
             StatusText.Text = $"正在重新导出 {snapshot.Questions.Count} 题…";
             ExportResult result = await App.Services.Exports.ExportAsync(
                 new ExportRequest(

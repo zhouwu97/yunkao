@@ -43,7 +43,8 @@ public sealed partial class ExtractionPanel : UserControl
             ExtractionStatus.Completing => "题目已完成，正在等待 AI 补全",
             _ => isPracticeReady ? "已检测到练习题目，点击开始提取" : "进入练习后可自动连续提取",
         };
-        StartButton.IsEnabled = !active;
+        StartButton.IsEnabled = !active && isPracticeReady;
+        StartButton.Label = !active && !isPracticeReady ? "请先进入练习" : "开始提取";
         PauseButton.IsEnabled = running || paused;
         PauseButton.Label = paused ? "继续提取" : "暂停提取";
         StopButton.IsEnabled = running || paused;

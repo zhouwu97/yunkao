@@ -200,6 +200,10 @@ public sealed class AiService(HttpClient httpClient)
 
             if (!response.IsSuccessStatusCode)
             {
+                if (response.StatusCode is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.MethodNotAllowed or System.Net.HttpStatusCode.NotImplemented)
+                {
+                    return new AiModelsResult(false, "当前供应商接口不支持自动获取模型列表（未提供 /models 端点），请手动填写模型名称。", []);
+                }
                 return new AiModelsResult(false, $"HTTP {(int)response.StatusCode}: {response.ReasonPhrase}", []);
             }
 
