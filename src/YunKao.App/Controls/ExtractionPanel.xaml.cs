@@ -52,7 +52,7 @@ public sealed partial class ExtractionPanel : UserControl
                 actionLabel: "正在恢复…",
                 action: PanelPrimaryAction.DisabledWait,
                 primaryVariant: LiquidButtonVariant.Soft,
-                showSecondary: false);
+                showStopButton: false);
             return;
         }
 
@@ -67,8 +67,7 @@ public sealed partial class ExtractionPanel : UserControl
                     actionLabel: "暂停提取",
                     action: PanelPrimaryAction.Pause,
                     primaryVariant: LiquidButtonVariant.Soft,
-                    showSecondary: true,
-                    secondaryPauseLabel: "暂停");
+                    showStopButton: true);
                 break;
 
             case ExtractionStatus.Paused:
@@ -80,8 +79,7 @@ public sealed partial class ExtractionPanel : UserControl
                     actionLabel: "继续提取",
                     action: PanelPrimaryAction.Resume,
                     primaryVariant: LiquidButtonVariant.Primary,
-                    showSecondary: true,
-                    secondaryPauseLabel: "继续");
+                    showStopButton: true);
                 break;
 
             case ExtractionStatus.Completing:
@@ -93,7 +91,7 @@ public sealed partial class ExtractionPanel : UserControl
                     actionLabel: "AI 处理中…",
                     action: PanelPrimaryAction.DisabledWait,
                     primaryVariant: LiquidButtonVariant.Soft,
-                    showSecondary: false);
+                    showStopButton: false);
                 break;
 
             case ExtractionStatus.Completed:
@@ -105,7 +103,7 @@ public sealed partial class ExtractionPanel : UserControl
                     actionLabel: "导出题库",
                     action: PanelPrimaryAction.Export,
                     primaryVariant: LiquidButtonVariant.Primary,
-                    showSecondary: false);
+                    showStopButton: false);
                 break;
 
             case ExtractionStatus.Error:
@@ -117,7 +115,7 @@ public sealed partial class ExtractionPanel : UserControl
                     actionLabel: "重新开始",
                     action: PanelPrimaryAction.Restart,
                     primaryVariant: LiquidButtonVariant.Coral,
-                    showSecondary: false);
+                    showStopButton: false);
                 break;
 
             default: // Idle
@@ -131,7 +129,7 @@ public sealed partial class ExtractionPanel : UserControl
                         actionLabel: isPracticeReady ? "开始提取" : "导出题库",
                         action: isPracticeReady ? PanelPrimaryAction.Start : PanelPrimaryAction.Export,
                         primaryVariant: LiquidButtonVariant.Primary,
-                        showSecondary: false);
+                        showStopButton: false);
                 }
                 else if (isLoginPage)
                 {
@@ -143,7 +141,7 @@ public sealed partial class ExtractionPanel : UserControl
                         actionLabel: "请先登录",
                         action: PanelPrimaryAction.DisabledWait,
                         primaryVariant: LiquidButtonVariant.Ghost,
-                        showSecondary: false);
+                        showStopButton: false);
                 }
                 else if (isPracticeReady)
                 {
@@ -155,7 +153,7 @@ public sealed partial class ExtractionPanel : UserControl
                         actionLabel: "开始提取",
                         action: PanelPrimaryAction.Start,
                         primaryVariant: LiquidButtonVariant.Primary,
-                        showSecondary: false);
+                        showStopButton: false);
                 }
                 else
                 {
@@ -167,7 +165,7 @@ public sealed partial class ExtractionPanel : UserControl
                         actionLabel: "等待进入练习页",
                         action: PanelPrimaryAction.DisabledWait,
                         primaryVariant: LiquidButtonVariant.Ghost,
-                        showSecondary: false);
+                        showStopButton: false);
                 }
                 break;
         }
@@ -184,8 +182,7 @@ public sealed partial class ExtractionPanel : UserControl
         string actionLabel,
         PanelPrimaryAction action,
         LiquidButtonVariant primaryVariant,
-        bool showSecondary,
-        string secondaryPauseLabel = "暂停")
+        bool showStopButton)
     {
         StatusIcon.Glyph = icon;
         StateText.Text = state;
@@ -197,11 +194,7 @@ public sealed partial class ExtractionPanel : UserControl
         PrimaryActionButton.IsEnabled = action != PanelPrimaryAction.DisabledWait;
         PrimaryActionButton.Variant = primaryVariant;
 
-        SecondaryActionsGrid.Visibility = showSecondary ? Visibility.Visible : Visibility.Collapsed;
-        if (showSecondary)
-        {
-            SecondaryPauseButton.Label = secondaryPauseLabel;
-        }
+        SecondaryStopButton.Visibility = showStopButton ? Visibility.Visible : Visibility.Collapsed;
     }
 
     public void SetInterrupted(int questionCount)

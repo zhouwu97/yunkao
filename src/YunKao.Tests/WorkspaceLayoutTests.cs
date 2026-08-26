@@ -11,9 +11,10 @@ public sealed class WorkspaceLayoutTests
     [InlineData(1170, WorkspaceLayoutMode.Narrow)]
     [InlineData(1250, WorkspaceLayoutMode.Narrow)]
     [InlineData(1340, WorkspaceLayoutMode.Narrow)]
-    [InlineData(1395.99, WorkspaceLayoutMode.Narrow)]
-    // >= 1396 (对应约 1520~1560px 窗口) 才允许 Dock (Wide)
-    [InlineData(1396, WorkspaceLayoutMode.Wide)]
+    [InlineData(1380, WorkspaceLayoutMode.Narrow)]
+    [InlineData(1411.99, WorkspaceLayoutMode.Narrow)]
+    // >= 1412（进入迟滞门槛）才从 Narrow 进入 Dock (Wide)
+    [InlineData(1412, WorkspaceLayoutMode.Wide)]
     [InlineData(1500, WorkspaceLayoutMode.Wide)]
     [InlineData(1679.99, WorkspaceLayoutMode.Wide)]
     [InlineData(1680, WorkspaceLayoutMode.ExtraWide)]
@@ -23,6 +24,23 @@ public sealed class WorkspaceLayoutTests
         WorkspaceLayoutMode expected)
     {
         Assert.Equal(expected, WorkspaceLayoutBreakpoints.GetMode(width));
+    }
+
+    [Theory]
+    // 处于 Narrow 模式时，在 1380~1411 维持 Narrow 避免跳变
+    [InlineData(1396, WorkspaceLayoutMode.Narrow, WorkspaceLayoutMode.Narrow)]
+    [InlineData(1411.99, WorkspaceLayoutMode.Narrow, WorkspaceLayoutMode.Narrow)]
+    [InlineData(1412, WorkspaceLayoutMode.Narrow, WorkspaceLayoutMode.Wide)]
+    // 处于 Wide 模式时，在 1380~1412 维持 Wide 避免拖拽抖动，直到 < 1380 才回退 Narrow
+    [InlineData(1400, WorkspaceLayoutMode.Wide, WorkspaceLayoutMode.Wide)]
+    [InlineData(1380, WorkspaceLayoutMode.Wide, WorkspaceLayoutMode.Wide)]
+    [InlineData(1379.99, WorkspaceLayoutMode.Wide, WorkspaceLayoutMode.Narrow)]
+    public void Hysteresis_prevents_frequent_layout_toggling_around_threshold(
+        double width,
+        WorkspaceLayoutMode currentMode,
+        WorkspaceLayoutMode expectedMode)
+    {
+        Assert.Equal(expectedMode, WorkspaceLayoutBreakpoints.GetMode(width, currentMode));
     }
 
     [Theory]

@@ -60,22 +60,22 @@
         </StackPanel>
       </Border>
 
-      <!-- 动态 Primary Action 与辅助操作 -->
-      <StackPanel x:Name="ActionsContainer" Spacing="8">
+      <!-- 动态 Primary Action 与危险辅助操作 -->
+      <StackPanel x:Name="ActionsContainer" Spacing="6">
         <controls:LiquidButton x:Name="PrimaryActionButton"
                                Label="等待进入练习页"
                                Click="OnPrimaryActionClick"
                                Variant="Primary"
                                BackdropMode="Inherited" />
 
-        <Grid x:Name="SecondaryActionsGrid" ColumnSpacing="8" Visibility="Collapsed">
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="*" />
-          </Grid.ColumnDefinitions>
-          <controls:LiquidButton x:Name="SecondaryPauseButton" Grid.Column="0" Label="暂停" Click="OnPauseClick" Variant="Soft" BackdropMode="Inherited" />
-          <controls:LiquidButton x:Name="SecondaryStopButton" Grid.Column="1" Label="停止" Click="OnStopClick" Variant="Coral" BackdropMode="Inherited" />
-        </Grid>
+        <Button x:Name="SecondaryStopButton"
+                Content="停止任务"
+                HorizontalAlignment="Right"
+                Style="{StaticResource DangerButtonStyle}"
+                FontSize="12"
+                Padding="8,4"
+                Click="OnStopClick"
+                Visibility="Collapsed" />
       </StackPanel>
     </StackPanel>
   </Grid>

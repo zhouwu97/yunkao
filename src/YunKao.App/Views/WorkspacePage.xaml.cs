@@ -62,6 +62,8 @@ public sealed partial class WorkspacePage : Page
         ApplyResponsiveLayout();
     }
 
+    private WorkspaceLayoutMode _currentLayoutMode = WorkspaceLayoutMode.Narrow;
+
     /// <summary>
     /// 使用扣除导航栏和内边距的内容区宽度做预算。
     /// 只有保证浏览器最低舒适宽度 (>=1040px) 时才允许 Dock 右栏，
@@ -71,7 +73,9 @@ public sealed partial class WorkspacePage : Page
     {
         if (ContentGrid.ActualWidth <= 0) return;
 
-        WorkspaceLayoutMode layoutMode = WorkspaceLayoutBreakpoints.GetMode(ContentGrid.ActualWidth);
+        WorkspaceLayoutMode layoutMode = WorkspaceLayoutBreakpoints.GetMode(ContentGrid.ActualWidth, _currentLayoutMode);
+        _currentLayoutMode = layoutMode;
+
         if (layoutMode != WorkspaceLayoutMode.Narrow)
         {
             _narrow = false;
@@ -193,9 +197,7 @@ public sealed partial class WorkspacePage : Page
         DrawerShell.BorderThickness = narrow ? new Thickness(1) : new Thickness(0);
         DrawerShell.Padding = narrow ? new Thickness(10) : new Thickness(0);
         MotionService.SetSoftShadow(DrawerShell, narrow);
-        LiquidBackdropMode islandMode = narrow
-            ? LiquidBackdropMode.Inherited
-            : LiquidBackdropMode.System;
+        LiquidBackdropMode islandMode = LiquidBackdropMode.Inherited;
         TaskCard.BackdropMode = islandMode;
         ToolsCard.BackdropMode = islandMode;
         Events.BackdropMode = islandMode;
