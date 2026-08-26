@@ -20,6 +20,8 @@ public sealed class ExtractionSession
     private readonly object _gate = new();
     private readonly HashSet<string> _seenKeys = new(StringComparer.Ordinal);
     private readonly List<Question> _questions = [];
+    // SessionId 用于持久化和展示；回调令牌另外维护，停止/恢复时可以立即让在途回调失效。
+    private Guid _callbackSessionId;
 
     public Guid SessionId { get; private set; }
     public ExtractionStatus Status { get; private set; } = ExtractionStatus.Idle;
@@ -46,6 +48,7 @@ public sealed class ExtractionSession
         lock (_gate)
         {
             SessionId = Guid.NewGuid();
+            _callbackSessionId = SessionId;
             Status = ExtractionStatus.Running;
             Current = 0;
             Total = Math.Max(0, total);
@@ -94,6 +97,7 @@ public sealed class ExtractionSession
         lock (_gate)
         {
             if (Status is ExtractionStatus.Idle or ExtractionStatus.Completed) return false;
+            _callbackSessionId = Guid.Empty;
             Status = ExtractionStatus.Idle;
             AiPending = 0;
             EndedAt = DateTimeOffset.UtcNow;
@@ -108,6 +112,7 @@ public sealed class ExtractionSession
         lock (_gate)
         {
             SessionId = Guid.NewGuid();
+            _callbackSessionId = Guid.Empty;
             Status = ExtractionStatus.Idle;
             Current = 0;
             Total = 0;
@@ -154,6 +159,7 @@ public sealed class ExtractionSession
     {
         lock (_gate)
         {
+            _callbackSessionId = Guid.Empty;
             Status = ExtractionStatus.Error;
             AiPending = 0;
             ErrorCount++;
@@ -170,7 +176,7 @@ public sealed class ExtractionSession
         bool changed = false;
         lock (_gate)
         {
-            if (sessionId != SessionId || Status != ExtractionStatus.Running)
+            if (sessionId != SessionId || sessionId != _callbackSessionId || Status != ExtractionStatus.Running)
             {
                 return false;
             }
@@ -202,7 +208,8 @@ public sealed class ExtractionSession
         string key = QuestionKeyBuilder.Build(question);
         lock (_gate)
         {
-            if (sessionId != SessionId || Status is ExtractionStatus.Idle or ExtractionStatus.Error)
+            if (sessionId != SessionId || sessionId != _callbackSessionId
+                || Status is ExtractionStatus.Idle or ExtractionStatus.Error)
             {
                 return false;
             }
@@ -239,7 +246,7 @@ public sealed class ExtractionSession
     {
         lock (_gate)
         {
-            if (sessionId != SessionId) return false;
+            if (sessionId != SessionId || sessionId != _callbackSessionId) return false;
             Current = Math.Max(0, current);
             Total = Math.Max(0, total);
             if (marker is not null) LastQuestionMarker = marker;
@@ -256,7 +263,7 @@ public sealed class ExtractionSession
     {
         lock (_gate)
         {
-            if (sessionId != SessionId) return false;
+            if (sessionId != SessionId || sessionId != _callbackSessionId) return false;
             AiPending++;
         }
 
@@ -271,7 +278,7 @@ public sealed class ExtractionSession
     {
         lock (_gate)
         {
-            if (sessionId != SessionId) return false;
+            if (sessionId != SessionId || sessionId != _callbackSessionId) return false;
             AiPending = Math.Max(0, AiPending - 1);
             if (!succeeded) AiFailedCount++;
             if (AiPending == 0 && Status == ExtractionStatus.Completing)
@@ -290,7 +297,7 @@ public sealed class ExtractionSession
     {
         lock (_gate)
         {
-            if (sessionId != SessionId) return false;
+            if (sessionId != SessionId || sessionId != _callbackSessionId) return false;
             ErrorCount++;
         }
         RaiseChanged();
@@ -301,7 +308,9 @@ public sealed class ExtractionSession
     {
         lock (_gate)
         {
-            return SessionId == sessionId && Status is (ExtractionStatus.Running or ExtractionStatus.Paused);
+            return SessionId == sessionId
+                && _callbackSessionId == sessionId
+                && Status is (ExtractionStatus.Running or ExtractionStatus.Paused);
         }
     }
 
@@ -331,11 +340,17 @@ public sealed class ExtractionSession
     public bool Restore(ExtractionSessionSnapshot snapshot)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
-        if (!Guid.TryParse(snapshot.SessionId, out Guid sessionId)) return false;
+        if (!Guid.TryParse(snapshot.SessionId, out Guid sessionId) || sessionId == Guid.Empty) return false;
 
         lock (_gate)
         {
+            if (Status is ExtractionStatus.Running or ExtractionStatus.Paused or ExtractionStatus.Completing)
+            {
+                return false;
+            }
+
             SessionId = sessionId;
+            _callbackSessionId = Guid.Empty;
             StartedAt = snapshot.StartedAt;
             Status = Enum.TryParse(snapshot.Status, true, out ExtractionStatus status)
                 ? status
@@ -370,6 +385,8 @@ public sealed class ExtractionSession
         lock (_gate)
         {
             if (Status != ExtractionStatus.Paused || SessionId == Guid.Empty || _questions.Count == 0) return false;
+            _callbackSessionId = SessionId;
+            EndedAt = null;
             Status = ExtractionStatus.Running;
         }
 

@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml;
 using YunKao.Controls;
+using YunKao.Core.Services;
 using YunKao.Services;
 
 namespace YunKao.Views;
@@ -60,7 +61,8 @@ public sealed partial class WorkspacePage : Page
     {
         if (windowWidth <= 0) return;
 
-        if (windowWidth >= 1180)
+        WorkspaceLayoutMode layoutMode = WorkspaceLayoutBreakpoints.GetMode(windowWidth);
+        if (layoutMode == WorkspaceLayoutMode.Wide)
         {
             _narrow = false;
             _drawerOpen = false;
@@ -77,7 +79,7 @@ public sealed partial class WorkspacePage : Page
             return;
         }
 
-        if (windowWidth >= 900)
+        if (layoutMode == WorkspaceLayoutMode.Medium)
         {
             _narrow = false;
             _drawerOpen = false;

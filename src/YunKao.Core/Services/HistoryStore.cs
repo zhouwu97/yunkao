@@ -106,12 +106,22 @@ public sealed class HistoryStore : IAsyncDisposable
         }
     }
 
-    public async Task SaveSessionAsync(
+    public Task SaveSessionAsync(
         ExtractionSession session,
         string course,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(session);
+        // 在等待数据库锁之前冻结快照，避免会话恢复/重启期间读到另一代 Session。
+        ExtractionSessionSnapshot snapshot = session.Snapshot(course);
+        return SaveSessionSnapshotAsync(snapshot, cancellationToken);
+    }
+
+    public async Task SaveSessionSnapshotAsync(
+        ExtractionSessionSnapshot snapshot,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
         await InitializeAsync(cancellationToken).ConfigureAwait(false);
         await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -140,7 +150,7 @@ public sealed class HistoryStore : IAsyncDisposable
                     error_count = excluded.error_count,
                     ai_failed_count = excluded.ai_failed_count;
                 """;
-            AddSessionParameters(command, session, course);
+            AddSessionParameters(command, snapshot);
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
@@ -415,23 +425,23 @@ public sealed class HistoryStore : IAsyncDisposable
 
     private SqliteConnection CreateConnection() => new($"Data Source={_databasePath};Pooling=False");
 
-    private static void AddSessionParameters(SqliteCommand command, ExtractionSession session, string course)
+    private static void AddSessionParameters(SqliteCommand command, ExtractionSessionSnapshot snapshot)
     {
-        command.Parameters.AddWithValue("$session_id", session.SessionId.ToString("N"));
-        command.Parameters.AddWithValue("$started_at", (session.StartedAt ?? DateTimeOffset.UtcNow).ToString("O"));
-        command.Parameters.AddWithValue("$completed_at", session.EndedAt?.ToString("O") ?? (object)DBNull.Value);
-        command.Parameters.AddWithValue("$status", session.Status.ToString());
-        command.Parameters.AddWithValue("$question_count", session.SavedCount);
-        command.Parameters.AddWithValue("$ai_count", session.Questions.Count(question => question.AnswerSource == "ai"));
-        command.Parameters.AddWithValue("$course", course ?? "");
-        command.Parameters.AddWithValue("$questions_json", JsonSerializer.Serialize(session.Questions, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
-        command.Parameters.AddWithValue("$current_position", session.Current);
-        command.Parameters.AddWithValue("$total_count", session.Total);
-        command.Parameters.AddWithValue("$last_question_marker", session.LastQuestionMarker);
-        command.Parameters.AddWithValue("$source_url", session.SourceUrl);
-        command.Parameters.AddWithValue("$duplicate_count", session.DuplicateCount);
-        command.Parameters.AddWithValue("$error_count", session.ErrorCount);
-        command.Parameters.AddWithValue("$ai_failed_count", session.AiFailedCount);
+        command.Parameters.AddWithValue("$session_id", snapshot.SessionId);
+        command.Parameters.AddWithValue("$started_at", snapshot.StartedAt.ToString("O"));
+        command.Parameters.AddWithValue("$completed_at", snapshot.EndedAt?.ToString("O") ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("$status", snapshot.Status);
+        command.Parameters.AddWithValue("$question_count", snapshot.Questions.Count);
+        command.Parameters.AddWithValue("$ai_count", snapshot.Questions.Count(question => question.AnswerSource == "ai"));
+        command.Parameters.AddWithValue("$course", snapshot.Course ?? "");
+        command.Parameters.AddWithValue("$questions_json", JsonSerializer.Serialize(snapshot.Questions, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+        command.Parameters.AddWithValue("$current_position", snapshot.Current);
+        command.Parameters.AddWithValue("$total_count", snapshot.Total);
+        command.Parameters.AddWithValue("$last_question_marker", snapshot.LastQuestionMarker ?? "");
+        command.Parameters.AddWithValue("$source_url", snapshot.SourceUrl ?? "");
+        command.Parameters.AddWithValue("$duplicate_count", snapshot.DuplicateCount);
+        command.Parameters.AddWithValue("$error_count", snapshot.ErrorCount);
+        command.Parameters.AddWithValue("$ai_failed_count", snapshot.AiFailedCount);
     }
 
     private ExtractionSessionSnapshot ReadSnapshot(SqliteDataReader reader)

@@ -132,15 +132,13 @@ public sealed partial class HistoryPage : Page
                 }
             }
 
-            bool restored = false;
-            if (App.Services.Coordinator is not null)
+            if (App.Services.Coordinator is null)
             {
-                restored = await App.Services.Coordinator.RestoreHistoricalSessionAsync(snapshot, force: true);
+                StatusText.Text = "工作台尚未就绪，请稍后重试。";
+                return;
             }
-            else
-            {
-                restored = currentSession.Restore(snapshot);
-            }
+
+            bool restored = await App.Services.Coordinator.RestoreHistoricalSessionAsync(snapshot, force: true);
 
             if (restored)
             {

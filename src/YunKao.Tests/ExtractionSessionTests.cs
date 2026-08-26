@@ -105,6 +105,58 @@ public sealed class ExtractionSessionTests
     }
 
     [Fact]
+    public void Restore_does_not_overwrite_a_running_session()
+    {
+        var session = new ExtractionSession();
+        Guid runningId = session.Start();
+        session.TryAddQuestion(runningId, new Question { QuestionId = "running-q", Title = "当前任务" });
+        var snapshot = CreateSnapshot("history-q", "历史任务");
+
+        Assert.False(session.Restore(snapshot));
+        Assert.Equal(runningId, session.SessionId);
+        Assert.Equal(ExtractionStatus.Running, session.Status);
+        Assert.Equal("当前任务", Assert.Single(session.Questions).Title);
+    }
+
+    [Fact]
+    public void Restore_does_not_overwrite_a_paused_or_completing_session()
+    {
+        var session = new ExtractionSession();
+        Guid currentId = session.Start(total: 2);
+        session.TryAddQuestion(currentId, new Question { QuestionId = "current-q", Title = "当前题目" });
+        var snapshot = CreateSnapshot("history-q", "历史题目");
+
+        Assert.True(session.Pause());
+        Assert.False(session.Restore(snapshot));
+        Assert.Equal(currentId, session.SessionId);
+        Assert.Equal(ExtractionStatus.Paused, session.Status);
+
+        Assert.True(session.Resume());
+        session.IncrementAiPending(currentId);
+        Assert.True(session.Complete());
+        Assert.Equal(ExtractionStatus.Completing, session.Status);
+        Assert.False(session.Restore(snapshot));
+        Assert.Equal(currentId, session.SessionId);
+        Assert.Equal(ExtractionStatus.Completing, session.Status);
+    }
+
+    [Fact]
+    public void Stopping_before_restore_invalidates_old_ai_callbacks()
+    {
+        var session = new ExtractionSession();
+        Guid oldId = session.Start();
+        session.TryAddQuestion(oldId, new Question { QuestionId = "old-q", Title = "旧题目" });
+        session.IncrementAiPending(oldId);
+        var snapshot = CreateSnapshot("history-q", "历史题目");
+
+        Assert.True(session.Stop());
+        Assert.False(session.CompleteAiTask(oldId, succeeded: false));
+        Assert.True(session.Restore(snapshot));
+        Assert.Equal(ExtractionStatus.Paused, session.Status);
+        Assert.Equal(0, session.AiPending);
+    }
+
+    [Fact]
     public void Restore_and_ResumeRestored_maintains_consistent_session_id_and_rejects_old_callbacks()
     {
         var session = new ExtractionSession();
@@ -125,6 +177,7 @@ public sealed class ExtractionSessionTests
             LastQuestionMarker: "marker-2",
             SourceUrl: "https://www.cctrcloud.net/practice/1");
 
+        Assert.True(session.Stop());
         Assert.True(session.Restore(snapshot));
         Assert.Equal(ExtractionStatus.Paused, session.Status);
         Assert.Equal(2, session.SavedCount);
@@ -141,5 +194,17 @@ public sealed class ExtractionSessionTests
         // New questions under restoredId are accepted
         Assert.True(session.TryAddQuestion(restoredId, new Question { QuestionId = "q-new", Title = "新题" }));
         Assert.Equal(3, session.SavedCount);
+    }
+
+    private static ExtractionSessionSnapshot CreateSnapshot(string questionId, string title)
+    {
+        return new ExtractionSessionSnapshot(
+            Guid.NewGuid().ToString("N"),
+            DateTimeOffset.UtcNow.AddHours(-1),
+            "paused",
+            1,
+            0,
+            "测试课程",
+            [new Question { QuestionId = questionId, Title = title }]);
     }
 }

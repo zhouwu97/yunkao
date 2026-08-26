@@ -3,6 +3,7 @@ using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text.Json;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
+using YunKao.Core.Services;
 
 namespace YunKao.Services;
 
@@ -18,11 +19,11 @@ public sealed class BridgeMessageEventArgs(string message) : EventArgs
     public string Message { get; } = message;
 }
 
-public sealed class BrowserHttpEventArgs(Uri? uri, int statusCode, string resourceContext) : EventArgs
+public sealed class BrowserHttpEventArgs(Uri? uri, int statusCode, BrowserResourceKind resourceKind) : EventArgs
 {
     public Uri? Uri { get; } = uri;
     public int StatusCode { get; } = statusCode;
-    public string ResourceContext { get; } = resourceContext;
+    public BrowserResourceKind ResourceKind { get; } = resourceKind;
 }
 
 /// <summary>
@@ -30,20 +31,19 @@ public sealed class BrowserHttpEventArgs(Uri? uri, int statusCode, string resour
 /// </summary>
 public sealed class WebViewService : IAsyncDisposable
 {
-    private static readonly HashSet<string> AllowedHosts = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "cctrcloud.net",
-        "www.cctrcloud.net",
-    };
-
     private WebView2? _view;
     private CoreWebView2? _core;
     private string? _bridgeScript;
     private int _blankProbeAttempts;
+    private readonly SemaphoreSlim _recoveryGate = new(1, 1);
+    private readonly BrowserRecoveryStateMachine _recoveryState = new();
+    private RecoveryWaiters? _recoveryWaiters;
 
     public bool IsInitialized => _core is not null;
     public bool IsBridgeInstalled { get; private set; }
+    public bool IsRecovering => _recoveryState.IsRecovering;
     public Uri? CurrentUri { get; private set; }
+    public BrowserPageState PageState { get; private set; } = new(false, false);
     public string BrowserVersion => _core?.Environment.BrowserVersionString ?? "未初始化";
 
     public event EventHandler<BrowserNavigationEventArgs>? NavigationChanged;
@@ -100,8 +100,6 @@ public sealed class WebViewService : IAsyncDisposable
         _core.Navigate(uri.AbsoluteUri);
     }
 
-    public const string QuestionRootSelector = ".swiper-slide-active, .practice_slide_content, .question-content, .exam-item, .exam_question, .subject_item";
-
     public bool CanGoBack => _core?.CanGoBack == true;
     public bool CanGoForward => _core?.CanGoForward == true;
 
@@ -130,39 +128,47 @@ public sealed class WebViewService : IAsyncDisposable
 
     public async Task<bool> IsPracticePageAsync(CancellationToken cancellationToken = default)
     {
-        if (_core is null) return false;
-        try
-        {
-            string script = $"(() => {{ const active = document.querySelector('{QuestionRootSelector}'); return !!active; }})();";
-            string result = await ExecuteScriptAsync(script, cancellationToken).ConfigureAwait(true);
-            return DeserializeScriptBoolean(result);
-        }
-        catch
-        {
-            return false;
-        }
+        BrowserPageState state = await GetPageStateAsync(cancellationToken).ConfigureAwait(true);
+        return state.IsPracticeReady;
     }
 
     public async Task<string> ProbePageStateAsync(CancellationToken cancellationToken = default)
     {
         if (_core is null) return "Initializing";
+        BrowserPageState state = await GetPageStateAsync(cancellationToken).ConfigureAwait(true);
+        return state.IsLogin ? "LoginRequired" : state.IsPracticeReady ? "PracticeReady" : "Browsing";
+    }
+
+    public async Task<BrowserPageState> GetPageStateAsync(CancellationToken cancellationToken = default)
+    {
+        if (_core is null)
+        {
+            return new(false, false, CurrentUri?.AbsoluteUri ?? "", "");
+        }
+
         try
         {
-            string script = $"(() => {{ if (document.querySelector('input[type=\"password\"], input[name=\"password\"], #password')) return 'LoginRequired'; if (document.querySelector('{QuestionRootSelector}')) return 'PracticeReady'; return 'Browsing'; }})();";
+            const string script = "(() => { const state = window.YunKaoBridge && window.YunKaoBridge.checkPracticeState ? window.YunKaoBridge.checkPracticeState() : { isLogin: false, isPractice: false, url: window.location.href, title: document.title }; return JSON.stringify(state); })();";
             string result = await ExecuteScriptAsync(script, cancellationToken).ConfigureAwait(true);
-            string state = DeserializeScriptString(result);
-            return string.IsNullOrWhiteSpace(state) ? "Browsing" : state;
+            BrowserPageState state = DeserializePageState(DeserializeScriptString(result));
+            PageState = state;
+            return state;
         }
         catch
         {
-            return "Browsing";
+            PageState = new(
+                IsLogin: false,
+                IsPractice: false,
+                Url: CurrentUri?.AbsoluteUri ?? PageState.Url,
+                Title: PageState.Title);
+            return PageState;
         }
     }
 
     public async Task<string> GetActiveQuestionHtmlAsync(CancellationToken cancellationToken = default)
     {
         EnsureAllowedPage();
-        string script = $"(() => {{ const x = document.querySelector('{QuestionRootSelector}'); return x ? x.outerHTML : ''; }})();";
+        const string script = "window.YunKaoBridge && window.YunKaoBridge.getActiveQuestionHtml ? window.YunKaoBridge.getActiveQuestionHtml() : '';";
         string result = await ExecuteScriptAsync(script, cancellationToken).ConfigureAwait(true);
         return DeserializeScriptString(result);
     }
@@ -177,8 +183,7 @@ public sealed class WebViewService : IAsyncDisposable
     public async Task<string> ReadQuestionMarkerAsync(CancellationToken cancellationToken = default)
     {
         EnsureAllowedPage();
-        string script =
-            $"(() => {{ const a = document.querySelector('{QuestionRootSelector}'); if (!a) return ''; const id = a.dataset.questionid || a.dataset.questionId || a.dataset.id || ''; const c = document.querySelector('.swiper-pagination-current')?.textContent?.trim() || ''; const t = document.querySelector('#swiper-total')?.textContent?.trim() || ''; const title = a.querySelector('.practice_slide_title, .title, .txt')?.textContent?.replace(/\\s+/g, ' ').trim() || ''; return id || `${{c}}/${{t}}|${{title}}`; }})();";
+        const string script = "window.YunKaoBridge && window.YunKaoBridge.readMarkerValue ? window.YunKaoBridge.readMarkerValue() : '';";
         string result = await ExecuteScriptAsync(script, cancellationToken).ConfigureAwait(true);
         return DeserializeScriptString(result);
     }
@@ -211,42 +216,83 @@ public sealed class WebViewService : IAsyncDisposable
 
     public static bool IsAllowedHost(Uri? uri)
     {
-        return uri is not null
-            && uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
-            && AllowedHosts.Contains(uri.Host);
+        return CloudResourceClassifier.IsAllowedHost(uri);
     }
 
-    public static IReadOnlyCollection<string> AllowedHostNames => AllowedHosts;
+    public static IReadOnlyCollection<string> AllowedHostNames => CloudResourceClassifier.AllowedHostNames;
 
     public static bool IsAllowedBridgePage(Uri? uri)
     {
         if (!IsAllowedHost(uri)) return false;
-        string path = uri!.AbsolutePath.TrimEnd('/');
-        return path.Length == 0
-            || path.Equals("/login", StringComparison.OrdinalIgnoreCase)
-            || path.Contains("login", StringComparison.OrdinalIgnoreCase)
-            || path.StartsWith("/practice", StringComparison.OrdinalIgnoreCase);
+        return CloudResourceClassifier.Classify(uri, "") is not BrowserResourceKind.Other;
     }
 
     public async Task<bool> RecoverAsync(CancellationToken cancellationToken = default)
     {
-        if (_view is null) return false;
-        Uri? lastUri = CurrentUri;
-        DetachCoreEvents();
-        _core = null;
-        IsBridgeInstalled = false;
+        if (!await _recoveryGate.WaitAsync(0, cancellationToken).ConfigureAwait(true)) return false;
+        bool completed = false;
         try
         {
+            if (_view is null)
+            {
+                throw new InvalidOperationException("WebView2 控件尚未创建。");
+            }
+
+            if (!_recoveryState.Begin()) return false;
+            Uri targetUri = CurrentUri ?? new Uri("https://www.cctrcloud.net/");
+            DetachCoreEvents();
+            _core = null;
+            IsBridgeInstalled = false;
+            var waiters = new RecoveryWaiters();
+            _recoveryWaiters = waiters;
+
             await InitializeAsync(_view, cancellationToken).ConfigureAwait(true);
-            if (lastUri is not null) Navigate(lastUri);
+            Navigate(targetUri);
+            bool navigationSucceeded = await waiters.Navigation.Task
+                .WaitAsync(TimeSpan.FromSeconds(20), cancellationToken)
+                .ConfigureAwait(true);
+            if (!navigationSucceeded)
+            {
+                throw new InvalidOperationException("恢复后的页面导航失败。");
+            }
+
+            if (IsAllowedBridgePage(targetUri))
+            {
+                await waiters.Bridge.Task
+                    .WaitAsync(TimeSpan.FromSeconds(20), cancellationToken)
+                    .ConfigureAwait(true);
+                await waiters.PageState.Task
+                    .WaitAsync(TimeSpan.FromSeconds(20), cancellationToken)
+                    .ConfigureAwait(true);
+            }
+            else
+            {
+                // 非云考页面不注入 Bridge，但仍可视为浏览器本体恢复完成；继续提取由上层门禁阻止。
+                _recoveryState.MarkBridgeReady();
+                _recoveryState.MarkPageState(false);
+            }
+
+            if (_recoveryState.Phase != BrowserRecoveryPhase.Completed)
+            {
+                throw new InvalidOperationException("恢复后的页面状态尚未就绪。");
+            }
+
+            completed = true;
             RecoveryCompleted?.Invoke(this, EventArgs.Empty);
             return true;
         }
         catch (Exception exception)
         {
+            _recoveryState.Fail();
             StatusChanged?.Invoke(this, "WebView2 重建失败：" + exception.Message);
             RecoveryFailed?.Invoke(this, exception.Message);
             return false;
+        }
+        finally
+        {
+            _recoveryWaiters = null;
+            if (!completed && _recoveryState.IsRecovering) _recoveryState.Fail();
+            _recoveryGate.Release();
         }
     }
 
@@ -261,6 +307,8 @@ public sealed class WebViewService : IAsyncDisposable
             _core.WebResourceResponseReceived -= OnWebResourceResponseReceived;
         }
 
+        _recoveryState.Fail();
+        _recoveryGate.Dispose();
         await Task.CompletedTask;
     }
 
@@ -269,6 +317,7 @@ public sealed class WebViewService : IAsyncDisposable
         Uri? uri = TryGetUri(sender.Source);
         CurrentUri = uri;
         IsBridgeInstalled = false;
+        PageState = new(false, false, uri?.AbsoluteUri ?? "", "");
         if (args.IsSuccess && IsAllowedBridgePage(uri) && !string.IsNullOrWhiteSpace(_bridgeScript))
         {
             try
@@ -286,6 +335,12 @@ public sealed class WebViewService : IAsyncDisposable
         else if (args.IsSuccess)
         {
             StatusChanged?.Invoke(this, "浏览器模式：当前页面不注入 Bridge");
+        }
+
+        if (_recoveryState.IsRecovering)
+        {
+            _recoveryState.MarkNavigationCompleted(args.IsSuccess);
+            _recoveryWaiters?.Navigation.TrySetResult(args.IsSuccess);
         }
 
         NavigationChanged?.Invoke(
@@ -308,7 +363,9 @@ public sealed class WebViewService : IAsyncDisposable
     {
         try
         {
-            BridgeMessageReceived?.Invoke(this, new BridgeMessageEventArgs(args.TryGetWebMessageAsString()));
+            string message = args.TryGetWebMessageAsString();
+            ObserveBridgeLifecycle(message);
+            BridgeMessageReceived?.Invoke(this, new BridgeMessageEventArgs(message));
         }
         catch (Exception exception)
         {
@@ -318,6 +375,7 @@ public sealed class WebViewService : IAsyncDisposable
 
     private void OnProcessFailed(CoreWebView2 sender, CoreWebView2ProcessFailedEventArgs args)
     {
+        if (IsRecovering) return;
         IsBridgeInstalled = false;
         string message = $"WebView2 进程异常：{args.ProcessFailedKind}";
         ProcessFailed?.Invoke(this, message);
@@ -329,25 +387,18 @@ public sealed class WebViewService : IAsyncDisposable
     {
         if (args.Response is null) return;
         int statusCode = args.Response.StatusCode;
-        if (statusCode is not (401 or 403 or 408 or 429 or 500 or 502 or 503 or 504)) return;
+        if (!CloudResourceClassifier.ShouldReportStatus(statusCode)) return;
         Uri? uri = TryGetUri(args.Request.Uri);
-        if (!IsAllowedHost(uri)) return;
+        string resourceContext = IsCurrentDocumentUri(uri) ? "Document" : "";
+        BrowserResourceKind resourceKind = CloudResourceClassifier.Classify(uri, resourceContext);
+        if (resourceKind == BrowserResourceKind.Other) return;
 
-        string path = uri?.AbsolutePath.ToLowerInvariant() ?? "";
-        if (path.EndsWith(".png") || path.EndsWith(".jpg") || path.EndsWith(".jpeg")
-            || path.EndsWith(".gif") || path.EndsWith(".svg") || path.EndsWith(".css")
-            || path.EndsWith(".woff") || path.EndsWith(".woff2") || path.EndsWith(".ttf")
-            || path.EndsWith(".ico"))
-        {
-            return;
-        }
-
-        string context = "response";
-        HttpStatusChanged?.Invoke(this, new BrowserHttpEventArgs(uri, statusCode, context));
+        HttpStatusChanged?.Invoke(this, new BrowserHttpEventArgs(uri, statusCode, resourceKind));
         string message = statusCode switch
         {
             401 => "登录状态已失效，提取已暂停。",
             403 => "当前页面无访问权限。",
+            408 => "云考请求超时，正在等待服务恢复。",
             429 => "请求过于频繁，正在等待服务恢复。",
             >= 500 => "云考服务暂时不可用，正在等待恢复。",
             _ => $"页面请求失败：HTTP {statusCode}",
@@ -399,6 +450,34 @@ public sealed class WebViewService : IAsyncDisposable
             : "";
     }
 
+    private void ObserveBridgeLifecycle(string message)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(message);
+            JsonElement root = document.RootElement;
+            string messageType = root.TryGetProperty("type", out JsonElement type)
+                ? type.GetString() ?? ""
+                : "";
+            if (messageType.Equals("bridgeReady", StringComparison.Ordinal))
+            {
+                _recoveryState.MarkBridgeReady();
+                _recoveryWaiters?.Bridge.TrySetResult(true);
+                return;
+            }
+
+            if (!messageType.Equals("pageState", StringComparison.Ordinal)) return;
+            BrowserPageState state = ParsePageState(root);
+            PageState = state;
+            _recoveryState.MarkPageState(state.IsPracticeReady);
+            _recoveryWaiters?.PageState.TrySetResult(true);
+        }
+        catch (JsonException)
+        {
+            // 原始消息仍会交给 Coordinator 记录诊断，这里只忽略无法参与恢复判定的消息。
+        }
+    }
+
     private void EnsureAllowedPage()
     {
         if (!IsAllowedHost(CurrentUri))
@@ -412,6 +491,53 @@ public sealed class WebViewService : IAsyncDisposable
         return Uri.TryCreate(value, UriKind.Absolute, out Uri? uri) ? uri : null;
     }
 
+    private bool IsCurrentDocumentUri(Uri? uri)
+    {
+        return uri is not null
+            && CurrentUri is not null
+            && Uri.Compare(uri, CurrentUri, UriComponents.SchemeAndServer | UriComponents.PathAndQuery,
+                UriFormat.SafeUnescaped, StringComparison.OrdinalIgnoreCase) == 0;
+    }
+
+    private static BrowserPageState DeserializePageState(string json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return new(false, false);
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(json);
+            return ParsePageState(document.RootElement);
+        }
+        catch (JsonException)
+        {
+            return new(false, false);
+        }
+    }
+
+    private static BrowserPageState ParsePageState(JsonElement root)
+    {
+        bool isLogin = ReadBoolean(root, "isLogin");
+        bool isPractice = ReadBoolean(root, "isPractice");
+        string url = root.TryGetProperty("url", out JsonElement urlElement)
+            ? urlElement.GetString() ?? ""
+            : "";
+        string title = root.TryGetProperty("title", out JsonElement titleElement)
+            ? titleElement.GetString() ?? ""
+            : "";
+        return new BrowserPageState(isLogin, isPractice, url, title);
+    }
+
+    private static bool ReadBoolean(JsonElement root, string property)
+    {
+        if (!root.TryGetProperty(property, out JsonElement value)) return false;
+        return value.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.String => bool.TryParse(value.GetString(), out bool parsed) && parsed,
+            _ => false,
+        };
+    }
+
     private static string DeserializeScriptString(string result)
     {
         if (string.IsNullOrWhiteSpace(result) || result == "null") return "";
@@ -422,6 +548,16 @@ public sealed class WebViewService : IAsyncDisposable
     private static bool DeserializeScriptBoolean(string result)
     {
         return bool.TryParse(result.Trim(), out bool value) && value;
+    }
+
+    private sealed class RecoveryWaiters
+    {
+        public TaskCompletionSource<bool> Navigation { get; } = CreateSource();
+        public TaskCompletionSource<bool> Bridge { get; } = CreateSource();
+        public TaskCompletionSource<bool> PageState { get; } = CreateSource();
+
+        private static TaskCompletionSource<bool> CreateSource()
+            => new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
     private void DetachCoreEvents()

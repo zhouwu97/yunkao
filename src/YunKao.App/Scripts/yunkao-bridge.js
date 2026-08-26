@@ -16,6 +16,17 @@
     return document.querySelector(QUESTION_ROOT_SELECTOR);
   }
 
+  function getPageState() {
+    const isLogin = !!document.querySelector("input[type='password'], input[name='password'], #password");
+    const active = findActiveQuestionRoot();
+    return {
+      isLogin: isLogin,
+      isPractice: !!active,
+      url: window.location.href,
+      title: document.title
+    };
+  }
+
   function readMarker() {
     const current = document.querySelector(".swiper-pagination-current");
     const total = document.querySelector("#swiper-total");
@@ -32,16 +43,9 @@
   }
 
   function checkPracticeState() {
-    const isLogin = !!document.querySelector("input[type='password'], input[name='password'], #password");
-    const active = findActiveQuestionRoot();
-    const isPractice = !!active;
-    post({
-      type: "pageState",
-      isLogin: isLogin,
-      isPractice: isPractice,
-      url: window.location.href,
-      title: document.title
-    });
+    const state = getPageState();
+    post({ type: "pageState", ...state });
+    return state;
   }
 
   function emitReady() {
@@ -85,7 +89,31 @@
     post({ type: "credentialsFilled" });
   }
 
-  window.YunKaoBridge = { next, emitReady };
+  function isPracticeReady() {
+    const state = getPageState();
+    return state.isPractice && !state.isLogin;
+  }
+
+  function getActiveQuestionHtml() {
+    const active = findActiveQuestionRoot();
+    return active ? active.outerHTML : "";
+  }
+
+  function readMarkerValue() {
+    const state = readMarker();
+    return state ? state.marker : "";
+  }
+
+  window.YunKaoBridge = {
+    next,
+    emitReady,
+    getPageState,
+    checkPracticeState,
+    isPracticeReady,
+    getActiveQuestionHtml,
+    readMarker,
+    readMarkerValue
+  };
   if (window.chrome?.webview) {
     window.chrome.webview.addEventListener("message", (event) => {
       if (!event.data) return;
