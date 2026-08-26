@@ -43,15 +43,20 @@ public sealed partial class BrowserShell : UserControl
         try
         {
             await _service.InitializeAsync(WebView);
+            App.Services.Workspace.WebViewInitialized = true;
+            App.Services.Workspace.BrowserVersion = _service.BrowserVersion;
+            App.Services.Workspace.BrowserStatus = "WebView2 已就绪";
             _service.Navigate(new Uri("https://www.cctrcloud.net/"));
         }
         catch (WebViewInitializationException exception)
         {
             StatusText.Text = exception.Message + "，请安装 Evergreen Runtime。";
+            App.Services.Workspace.BrowserStatus = StatusText.Text;
         }
         catch (Exception exception)
         {
             StatusText.Text = "浏览器启动失败：" + exception.Message;
+            App.Services.Workspace.BrowserStatus = StatusText.Text;
         }
     }
 
@@ -148,6 +153,10 @@ public sealed partial class BrowserShell : UserControl
         ToolTipService.SetToolTip(AddressBox, _fullAddress);
         ToolTipService.SetToolTip(AddressDisplay, _fullAddress);
         StatusText.Text = args.Message;
+        App.Services.Workspace.CurrentUrl = args.Uri;
+        App.Services.Workspace.BridgeInstalled = _service.IsBridgeInstalled;
+        App.Services.Workspace.BrowserVersion = _service.BrowserVersion;
+        App.Services.Workspace.BrowserStatus = args.Message;
     }
 
     private void OnAddressLostFocus(object sender, RoutedEventArgs args)
@@ -187,10 +196,18 @@ public sealed partial class BrowserShell : UserControl
             : $"{uri.Host} {path.Replace("/", " / ", StringComparison.Ordinal)}";
     }
 
-    private void OnStatusChanged(object? sender, string message) => StatusText.Text = message;
+    private void OnStatusChanged(object? sender, string message)
+    {
+        StatusText.Text = message;
+        App.Services.Workspace.BrowserStatus = message;
+        App.Services.Workspace.BridgeInstalled = _service.IsBridgeInstalled;
+    }
     private void OnProcessFailed(object? sender, string message)
     {
         StatusText.Text = message + "，正在重建 WebView2。";
+        App.Services.Workspace.WebViewInitialized = false;
+        App.Services.Workspace.BridgeInstalled = false;
+        App.Services.Workspace.BrowserStatus = StatusText.Text;
         ProcessFailed?.Invoke(this, message);
     }
 

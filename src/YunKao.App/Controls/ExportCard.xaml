@@ -17,6 +17,11 @@
         </StackPanel>
         <TextBlock x:Name="StateText" Text="READY" HorizontalAlignment="Right" Style="{StaticResource CaptionTextStyle}" />
       </Grid>
+      <ToggleSwitch x:Name="PracticeModeToggle"
+                    Header="练习版"
+                    OffContent="答案版"
+                    OnContent="隐藏答案和解析"
+                    Toggled="OnPracticeModeToggled" />
       <Grid ColumnSpacing="7">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" />
@@ -25,7 +30,17 @@
         </Grid.ColumnDefinitions>
         <controls:LiquidButton x:Name="PdfButton" Grid.Column="0" Label="PDF" Variant="Soft" BackdropMode="Inherited" Click="OnPdfClick" />
         <controls:LiquidButton x:Name="DocxButton" Grid.Column="1" Label="DOCX" Variant="Violet" BackdropMode="Inherited" Click="OnDocxClick" />
-        <controls:LiquidButton x:Name="MoreButton" Grid.Column="2" Label="更多" Variant="Coral" BackdropMode="Inherited" Click="OnMoreClick" />
+        <Button x:Name="MoreButton"
+                Grid.Column="2"
+                Content="更多"
+                Style="{StaticResource QuietButtonStyle}">
+          <Button.Flyout>
+            <MenuFlyout>
+              <MenuFlyoutItem Text="Markdown" Tag="md" Click="OnMoreFormatClick" />
+              <MenuFlyoutItem Text="TXT" Tag="txt" Click="OnMoreFormatClick" />
+            </MenuFlyout>
+          </Button.Flyout>
+        </Button>
       </Grid>
     </StackPanel>
   </Border>

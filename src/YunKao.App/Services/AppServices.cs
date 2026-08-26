@@ -9,6 +9,7 @@ namespace YunKao.Services;
 public sealed class AppServices : IAsyncDisposable
 {
     private readonly HttpClient _httpClient = new() { Timeout = TimeSpan.FromSeconds(45) };
+    private IAsyncDisposable? _workspaceCoordinator;
 
     public AppServices()
     {
@@ -34,6 +35,15 @@ public sealed class AppServices : IAsyncDisposable
     public IReadOnlyList<ExtractionSessionSnapshot> InterruptedSessions { get; private set; } = Array.Empty<ExtractionSessionSnapshot>();
     public event EventHandler? Initialized;
 
+    /// <summary>
+    /// 统一登记工作台生命周期，确保窗口关闭时先保存会话并停止在途任务。
+    /// </summary>
+    public void RegisterWorkspaceCoordinator(IAsyncDisposable coordinator)
+    {
+        ArgumentNullException.ThrowIfNull(coordinator);
+        _workspaceCoordinator = coordinator;
+    }
+
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         AppSettings settings = Settings.Load();
@@ -46,6 +56,11 @@ public sealed class AppServices : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (_workspaceCoordinator is not null)
+        {
+            await _workspaceCoordinator.DisposeAsync().ConfigureAwait(false);
+            _workspaceCoordinator = null;
+        }
         await Exports.DisposeAsync().ConfigureAwait(false);
         await Worker.DisposeAsync().ConfigureAwait(false);
         await AiQueue.DisposeAsync().ConfigureAwait(false);

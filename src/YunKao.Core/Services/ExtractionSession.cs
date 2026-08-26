@@ -27,7 +27,12 @@ public sealed class ExtractionSession
     public int Total { get; private set; }
     public int SavedCount { get { lock (_gate) return _questions.Count; } }
     public int AiPending { get; private set; }
+    public int AiFailedCount { get; private set; }
+    public int DuplicateCount { get; private set; }
+    public int ErrorCount { get; private set; }
     public DateTimeOffset? StartedAt { get; private set; }
+    public DateTimeOffset? EndedAt { get; private set; }
+    public string SourceUrl { get; private set; } = "";
     public string LastQuestionMarker { get; private set; } = "";
     public IReadOnlyList<Question> Questions
     {
@@ -36,7 +41,7 @@ public sealed class ExtractionSession
 
     public event EventHandler? Changed;
 
-    public Guid Start(int total = 0)
+    public Guid Start(int total = 0, string sourceUrl = "")
     {
         lock (_gate)
         {
@@ -45,7 +50,12 @@ public sealed class ExtractionSession
             Current = 0;
             Total = Math.Max(0, total);
             AiPending = 0;
+            AiFailedCount = 0;
+            DuplicateCount = 0;
+            ErrorCount = 0;
             StartedAt = DateTimeOffset.UtcNow;
+            EndedAt = null;
+            SourceUrl = sourceUrl ?? "";
             LastQuestionMarker = "";
             _seenKeys.Clear();
             _questions.Clear();
@@ -86,6 +96,7 @@ public sealed class ExtractionSession
             if (Status is ExtractionStatus.Idle or ExtractionStatus.Completed) return false;
             Status = ExtractionStatus.Idle;
             AiPending = 0;
+            EndedAt = DateTimeOffset.UtcNow;
         }
 
         RaiseChanged();
@@ -101,6 +112,12 @@ public sealed class ExtractionSession
             Current = 0;
             Total = 0;
             AiPending = 0;
+            AiFailedCount = 0;
+            DuplicateCount = 0;
+            ErrorCount = 0;
+            StartedAt = null;
+            EndedAt = null;
+            SourceUrl = "";
             LastQuestionMarker = "";
             _seenKeys.Clear();
             _questions.Clear();
@@ -125,6 +142,7 @@ public sealed class ExtractionSession
             else
             {
                 Status = ExtractionStatus.Completed;
+                EndedAt = DateTimeOffset.UtcNow;
             }
         }
 
@@ -138,6 +156,8 @@ public sealed class ExtractionSession
         {
             Status = ExtractionStatus.Error;
             AiPending = 0;
+            ErrorCount++;
+            EndedAt = DateTimeOffset.UtcNow;
         }
 
         RaiseChanged();
@@ -147,6 +167,7 @@ public sealed class ExtractionSession
     {
         ArgumentNullException.ThrowIfNull(question);
         bool added;
+        bool changed = false;
         lock (_gate)
         {
             if (sessionId != SessionId || Status != ExtractionStatus.Running)
@@ -160,10 +181,16 @@ public sealed class ExtractionSession
             {
                 _questions.Add(question.Clone());
                 LastQuestionMarker = question.Marker;
+                changed = true;
+            }
+            else
+            {
+                DuplicateCount++;
+                changed = true;
             }
         }
 
-        if (added) RaiseChanged();
+        if (changed) RaiseChanged();
         return added;
     }
 
@@ -205,23 +232,69 @@ public sealed class ExtractionSession
         RaiseChanged();
     }
 
-    public void IncrementAiPending()
-    {
-        lock (_gate) AiPending++;
-        RaiseChanged();
-    }
-
-    public void DecrementAiPending()
+    /// <summary>
+    /// 仅允许当前会话更新进度，避免旧异步任务覆盖新会话。
+    /// </summary>
+    public bool TrySetProgress(Guid sessionId, int current, int total, string? marker = null)
     {
         lock (_gate)
         {
+            if (sessionId != SessionId) return false;
+            Current = Math.Max(0, current);
+            Total = Math.Max(0, total);
+            if (marker is not null) LastQuestionMarker = marker;
+        }
+
+        RaiseChanged();
+        return true;
+    }
+
+    /// <summary>
+    /// 为当前会话登记 AI 任务。已清空或替换的旧会话不能影响新任务计数。
+    /// </summary>
+    public bool IncrementAiPending(Guid sessionId)
+    {
+        lock (_gate)
+        {
+            if (sessionId != SessionId) return false;
+            AiPending++;
+        }
+
+        RaiseChanged();
+        return true;
+    }
+
+    /// <summary>
+    /// 为当前会话完成 AI 任务。旧回调直接丢弃，防止状态漂移。
+    /// </summary>
+    public bool CompleteAiTask(Guid sessionId, bool succeeded)
+    {
+        lock (_gate)
+        {
+            if (sessionId != SessionId) return false;
             AiPending = Math.Max(0, AiPending - 1);
+            if (!succeeded) AiFailedCount++;
             if (AiPending == 0 && Status == ExtractionStatus.Completing)
             {
                 Status = ExtractionStatus.Completed;
+                EndedAt = DateTimeOffset.UtcNow;
             }
         }
         RaiseChanged();
+        return true;
+    }
+
+    public bool DecrementAiPending(Guid sessionId) => CompleteAiTask(sessionId, succeeded: true);
+
+    public bool RecordError(Guid sessionId)
+    {
+        lock (_gate)
+        {
+            if (sessionId != SessionId) return false;
+            ErrorCount++;
+        }
+        RaiseChanged();
+        return true;
     }
 
     public bool IsCurrent(Guid sessionId)
@@ -246,7 +319,12 @@ public sealed class ExtractionSession
                 _questions.Select(question => question.Clone()).ToArray(),
                 Current,
                 Total,
-                LastQuestionMarker);
+                LastQuestionMarker,
+                EndedAt,
+                SourceUrl,
+                DuplicateCount,
+                ErrorCount,
+                AiFailedCount);
         }
     }
 
@@ -265,7 +343,12 @@ public sealed class ExtractionSession
             Current = Math.Max(0, snapshot.Current);
             Total = Math.Max(0, snapshot.Total);
             AiPending = 0;
+            AiFailedCount = Math.Max(0, snapshot.AiFailedCount);
+            DuplicateCount = Math.Max(0, snapshot.DuplicateCount);
+            ErrorCount = Math.Max(0, snapshot.ErrorCount);
             LastQuestionMarker = snapshot.LastQuestionMarker ?? "";
+            EndedAt = snapshot.EndedAt;
+            SourceUrl = snapshot.SourceUrl ?? "";
             _questions.Clear();
             _seenKeys.Clear();
             foreach (Question question in snapshot.Questions)

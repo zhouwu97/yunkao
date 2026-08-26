@@ -36,7 +36,8 @@ public sealed partial class HistoryPage : Page
                         Children =
                         {
                             new TextBlock { Text = $"{row.StartedAt.LocalDateTime:yyyy-MM-dd HH:mm:ss} · {row.Status}", Style = (Style)Application.Current.Resources["CardTitleStyle"] },
-                            new TextBlock { Text = $"{row.QuestionCount} 题 · AI {row.AiCount} 题 · {row.Course}", Style = (Style)Application.Current.Resources["SecondaryTextStyle"] },
+                            new TextBlock { Text = $"{row.QuestionCount} 题 · 重复 {row.DuplicateCount} · 异常 {row.ErrorCount} · AI {row.AiCount} 题", Style = (Style)Application.Current.Resources["SecondaryTextStyle"] },
+                            new TextBlock { Text = string.IsNullOrWhiteSpace(row.SourceUrl) ? row.Course : row.SourceUrl, TextTrimming = TextTrimming.CharacterEllipsis, Style = (Style)Application.Current.Resources["CaptionTextStyle"] },
                         },
                     },
                 });

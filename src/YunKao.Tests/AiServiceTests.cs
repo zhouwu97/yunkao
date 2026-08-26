@@ -35,6 +35,34 @@ public sealed class AiServiceTests
         Assert.Equal("test-model", handler.LastBody!.Value.GetProperty("model").GetString());
     }
 
+    [Fact]
+    public async Task Queue_limits_parallel_ai_requests_to_three()
+    {
+        var handler = new DelayedHandler();
+        using var httpClient = new HttpClient(handler);
+        var queue = new AiTaskQueue(new AiService(httpClient));
+        var settings = new AiRequestConfiguration
+        {
+            Provider = "custom",
+            BaseUrl = "https://api.example.com/v1",
+            Model = "test-model",
+            ApiKey = "secret",
+        };
+        try
+        {
+            Task<AiResult>[] tasks = Enumerable.Range(0, 8)
+                .Select(index => queue.EnqueueAsync(
+                    new Question { Title = $"测试题 {index}" }, settings, CancellationToken.None))
+                .ToArray();
+            await Task.WhenAll(tasks);
+            Assert.Equal(3, handler.MaximumConcurrency);
+        }
+        finally
+        {
+            await queue.DisposeAsync();
+        }
+    }
+
     private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> handler) : HttpMessageHandler
     {
         public HttpRequestMessage? LastRequest { get; private set; }
@@ -45,6 +73,36 @@ public sealed class AiServiceTests
             LastRequest = request;
             LastBody = System.Text.Json.JsonDocument.Parse(await request.Content!.ReadAsStringAsync(cancellationToken)).RootElement.Clone();
             return handler(request);
+        }
+    }
+
+    private sealed class DelayedHandler : HttpMessageHandler
+    {
+        private int _inFlight;
+        private int _maximumConcurrency;
+
+        public int MaximumConcurrency => _maximumConcurrency;
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            int current = Interlocked.Increment(ref _inFlight);
+            while (true)
+            {
+                int previous = _maximumConcurrency;
+                if (current <= previous || Interlocked.CompareExchange(ref _maximumConcurrency, current, previous) == previous) break;
+            }
+            try
+            {
+                await Task.Delay(35, cancellationToken);
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("{\"choices\":[{\"message\":{\"content\":\"{\\\"answer\\\":\\\"A\\\",\\\"analysis\\\":\\\"解析\\\",\\\"confidence\\\":0.9}\"}}]}"),
+                };
+            }
+            finally
+            {
+                Interlocked.Decrement(ref _inFlight);
+            }
         }
     }
 }

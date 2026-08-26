@@ -32,8 +32,8 @@
 
         <Border HorizontalAlignment="Right" Background="#42CDEFF2" BorderBrush="#5CFFFFFF" BorderThickness="1" CornerRadius="16" Padding="9,4">
           <StackPanel Orientation="Horizontal" Spacing="6">
-            <Ellipse Width="6" Height="6" Fill="{StaticResource CyanPrimaryBrush}" VerticalAlignment="Center" />
-            <TextBlock Text="本地运行" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" />
+            <Ellipse x:Name="TaskStatusIndicator" Width="6" Height="6" Fill="{StaticResource CyanPrimaryBrush}" VerticalAlignment="Center" />
+            <TextBlock x:Name="TaskStatusText" Text="本地就绪" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" />
           </StackPanel>
         </Border>
       </Grid>

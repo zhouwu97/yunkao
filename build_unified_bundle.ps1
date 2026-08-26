@@ -1,5 +1,6 @@
 param(
-    [switch]$SkipWorker
+    [switch]$SkipWorker,
+    [switch]$SkipTests
 )
 
 $ErrorActionPreference = "Stop"
@@ -7,6 +8,13 @@ $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $versionPath = Join-Path $projectRoot "VERSION"
 $version = (Get-Content -Raw -LiteralPath $versionPath).Trim()
 if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid VERSION: $version" }
+
+if (-not $SkipTests) {
+    & dotnet test (Join-Path $projectRoot "src\YunKao.Tests\YunKao.Tests.csproj") --configuration Debug --no-restore --verbosity minimal
+    if ($LASTEXITCODE -ne 0) { throw "Core regression tests failed: exit code $LASTEXITCODE" }
+    & python -m pytest (Join-Path $projectRoot "tests") -q
+    if ($LASTEXITCODE -ne 0) { throw "Worker regression tests failed: exit code $LASTEXITCODE" }
+}
 
 $artifactName = "yunkao-desktop-v$version-windows-x64"
 $distRoot = Join-Path $projectRoot "dist"
@@ -48,6 +56,18 @@ $readmePath = (Get-ChildItem -LiteralPath $projectRoot -Filter "README_*.txt" | 
 if ([string]::IsNullOrWhiteSpace($readmePath)) { throw "Release README not found" }
 Copy-Item -LiteralPath $readmePath -Destination (Join-Path $artifactDir "README.txt") -Force
 Copy-Item -LiteralPath $versionPath -Destination (Join-Path $artifactDir "VERSION") -Force
+
+$releaseManifest = [ordered]@{
+    version = $version
+    platform = "windows-x64"
+    generatedAt = [DateTimeOffset]::UtcNow.ToString("O")
+    workerSha256 = (Get-FileHash -LiteralPath (Join-Path $artifactDir "worker\YunKao.Worker.exe") -Algorithm SHA256).Hash
+    bridgeSha256 = (Get-FileHash -LiteralPath (Join-Path $artifactDir "Scripts\yunkao-bridge.js") -Algorithm SHA256).Hash
+}
+$releaseManifest | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $artifactDir "release-manifest.json") -Encoding UTF8
+
+& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $projectRoot "tools\verify-release.ps1") -ArtifactPath $artifactDir -ExpectedVersion $version
+if ($LASTEXITCODE -ne 0) { throw "Release integrity verification failed: exit code $LASTEXITCODE" }
 
 & tar.exe -a -c -f $zipPath -C $distRoot $artifactName
 if ($LASTEXITCODE -ne 0) { throw "Archive creation failed: exit code $LASTEXITCODE" }

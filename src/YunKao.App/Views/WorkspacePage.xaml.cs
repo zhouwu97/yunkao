@@ -35,28 +35,12 @@ public sealed partial class WorkspacePage : Page
     {
         if (windowWidth <= 0) return;
 
-        if (windowWidth >= 1180)
+        if (windowWidth >= 1440)
         {
             _narrow = false;
             _drawerOpen = false;
             ConfigureDrawerSurface(narrow: false);
             ControlColumn.Width = new GridLength(328);
-            Grid.SetColumn(ControlPanel, 1);
-            Grid.SetColumnSpan(ControlPanel, 1);
-            ControlPanel.HorizontalAlignment = HorizontalAlignment.Stretch;
-            ControlPanel.Visibility = Visibility.Visible;
-            MotionService.SetTranslateX(ControlPanel, 0);
-            ControlPanel.Opacity = 1;
-            DrawerToggle.Visibility = Visibility.Collapsed;
-            return;
-        }
-
-        if (windowWidth >= 960)
-        {
-            _narrow = false;
-            _drawerOpen = false;
-            ConfigureDrawerSurface(narrow: false);
-            ControlColumn.Width = new GridLength(288);
             Grid.SetColumn(ControlPanel, 1);
             Grid.SetColumnSpan(ControlPanel, 1);
             ControlPanel.HorizontalAlignment = HorizontalAlignment.Stretch;

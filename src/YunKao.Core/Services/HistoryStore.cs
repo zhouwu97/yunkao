@@ -52,7 +52,11 @@ public sealed class HistoryStore : IAsyncDisposable
                     questions_json TEXT NOT NULL,
                     current_position INTEGER NOT NULL DEFAULT 0,
                     total_count INTEGER NOT NULL DEFAULT 0,
-                    last_question_marker TEXT NOT NULL DEFAULT ''
+                    last_question_marker TEXT NOT NULL DEFAULT '',
+                    source_url TEXT NOT NULL DEFAULT '',
+                    duplicate_count INTEGER NOT NULL DEFAULT 0,
+                    error_count INTEGER NOT NULL DEFAULT 0,
+                    ai_failed_count INTEGER NOT NULL DEFAULT 0
                 );
                 CREATE INDEX IF NOT EXISTS ix_extraction_sessions_started_at
                     ON extraction_sessions(started_at DESC);
@@ -66,7 +70,9 @@ public sealed class HistoryStore : IAsyncDisposable
                     file_path TEXT NOT NULL,
                     question_count INTEGER NOT NULL,
                     created_at TEXT NOT NULL,
-                    status TEXT NOT NULL
+                    status TEXT NOT NULL,
+                    session_id TEXT NOT NULL DEFAULT '',
+                    include_answers INTEGER NOT NULL DEFAULT 1
                 );
                 CREATE INDEX IF NOT EXISTS ix_exports_created_at
                     ON exports(created_at DESC);
@@ -86,6 +92,12 @@ public sealed class HistoryStore : IAsyncDisposable
             await EnsureSessionColumnAsync(connection, "current_position", "INTEGER NOT NULL DEFAULT 0", cancellationToken).ConfigureAwait(false);
             await EnsureSessionColumnAsync(connection, "total_count", "INTEGER NOT NULL DEFAULT 0", cancellationToken).ConfigureAwait(false);
             await EnsureSessionColumnAsync(connection, "last_question_marker", "TEXT NOT NULL DEFAULT ''", cancellationToken).ConfigureAwait(false);
+            await EnsureSessionColumnAsync(connection, "source_url", "TEXT NOT NULL DEFAULT ''", cancellationToken).ConfigureAwait(false);
+            await EnsureSessionColumnAsync(connection, "duplicate_count", "INTEGER NOT NULL DEFAULT 0", cancellationToken).ConfigureAwait(false);
+            await EnsureSessionColumnAsync(connection, "error_count", "INTEGER NOT NULL DEFAULT 0", cancellationToken).ConfigureAwait(false);
+            await EnsureSessionColumnAsync(connection, "ai_failed_count", "INTEGER NOT NULL DEFAULT 0", cancellationToken).ConfigureAwait(false);
+            await EnsureExportColumnAsync(connection, "session_id", "TEXT NOT NULL DEFAULT ''", cancellationToken).ConfigureAwait(false);
+            await EnsureExportColumnAsync(connection, "include_answers", "INTEGER NOT NULL DEFAULT 1", cancellationToken).ConfigureAwait(false);
             _initialized = true;
         }
         finally
@@ -109,9 +121,9 @@ public sealed class HistoryStore : IAsyncDisposable
             command.CommandText = """
                 INSERT INTO extraction_sessions
                     (session_id, started_at, completed_at, status, question_count, ai_count, course, questions_json,
-                     current_position, total_count, last_question_marker)
+                     current_position, total_count, last_question_marker, source_url, duplicate_count, error_count, ai_failed_count)
                 VALUES ($session_id, $started_at, $completed_at, $status, $question_count, $ai_count, $course, $questions_json,
-                        $current_position, $total_count, $last_question_marker)
+                        $current_position, $total_count, $last_question_marker, $source_url, $duplicate_count, $error_count, $ai_failed_count)
                 ON CONFLICT(session_id) DO UPDATE SET
                     started_at = excluded.started_at,
                     completed_at = excluded.completed_at,
@@ -122,7 +134,11 @@ public sealed class HistoryStore : IAsyncDisposable
                     questions_json = excluded.questions_json,
                     current_position = excluded.current_position,
                     total_count = excluded.total_count,
-                    last_question_marker = excluded.last_question_marker;
+                    last_question_marker = excluded.last_question_marker,
+                    source_url = excluded.source_url,
+                    duplicate_count = excluded.duplicate_count,
+                    error_count = excluded.error_count,
+                    ai_failed_count = excluded.ai_failed_count;
                 """;
             AddSessionParameters(command, session, course);
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
@@ -142,14 +158,16 @@ public sealed class HistoryStore : IAsyncDisposable
             await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
             await using var command = connection.CreateCommand();
             command.CommandText = """
-                INSERT INTO exports(format, file_path, question_count, created_at, status)
-                VALUES ($format, $file_path, $question_count, $created_at, $status);
+                INSERT INTO exports(format, file_path, question_count, created_at, status, session_id, include_answers)
+                VALUES ($format, $file_path, $question_count, $created_at, $status, $session_id, $include_answers);
                 """;
             command.Parameters.AddWithValue("$format", record.Format);
             command.Parameters.AddWithValue("$file_path", record.FilePath);
             command.Parameters.AddWithValue("$question_count", record.QuestionCount);
             command.Parameters.AddWithValue("$created_at", record.CreatedAt.ToString("O"));
             command.Parameters.AddWithValue("$status", record.Status);
+            command.Parameters.AddWithValue("$session_id", record.SessionId ?? "");
+            command.Parameters.AddWithValue("$include_answers", record.IncludeAnswers ? 1 : 0);
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
         finally
@@ -205,6 +223,73 @@ public sealed class HistoryStore : IAsyncDisposable
         CancellationToken cancellationToken = default)
         => ReadDiagnosticsAsync(before, limit, cancellationToken);
 
+    /// <summary>
+    /// 返回导出关联的题目快照，供导出中心安全地重新导出。
+    /// </summary>
+    public async Task<ExtractionSessionSnapshot?> GetSessionSnapshotAsync(
+        string sessionId,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId)) return null;
+        await InitializeAsync(cancellationToken).ConfigureAwait(false);
+        await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            SELECT session_id, started_at, status, question_count, ai_count, course, questions_json,
+                   current_position, total_count, last_question_marker, completed_at, source_url, duplicate_count, error_count, ai_failed_count
+            FROM extraction_sessions
+            WHERE session_id = $session_id
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$session_id", sessionId);
+        await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+        return await reader.ReadAsync(cancellationToken).ConfigureAwait(false) ? ReadSnapshot(reader) : null;
+    }
+
+    /// <summary>
+    /// 清空本次题目时移除其可恢复快照，避免下次启动把已明确丢弃的会话误判为中断任务。
+    /// </summary>
+    public async Task DeleteSessionAsync(string sessionId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId)) return;
+        await InitializeAsync(cancellationToken).ConfigureAwait(false);
+        await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "DELETE FROM extraction_sessions WHERE session_id = $session_id;";
+            command.Parameters.AddWithValue("$session_id", sessionId);
+            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
+    }
+
+    /// <summary>
+    /// 仅删除本地记录，不删除用户已经生成的文件。
+    /// </summary>
+    public async Task DeleteExportAsync(long exportId, CancellationToken cancellationToken = default)
+    {
+        if (exportId <= 0) return;
+        await InitializeAsync(cancellationToken).ConfigureAwait(false);
+        await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
+            await using var command = connection.CreateCommand();
+            command.CommandText = "DELETE FROM exports WHERE id = $id;";
+            command.Parameters.AddWithValue("$id", exportId);
+            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
+    }
+
     public async Task<IReadOnlyList<ExtractionSessionSnapshot>> GetInterruptedSessionsAsync(
         CancellationToken cancellationToken = default)
     {
@@ -213,7 +298,7 @@ public sealed class HistoryStore : IAsyncDisposable
         await using var command = connection.CreateCommand();
         command.CommandText = """
             SELECT session_id, started_at, status, question_count, ai_count, course, questions_json,
-                   current_position, total_count, last_question_marker
+                   current_position, total_count, last_question_marker, completed_at, source_url, duplicate_count, error_count, ai_failed_count
             FROM extraction_sessions
             WHERE status = 'interrupted'
             ORDER BY started_at DESC;
@@ -239,7 +324,8 @@ public sealed class HistoryStore : IAsyncDisposable
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT id, session_id, started_at, completed_at, status, question_count, ai_count, course
+            SELECT id, session_id, started_at, completed_at, status, question_count, ai_count, course,
+                   source_url, duplicate_count, error_count
             FROM extraction_sessions
             WHERE ($before IS NULL OR started_at < $before)
             ORDER BY started_at DESC
@@ -254,7 +340,8 @@ public sealed class HistoryStore : IAsyncDisposable
             rows.Add(new ExtractionSessionRecord(
                 reader.GetInt64(0), reader.GetString(1), DateTimeOffset.Parse(reader.GetString(2)),
                 reader.IsDBNull(3) ? null : DateTimeOffset.Parse(reader.GetString(3)), reader.GetString(4),
-                reader.GetInt32(5), reader.GetInt32(6), reader.GetString(7)));
+                reader.GetInt32(5), reader.GetInt32(6), reader.GetString(7), reader.GetString(8),
+                reader.GetInt32(9), reader.GetInt32(10)));
         }
         return rows;
     }
@@ -266,7 +353,7 @@ public sealed class HistoryStore : IAsyncDisposable
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
         command.CommandText = """
-            SELECT id, format, file_path, question_count, created_at, status
+            SELECT id, format, file_path, question_count, created_at, status, session_id, include_answers
             FROM exports
             WHERE ($before IS NULL OR created_at < $before)
             ORDER BY created_at DESC
@@ -280,7 +367,8 @@ public sealed class HistoryStore : IAsyncDisposable
         {
             rows.Add(new ExportRecord(
                 reader.GetInt64(0), reader.GetString(1), reader.GetString(2), reader.GetInt32(3),
-                DateTimeOffset.Parse(reader.GetString(4)), reader.GetString(5)));
+                DateTimeOffset.Parse(reader.GetString(4)), reader.GetString(5),
+                reader.GetString(6), reader.GetInt32(7) != 0));
         }
         return rows;
     }
@@ -331,9 +419,7 @@ public sealed class HistoryStore : IAsyncDisposable
     {
         command.Parameters.AddWithValue("$session_id", session.SessionId.ToString("N"));
         command.Parameters.AddWithValue("$started_at", (session.StartedAt ?? DateTimeOffset.UtcNow).ToString("O"));
-        command.Parameters.AddWithValue("$completed_at", session.Status == ExtractionStatus.Completed
-            ? DateTimeOffset.UtcNow.ToString("O")
-            : DBNull.Value);
+        command.Parameters.AddWithValue("$completed_at", session.EndedAt?.ToString("O") ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("$status", session.Status.ToString());
         command.Parameters.AddWithValue("$question_count", session.SavedCount);
         command.Parameters.AddWithValue("$ai_count", session.Questions.Count(question => question.AnswerSource == "ai"));
@@ -342,6 +428,10 @@ public sealed class HistoryStore : IAsyncDisposable
         command.Parameters.AddWithValue("$current_position", session.Current);
         command.Parameters.AddWithValue("$total_count", session.Total);
         command.Parameters.AddWithValue("$last_question_marker", session.LastQuestionMarker);
+        command.Parameters.AddWithValue("$source_url", session.SourceUrl);
+        command.Parameters.AddWithValue("$duplicate_count", session.DuplicateCount);
+        command.Parameters.AddWithValue("$error_count", session.ErrorCount);
+        command.Parameters.AddWithValue("$ai_failed_count", session.AiFailedCount);
     }
 
     private ExtractionSessionSnapshot ReadSnapshot(SqliteDataReader reader)
@@ -351,7 +441,9 @@ public sealed class HistoryStore : IAsyncDisposable
         return new ExtractionSessionSnapshot(
             reader.GetString(0), DateTimeOffset.Parse(reader.GetString(1)), reader.GetString(2),
             reader.GetInt32(3), reader.GetInt32(4), reader.GetString(5), questions,
-            reader.GetInt32(7), reader.GetInt32(8), reader.GetString(9));
+            reader.GetInt32(7), reader.GetInt32(8), reader.GetString(9),
+            reader.IsDBNull(10) ? null : DateTimeOffset.Parse(reader.GetString(10)),
+            reader.GetString(11), reader.GetInt32(12), reader.GetInt32(13), reader.GetInt32(14));
     }
 
     private static async Task EnsureSessionColumnAsync(
@@ -369,6 +461,24 @@ public sealed class HistoryStore : IAsyncDisposable
         catch (SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
         {
             // 旧版本数据库已经完成过该列迁移，继续执行其余启动流程。
+        }
+    }
+
+    private static async Task EnsureExportColumnAsync(
+        SqliteConnection connection,
+        string columnName,
+        string definition,
+        CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = $"ALTER TABLE exports ADD COLUMN {columnName} {definition};";
+        try
+        {
+            await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (SqliteException exception) when (exception.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
+        {
+            // 已升级过的本地数据库无需重复迁移。
         }
     }
 

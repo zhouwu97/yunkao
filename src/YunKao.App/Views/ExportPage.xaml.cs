@@ -1,7 +1,9 @@
 using System.Diagnostics;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Windows.ApplicationModel.DataTransfer;
 using YunKao.Core.Models;
+using YunKao.Services;
 
 namespace YunKao.Views;
 
@@ -29,14 +31,15 @@ public sealed partial class ExportPage : Page
             IReadOnlyList<ExportRecord> rows = await App.Services.History.GetExportsAsync(_cursor, 50);
             foreach (ExportRecord row in rows)
             {
-                var openButton = new Button
+                var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
+                actions.Children.Add(CreateActionButton("打开", row, OnOpenClick));
+                actions.Children.Add(CreateActionButton("文件夹", row, OnOpenFolderClick));
+                actions.Children.Add(CreateActionButton("复制路径", row, OnCopyPathClick));
+                if (!string.IsNullOrWhiteSpace(row.SessionId))
                 {
-                    Content = "打开",
-                    Tag = row.FilePath,
-                    Style = (Style)Application.Current.Resources["QuietButtonStyle"],
-                    HorizontalAlignment = HorizontalAlignment.Right,
-                };
-                openButton.Click += OnOpenClick;
+                    actions.Children.Add(CreateActionButton("重新导出", row, OnReExportClick));
+                }
+                actions.Children.Add(CreateActionButton("删除记录", row, OnDeleteRecordClick));
                 var grid = new Grid { ColumnSpacing = 10 };
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
                 grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -50,9 +53,9 @@ public sealed partial class ExportPage : Page
                     },
                 };
                 Grid.SetColumn(text, 0);
-                Grid.SetColumn(openButton, 1);
+                Grid.SetColumn(actions, 1);
                 grid.Children.Add(text);
-                grid.Children.Add(openButton);
+                grid.Children.Add(actions);
                 ExportsList.Items.Add(new ListViewItem { Content = grid });
             }
 
@@ -69,9 +72,141 @@ public sealed partial class ExportPage : Page
         finally { _loading = false; }
     }
 
+    private static Button CreateActionButton(string label, ExportRecord record, RoutedEventHandler handler)
+    {
+        var button = new Button
+        {
+            Content = label,
+            Tag = record,
+            Style = (Style)Application.Current.Resources["QuietButtonStyle"],
+        };
+        button.Click += handler;
+        return button;
+    }
+
     private void OnOpenClick(object sender, RoutedEventArgs args)
     {
-        if (sender is not Button button || button.Tag is not string path || !File.Exists(path)) return;
-        Process.Start(new ProcessStartInfo(path) { UseShellExecute = true });
+        if (!TryGetRecord(sender, out ExportRecord record)) return;
+        if (!File.Exists(record.FilePath))
+        {
+            StatusText.Text = "导出文件已不存在：" + record.FilePath;
+            return;
+        }
+        Process.Start(new ProcessStartInfo(record.FilePath) { UseShellExecute = true });
+        StatusText.Text = "已打开文件";
+    }
+
+    private void OnOpenFolderClick(object sender, RoutedEventArgs args)
+    {
+        if (!TryGetRecord(sender, out ExportRecord record)) return;
+        string? directory = Path.GetDirectoryName(record.FilePath);
+        if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
+        {
+            StatusText.Text = "导出目录已不存在：" + (directory ?? record.FilePath);
+            return;
+        }
+        Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true });
+        StatusText.Text = "已打开所在文件夹";
+    }
+
+    private void OnCopyPathClick(object sender, RoutedEventArgs args)
+    {
+        if (!TryGetRecord(sender, out ExportRecord record)) return;
+        var data = new DataPackage();
+        data.SetText(record.FilePath);
+        Clipboard.SetContent(data);
+        StatusText.Text = "文件路径已复制";
+    }
+
+    private async void OnReExportClick(object sender, RoutedEventArgs args)
+    {
+        if (!TryGetRecord(sender, out ExportRecord record)) return;
+        try
+        {
+            ExtractionSessionSnapshot? snapshot = await App.Services.History.GetSessionSnapshotAsync(record.SessionId);
+            if (snapshot is null || snapshot.Questions.Count == 0)
+            {
+                StatusText.Text = "找不到可重新导出的题目快照";
+                return;
+            }
+
+            AppSettings settings = App.Services.Settings.Load();
+            string format = NormalizeFormat(record.Format);
+            string extension = format;
+            string directory = string.IsNullOrWhiteSpace(settings.DefaultExportDirectory)
+                ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+                : settings.DefaultExportDirectory;
+            Directory.CreateDirectory(directory);
+            string path = Path.Combine(directory,
+                $"{settings.ExportPrefix}_{DateTime.Now:yyyyMMdd_HHmmss}_{Guid.NewGuid():N}.{extension}");
+            StatusText.Text = $"正在重新导出 {snapshot.Questions.Count} 题…";
+            ExportResult result = await App.Services.Exports.ExportAsync(
+                new ExportRequest(
+                    format,
+                    path,
+                    snapshot.Questions.Select(question => question.Clone()).ToArray(),
+                    record.IncludeAnswers,
+                    Watermark: true));
+            await App.Services.History.SaveExportAsync(new ExportRecord(
+                0,
+                result.Format.ToUpperInvariant(),
+                result.FilePath,
+                result.QuestionCount,
+                DateTimeOffset.Now,
+                "completed",
+                snapshot.SessionId,
+                record.IncludeAnswers));
+            if (settings.AutoOpenAfterExport)
+            {
+                Process.Start(new ProcessStartInfo(result.FilePath) { UseShellExecute = true });
+            }
+            StatusText.Text = "重新导出完成";
+            await LoadAsync(reset: true);
+        }
+        catch (Exception exception)
+        {
+            StatusText.Text = "重新导出失败：" + exception.Message;
+            App.Services.Diagnostics.Error("历史导出重新生成失败", exception);
+        }
+    }
+
+    private async void OnDeleteRecordClick(object sender, RoutedEventArgs args)
+    {
+        if (!TryGetRecord(sender, out ExportRecord record)) return;
+        var confirmation = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = "删除导出记录？",
+            Content = "仅删除本地记录，不会删除已生成的文件。",
+            PrimaryButtonText = "删除记录",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Close,
+        };
+        if (await confirmation.ShowAsync() != ContentDialogResult.Primary) return;
+        await App.Services.History.DeleteExportAsync(record.Id);
+        StatusText.Text = "导出记录已删除，文件未受影响";
+        await LoadAsync(reset: true);
+    }
+
+    private static bool TryGetRecord(object sender, out ExportRecord record)
+    {
+        if (sender is Button { Tag: ExportRecord item })
+        {
+            record = item;
+            return true;
+        }
+        record = default!;
+        return false;
+    }
+
+    private static string NormalizeFormat(string format)
+    {
+        string normalized = (format ?? "").Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "markdown" or "md" => "md",
+            "txt" or "docx" or "pdf" => normalized,
+            _ => throw new InvalidOperationException("历史记录包含不支持的导出格式。"),
+        };
     }
 }

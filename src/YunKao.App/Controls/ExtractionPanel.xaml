@@ -22,6 +22,17 @@
                  TextWrapping="Wrap"
                  Style="{StaticResource SecondaryTextStyle}" />
       <controls:LiquidButton x:Name="StartButton" Label="开始提取" Click="OnStartClick" Variant="Primary" BackdropMode="Inherited" />
+      <Button x:Name="MoreButton"
+              Content="更多"
+              HorizontalAlignment="Left"
+              Style="{StaticResource QuietButtonStyle}">
+        <Button.Flyout>
+          <MenuFlyout>
+            <MenuFlyoutItem Text="清空本次题目" Click="OnClearClick" />
+            <MenuFlyoutItem Text="重新开始" Click="OnRestartClick" />
+          </MenuFlyout>
+        </Button.Flyout>
+      </Button>
       <controls:LiquidButton x:Name="RestoreButton" Label="恢复上次" Click="OnRestoreClick" Variant="Ghost" BackdropMode="Inherited" Visibility="Collapsed" />
       <Grid ColumnSpacing="8">
         <Grid.ColumnDefinitions>

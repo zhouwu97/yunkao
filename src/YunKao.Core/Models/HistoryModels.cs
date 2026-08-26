@@ -8,7 +8,10 @@ public sealed record ExtractionSessionRecord(
     string Status,
     int QuestionCount,
     int AiCount,
-    string Course);
+    string Course,
+    string SourceUrl = "",
+    int DuplicateCount = 0,
+    int ErrorCount = 0);
 
 public sealed record ExtractionSessionSnapshot(
     string SessionId,
@@ -20,7 +23,12 @@ public sealed record ExtractionSessionSnapshot(
     IReadOnlyList<Question> Questions,
     int Current = 0,
     int Total = 0,
-    string LastQuestionMarker = "");
+    string LastQuestionMarker = "",
+    DateTimeOffset? EndedAt = null,
+    string SourceUrl = "",
+    int DuplicateCount = 0,
+    int ErrorCount = 0,
+    int AiFailedCount = 0);
 
 public sealed record ExportRecord(
     long Id,
@@ -28,7 +36,9 @@ public sealed record ExportRecord(
     string FilePath,
     int QuestionCount,
     DateTimeOffset CreatedAt,
-    string Status);
+    string Status,
+    string SessionId = "",
+    bool IncludeAnswers = true);
 
 public sealed record DiagnosticRecord(
     long Id,

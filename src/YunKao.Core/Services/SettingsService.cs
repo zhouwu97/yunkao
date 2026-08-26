@@ -300,6 +300,24 @@ public sealed class SettingsService
         else _credentials.Set(YunKaoCredentialService, account, password);
     }
 
+    /// <summary>
+    /// 只读探测凭据库，诊断页可据此区分配置缺失和系统凭据库不可用。
+    /// </summary>
+    public bool TryGetCredentialStoreStatus(out string message)
+    {
+        try
+        {
+            _ = _credentials.Get(YunKaoCredentialService, "__diagnostic_probe__");
+            message = "可用";
+            return true;
+        }
+        catch (Exception exception)
+        {
+            message = "不可用：" + exception.Message;
+            return false;
+        }
+    }
+
     private static ICredentialStore CreateDefaultCredentialStore()
     {
         return OperatingSystem.IsWindows() ? new WindowsCredentialStore() : new InMemoryCredentialStore();

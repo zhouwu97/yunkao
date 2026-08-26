@@ -44,6 +44,7 @@ public sealed class WebViewService : IAsyncDisposable
     public bool IsInitialized => _core is not null;
     public bool IsBridgeInstalled { get; private set; }
     public Uri? CurrentUri { get; private set; }
+    public string BrowserVersion => _core?.Environment.BrowserVersionString ?? "未初始化";
 
     public event EventHandler<BrowserNavigationEventArgs>? NavigationChanged;
     public event EventHandler<BridgeMessageEventArgs>? BridgeMessageReceived;

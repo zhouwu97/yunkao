@@ -12,4 +12,8 @@ public sealed class WorkspaceRuntime
     public string CurrentCourse { get; set; } = "";
     public bool AuthExpired { get; set; }
     public bool PermissionDenied { get; set; }
+    public bool WebViewInitialized { get; set; }
+    public bool BridgeInstalled { get; set; }
+    public string BrowserVersion { get; set; } = "未初始化";
+    public string BrowserStatus { get; set; } = "等待 WebView2";
 }

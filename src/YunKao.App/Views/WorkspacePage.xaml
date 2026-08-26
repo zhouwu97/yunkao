@@ -51,14 +51,12 @@
               </controls:LiquidCard>
 
               <controls:LiquidCard x:Name="ToolsCard" Variant="Violet" Padding="14">
-                <StackPanel Spacing="12">
-                  <controls:ExportCard x:Name="Export" />
-                  <Border Height="1" Background="{StaticResource LiquidInnerBorderBrush}" />
-                  <controls:AiStatusCard x:Name="AiStatus" />
-                </StackPanel>
+                <controls:ExportCard x:Name="Export" />
               </controls:LiquidCard>
 
-              <controls:EventList x:Name="Events" />
+              <!-- AI 运行细节和事件仅进入诊断页，工作台只保留下一步决策所需的信息。 -->
+              <controls:AiStatusCard x:Name="AiStatus" Visibility="Collapsed" />
+              <controls:EventList x:Name="Events" Visibility="Collapsed" />
             </StackPanel>
           </ScrollViewer>
         </Border>

@@ -53,14 +53,18 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         _aiStatus = aiStatus;
         _events = events;
         _session = services.Workspace.Session;
+        _services.RegisterWorkspaceCoordinator(this);
         _imageResolver = new ImageResolver(browser.Service);
         _markerLoop = ProcessMarkerQueueAsync(_lifetimeCancellation.Token);
 
         _panel.StartRequested += (_, _) => Track(StartAsync());
         _panel.PauseRequested += (_, _) => TogglePause();
         _panel.StopRequested += (_, _) => Stop();
+        _panel.ClearRequested += (_, _) => ClearCurrentSession();
+        _panel.RestartRequested += (_, _) => RestartCurrentSession();
         _panel.RestoreRequested += (_, _) => RestoreInterruptedSession();
         _export.ExportRequested += (_, format) => Track(ExportAsync(format));
+        _export.PracticeModeChanged += OnPracticeModeChanged;
         _browser.BridgeMessageReceived += OnBridgeMessageReceived;
         _browser.ProcessFailed += OnBrowserProcessFailed;
         _browser.Service.HttpStatusChanged += OnHttpStatusChanged;
@@ -68,6 +72,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         _services.Exports.ProgressChanged += OnExportProgress;
         _services.Initialized += OnServicesInitialized;
         if (_browser.Service.IsBridgeInstalled) Track(FillCredentialsOnBridgeReadyAsync());
+        _export.SetPracticeMode(_services.Settings.Load().ExportWithoutAnswers);
         RenderInterruptedPrompt();
     }
 
@@ -91,13 +96,13 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
             }
             else
             {
-                _sessionId = _session.Start();
+                _sessionId = _session.Start(sourceUrl: _browser.Service.CurrentUri?.AbsoluteUri ?? "");
             }
             _lastProcessedMarker = "";
             _workerRestarted = false;
             _services.Workspace.AuthExpired = false;
             _services.Workspace.PermissionDenied = false;
-            _panel.SetState("正在启动", running: true, paused: false);
+            _panel.SetState(ExtractionStatus.Running, _session.SavedCount);
             _events.Add("开始提取：准备 Worker");
 
             try
@@ -159,6 +164,27 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         Track(PersistSessionAsync());
     }
 
+    /// <summary>
+    /// 清空当前题目并取消其提取/AI 生命周期；正在导出的快照不受影响。
+    /// </summary>
+    public void ClearCurrentSession()
+    {
+        string clearedSessionId = _session.SessionId == Guid.Empty ? "" : _session.SessionId.ToString("N");
+        _extractionCancellation?.Cancel();
+        _aiCancellation?.Cancel();
+        _restoredSessionPending = false;
+        _lastProcessedMarker = "";
+        _session.Clear();
+        if (!string.IsNullOrWhiteSpace(clearedSessionId)) Track(_services.History.DeleteSessionAsync(clearedSessionId));
+        _events.Add("已清空本次题目，可重新开始提取");
+    }
+
+    public void RestartCurrentSession()
+    {
+        ClearCurrentSession();
+        Track(StartAsync());
+    }
+
     public async Task ExportAsync(string format)
     {
         IReadOnlyList<Question> snapshot = _session.Questions;
@@ -168,7 +194,6 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
             return;
         }
 
-        if (format == "more") format = "md";
         AppSettings settings = _services.Settings.Load();
         string directory = string.IsNullOrWhiteSpace(settings.DefaultExportDirectory)
             ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
@@ -201,7 +226,9 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
                 result.FilePath,
                 result.QuestionCount,
                 DateTimeOffset.Now,
-                "completed");
+                "completed",
+                _session.SessionId.ToString("N"),
+                !settings.ExportWithoutAnswers);
             await _services.History.SaveExportAsync(record).ConfigureAwait(true);
             _events.Add($"导出完成：{result.FilePath}");
             if (settings.AutoOpenAfterExport)
@@ -242,6 +269,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         _browser.Service.HttpStatusChanged -= OnHttpStatusChanged;
         _session.Changed -= OnSessionChanged;
         _services.Exports.ProgressChanged -= OnExportProgress;
+        _export.PracticeModeChanged -= OnPracticeModeChanged;
         _services.Initialized -= OnServicesInitialized;
         try
         {
@@ -392,7 +420,11 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
                 {
                     _services.Diagnostics.Error("题目处理失败", exception);
                     _events.Add("题目处理失败：" + exception.Message, warning: true);
-                    if (_session.Status == ExtractionStatus.Running) _session.Fail();
+                    if (_session.Status == ExtractionStatus.Running)
+                    {
+                        _session.Fail();
+                        Track(PersistSessionAsync());
+                    }
                 }
             }
         }
@@ -422,14 +454,16 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
 
         if (TryReadProgress(marker.Message, out int current, out int total))
         {
-            _session.SetProgress(current, total, question.Marker);
+            _session.TrySetProgress(marker.SessionId, current, total, question.Marker);
         }
 
-        bool added = _session.TryAddQuestion(_sessionId, question);
+        bool added = _session.TryAddQuestion(marker.SessionId, question);
+        if (!_session.IsCurrent(marker.SessionId)) return;
         _lastProcessedMarker = question.Marker;
         if (!added)
         {
             _events.Add($"跳过重复题：{TrimForEvent(question.Title)}");
+            Track(PersistSessionAsync());
         }
         else
         {
@@ -437,14 +471,17 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
             Track(PersistSessionAsync());
             if (string.IsNullOrWhiteSpace(question.Answer) && _services.Settings.Load().AiEnabled)
             {
-                _session.IncrementAiPending();
-                Track(FillAiAsync(_sessionId, question, _aiCancellation?.Token ?? CancellationToken.None));
+                if (_session.IncrementAiPending(marker.SessionId))
+                {
+                    Track(FillAiAsync(marker.SessionId, question, _aiCancellation?.Token ?? CancellationToken.None));
+                }
             }
         }
 
         if (_session.Total > 0 && _session.Current >= _session.Total)
         {
             _session.Complete();
+            Track(PersistSessionAsync());
             return;
         }
 
@@ -456,20 +493,21 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
             return;
         }
 
-        await WaitForNextMarkerAsync(question.Marker, cancellationToken).ConfigureAwait(true);
+        await WaitForNextMarkerAsync(marker.SessionId, question.Marker, cancellationToken).ConfigureAwait(true);
     }
 
-    private async Task WaitForNextMarkerAsync(string previousMarker, CancellationToken cancellationToken)
+    private async Task WaitForNextMarkerAsync(Guid sessionId, string previousMarker, CancellationToken cancellationToken)
     {
         await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken).ConfigureAwait(true);
+        if (!_session.IsCurrent(sessionId)) return;
         string marker = await _browser.Service.ReadQuestionMarkerAsync(cancellationToken).ConfigureAwait(true);
         if (!string.IsNullOrWhiteSpace(marker) && !string.Equals(marker, previousMarker, StringComparison.Ordinal))
         {
-            _markerQueue.Writer.TryWrite(new QuestionMarker(_sessionId, CreateMarkerJson(marker), 0));
+            _markerQueue.Writer.TryWrite(new QuestionMarker(sessionId, CreateMarkerJson(marker), 0));
             return;
         }
 
-        if (_session.Status == ExtractionStatus.Running)
+        if (_session.IsCurrent(sessionId) && _session.Status == ExtractionStatus.Running)
         {
             _events.Add("等待下一题超时，提取已暂停，请检查网络或页面", warning: true);
             _session.Pause();
@@ -478,6 +516,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
 
     private async Task FillAiAsync(Guid sessionId, Question question, CancellationToken parentToken)
     {
+        bool succeeded = false;
         try
         {
             AppSettings settings = _services.Settings.Load();
@@ -498,6 +537,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
                 item.AnalysisSource = "ai";
                 item.AnswerConfidence = result.Confidence;
             });
+            succeeded = true;
             Track(PersistSessionAsync());
             SetAiStatus("已补全", $"置信度 {result.Confidence:0.00}");
         }
@@ -514,7 +554,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         }
         finally
         {
-            _session.DecrementAiPending();
+            if (_session.CompleteAiTask(sessionId, succeeded)) Track(PersistSessionAsync());
         }
     }
 
@@ -546,17 +586,8 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
     {
         void Render()
         {
-            bool running = _session.Status == ExtractionStatus.Running;
-            bool paused = _session.Status == ExtractionStatus.Paused;
-            _panel.SetState(_session.Status switch
-            {
-                ExtractionStatus.Running => "提取中",
-                ExtractionStatus.Paused => "已暂停",
-                ExtractionStatus.Completing => "等待 AI 完成",
-                ExtractionStatus.Completed => "已完成",
-                ExtractionStatus.Error => "异常",
-                _ => _session.SavedCount > 0 ? "已停止 · 可导出" : "等待开始",
-            }, running, paused);
+            App.MainWindow?.SetTaskState(_session.Status);
+            _panel.SetState(_session.Status, _session.SavedCount);
             _progress.SetProgress(_session.Current, _session.Total,
                 $"已保存 {_session.SavedCount} 题 · AI 待处理 {_session.AiPending}", _session.SavedCount, _session.AiPending);
         }
@@ -568,11 +599,26 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
     {
         void Render()
         {
-            _progress.SetProgress(progress.Current, progress.Total, progress.Message);
+            _export.SetExportProgress(progress.Current, progress.Total, progress.Message);
             _events.Add(progress.Message);
         }
 
         if (!_progress.DispatcherQueue.TryEnqueue(Render)) Render();
+    }
+
+    private void OnPracticeModeChanged(object? sender, bool enabled)
+    {
+        try
+        {
+            AppSettings settings = _services.Settings.Load();
+            settings.ExportWithoutAnswers = enabled;
+            _services.Settings.Save(settings);
+            _events.Add(enabled ? "已切换为练习版导出" : "已切换为答案版导出");
+        }
+        catch (Exception exception)
+        {
+            _services.Diagnostics.Error("保存练习版设置失败", exception);
+        }
     }
 
     private void Track(Task task)

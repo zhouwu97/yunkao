@@ -27,6 +27,9 @@ public sealed class DiagnosticLog
 
     public event EventHandler<DiagnosticRecord>? EntryAdded;
 
+    public string LogPath => _logPath;
+    public string LogDirectory => Path.GetDirectoryName(_logPath) ?? "";
+
     public IReadOnlyList<DiagnosticRecord> Entries
     {
         get { lock (_gate) return _entries.ToArray(); }

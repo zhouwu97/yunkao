@@ -14,14 +14,26 @@ public sealed class HistoryStoreTests
         {
             var store = new HistoryStore(Path.Combine(root, "yunkao.db"));
             var session = new ExtractionSession();
-            Guid id = session.Start();
+            Guid id = session.Start(sourceUrl: "https://www.cctrcloud.net/practice/demo");
+            session.TryAddQuestion(id, new Question { Title = "测试题" });
             session.TryAddQuestion(id, new Question { Title = "测试题" });
             session.Complete();
             await store.SaveSessionAsync(session, "测试课程");
-            await store.SaveExportAsync(new ExportRecord(0, "MD", "test.md", 1, DateTimeOffset.UtcNow, "completed"));
+            await store.SaveExportAsync(new ExportRecord(
+                0, "MD", "test.md", 1, DateTimeOffset.UtcNow, "completed", id.ToString("N"), IncludeAnswers: false));
 
-            Assert.Single(await store.GetSessionsAsync());
-            Assert.Single(await store.GetExportsAsync());
+            ExtractionSessionRecord savedSession = Assert.Single(await store.GetSessionsAsync());
+            Assert.Equal("https://www.cctrcloud.net/practice/demo", savedSession.SourceUrl);
+            Assert.Equal(1, savedSession.DuplicateCount);
+            Assert.NotNull(savedSession.CompletedAt);
+            ExportRecord export = Assert.Single(await store.GetExportsAsync());
+            Assert.Equal(id.ToString("N"), export.SessionId);
+            Assert.False(export.IncludeAnswers);
+            Assert.NotNull(await store.GetSessionSnapshotAsync(id.ToString("N")));
+            await store.DeleteExportAsync(export.Id);
+            Assert.Empty(await store.GetExportsAsync());
+            await store.DeleteSessionAsync(id.ToString("N"));
+            Assert.Null(await store.GetSessionSnapshotAsync(id.ToString("N")));
             await store.DisposeAsync();
         }
         finally

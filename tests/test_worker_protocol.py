@@ -92,6 +92,57 @@ class WorkerProtocolTests(unittest.TestCase):
                 if process.stderr is not None:
                     process.stderr.close()
 
+    def test_worker_protocol_parses_all_supported_question_fixtures(self):
+        fixtures = {
+            "single.html": "single-001",
+            "multiple.html": "multiple-001",
+            "judgment.html": "judgment-001",
+            "image.html": "image-001",
+            "mathjax.html": "mathjax-001",
+            "long.html": "long-001",
+        }
+        process = subprocess.Popen(
+            [sys.executable, str(ROOT / "worker" / "worker_main.py")],
+            cwd=ROOT,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env={**os.environ, "PYTHONUNBUFFERED": "1"},
+        )
+        assert process.stdin is not None
+        assert process.stdout is not None
+        try:
+            for index, (name, question_id) in enumerate(fixtures.items(), start=1):
+                self._send(
+                    process,
+                    {
+                        "protocol": 1,
+                        "id": f"fixture-{index}",
+                        "method": "parseQuestion",
+                        "params": {
+                            "html": (ROOT / "tests" / "fixtures" / name).read_text(encoding="utf-8"),
+                            "baseUrl": "https://www.cctrcloud.net/practice/",
+                        },
+                    },
+                )
+                response = self._read_until(process, f"fixture-{index}")
+                self.assertTrue(response["ok"], name)
+                self.assertEqual(response["result"]["question_id"], question_id)
+
+            self._send(process, {"protocol": 1, "id": "shutdown", "method": "shutdown", "params": {}})
+            self.assertTrue(self._read_until(process, "shutdown")["ok"])
+            process.wait(timeout=5)
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=5)
+            if process.stdin is not None:
+                process.stdin.close()
+            if process.stdout is not None:
+                process.stdout.close()
+            if process.stderr is not None:
+                process.stderr.close()
+
     @staticmethod
     def _send(process: subprocess.Popen, message: dict) -> None:
         assert process.stdin is not None

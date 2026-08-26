@@ -82,7 +82,12 @@ public sealed class AiService(HttpClient httpClient)
                     HttpCompletionOption.ResponseHeadersRead,
                     cancellationToken).ConfigureAwait(false);
             }
-            catch (HttpRequestException) when (attempt < 3)
+            catch (HttpRequestException) when (attempt < 4)
+            {
+                await Task.Delay(GetRetryDelay(attempt), cancellationToken).ConfigureAwait(false);
+                continue;
+            }
+            catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested && attempt < 4)
             {
                 await Task.Delay(GetRetryDelay(attempt), cancellationToken).ConfigureAwait(false);
                 continue;
@@ -92,7 +97,7 @@ public sealed class AiService(HttpClient httpClient)
             {
                 if (!response.IsSuccessStatusCode)
                 {
-                    if (IsRetryable((int)response.StatusCode) && attempt < 3)
+                    if (IsRetryable((int)response.StatusCode) && attempt < 4)
                     {
                         TimeSpan delay = GetRetryAfter(response) ?? GetRetryDelay(attempt);
                         await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
@@ -125,9 +130,8 @@ public sealed class AiService(HttpClient httpClient)
 
     private static TimeSpan GetRetryDelay(int attempt)
     {
-        double[] delays = [0.5, 1.2, 2.5];
-        double jitter = Random.Shared.NextDouble() * 0.2;
-        return TimeSpan.FromSeconds(delays[Math.Min(attempt, delays.Length - 1)] + jitter);
+        double[] delays = [1, 2, 4, 8];
+        return TimeSpan.FromSeconds(delays[Math.Min(attempt, delays.Length - 1)]);
     }
 
     public static AiResult ParseResponse(JsonElement root)

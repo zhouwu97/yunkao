@@ -1,8 +1,10 @@
 using Microsoft.UI.Windowing;
 using Microsoft.UI;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Media;
 using WinRT.Interop;
 using YunKao.Controls;
+using YunKao.Core.Services;
 using YunKao.Services;
 using YunKao.Views;
 using Windows.Graphics;
@@ -76,9 +78,9 @@ public sealed partial class MainWindow : Window
     private void OnRootGridSizeChanged(object sender, Microsoft.UI.Xaml.SizeChangedEventArgs args)
     {
         double width = args.NewSize.Width;
-        double railWidth = width >= 1180 ? 68 : width >= 960 ? 64 : 60;
+        double railWidth = width >= 1440 ? 68 : width >= 1100 ? 64 : 56;
         NavigationColumn.Width = new GridLength(railWidth);
-        bool compact = width < 1180;
+        bool compact = width < 1440;
         NavigationRail.SetCompact(compact);
         if (RootFrame.Content is WorkspacePage workspace) workspace.ApplyWindowWidth(width);
     }
@@ -108,5 +110,23 @@ public sealed partial class MainWindow : Window
         {
             // 设计时或无 AppWindow 的宿主环境不影响页面加载。
         }
+    }
+
+    /// <summary>
+    /// 标题栏只显示当前会话的唯一状态，避免与工作台按钮出现相互矛盾的提示。
+    /// </summary>
+    public void SetTaskState(ExtractionStatus status)
+    {
+        (string text, string brushKey) = status switch
+        {
+            ExtractionStatus.Running => ("正在提取", "BluePrimaryBrush"),
+            ExtractionStatus.Paused => ("任务已暂停", "AmberBrush"),
+            ExtractionStatus.Completing => ("等待 AI 完成", "VioletPrimaryBrush"),
+            ExtractionStatus.Completed => ("任务已完成", "CyanPrimaryBrush"),
+            ExtractionStatus.Error => ("任务异常", "CoralPrimaryBrush"),
+            _ => ("本地就绪", "CyanPrimaryBrush"),
+        };
+        TaskStatusText.Text = text;
+        TaskStatusIndicator.Fill = (Brush)Application.Current.Resources[brushKey];
     }
 }
