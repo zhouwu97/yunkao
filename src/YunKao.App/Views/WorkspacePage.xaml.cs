@@ -34,6 +34,7 @@ public sealed partial class WorkspacePage : Page
                 AiStatus,
                 Events);
             _coordinator.BannerRequested += OnBannerRequested;
+            Browser.TaskRequested += OnTaskRequested;
         }
     }
 
@@ -62,40 +63,12 @@ public sealed partial class WorkspacePage : Page
         ApplyResponsiveLayout();
     }
 
-    private WorkspaceLayoutMode _currentLayoutMode = WorkspaceLayoutMode.Narrow;
-
     /// <summary>
-    /// 使用扣除导航栏和内边距的内容区宽度做预算。
-    /// 只有保证浏览器最低舒适宽度 (>=1040px) 时才允许 Dock 右栏，
-    /// 否则一律使用 Overlay Drawer，此时 ControlColumn.Width 为 0，打开/关闭面板完全不改变 WebView 宽度。
+    /// 任务面板始终覆盖在 WebView 上，打开或关闭都不会改变网页视口宽度。
     /// </summary>
     public void ApplyResponsiveLayout()
     {
         if (ContentGrid.ActualWidth <= 0) return;
-
-        WorkspaceLayoutMode layoutMode = WorkspaceLayoutBreakpoints.GetMode(ContentGrid.ActualWidth, _currentLayoutMode);
-        _currentLayoutMode = layoutMode;
-
-        if (layoutMode != WorkspaceLayoutMode.Narrow)
-        {
-            _narrow = false;
-            _drawerOpen = false;
-            double controlWidth = WorkspaceLayoutBreakpoints.GetControlWidth(layoutMode);
-            ContentGrid.ColumnSpacing = WorkspaceLayoutBreakpoints.BrowserColumnSpacing;
-            ControlColumn.Width = new GridLength(controlWidth);
-            Grid.SetColumn(ControlPanel, 1);
-            Grid.SetColumnSpan(ControlPanel, 1);
-            ControlPanel.Width = controlWidth;
-            ControlPanel.HorizontalAlignment = HorizontalAlignment.Stretch;
-            ControlPanel.Visibility = Visibility.Visible;
-            DrawerScrim.Visibility = Visibility.Collapsed;
-            DrawerScrim.Opacity = 0;
-            MotionService.SetTranslateX(ControlPanel, 0);
-            ControlPanel.Opacity = 1;
-            DrawerToggle.Visibility = Visibility.Collapsed;
-            ConfigureDrawerSurface(narrow: false);
-            return;
-        }
 
         bool enteringNarrowMode = !_narrow;
         _narrow = true;
@@ -105,7 +78,6 @@ public sealed partial class WorkspacePage : Page
         Grid.SetColumnSpan(ControlPanel, 2);
         ControlPanel.Width = GetDrawerWidth();
         ControlPanel.HorizontalAlignment = HorizontalAlignment.Right;
-        DrawerToggle.Visibility = Visibility.Visible;
         ConfigureDrawerSurface(narrow: true);
 
         if (enteringNarrowMode)
@@ -118,17 +90,22 @@ public sealed partial class WorkspacePage : Page
         UpdateDrawerVisual();
     }
 
-    private void OnDrawerToggleClick(object sender, RoutedEventArgs args)
+    private void OnTaskRequested(object? sender, EventArgs args)
     {
-        if (!_narrow) return;
         _drawerOpen = !_drawerOpen;
+        UpdateDrawerVisual();
+    }
+
+    private void OnDrawerCloseClick(object sender, RoutedEventArgs args)
+    {
+        if (!_drawerOpen) return;
+        _drawerOpen = false;
         UpdateDrawerVisual();
     }
 
     private void UpdateDrawerVisual()
     {
         if (!_narrow) return;
-        DrawerToggle.Label = _drawerOpen ? "收起任务" : "任务状态";
         if (_drawerOpen)
         {
             bool scrimWasHidden = DrawerScrim.Visibility != Visibility.Visible;
@@ -197,10 +174,7 @@ public sealed partial class WorkspacePage : Page
         DrawerShell.BorderThickness = narrow ? new Thickness(1) : new Thickness(0);
         DrawerShell.Padding = narrow ? new Thickness(10) : new Thickness(0);
         MotionService.SetSoftShadow(DrawerShell, narrow);
-        LiquidBackdropMode islandMode = LiquidBackdropMode.Inherited;
-        TaskCard.BackdropMode = islandMode;
-        ToolsCard.BackdropMode = islandMode;
-        Events.BackdropMode = islandMode;
+        Events.BackdropMode = LiquidBackdropMode.Inherited;
     }
 
     private double GetDrawerWidth()

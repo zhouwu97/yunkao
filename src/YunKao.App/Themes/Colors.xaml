@@ -43,19 +43,19 @@
   <!-- Level 0: the window material is owned by BackdropService. -->
   <SolidColorBrush x:Key="WindowBackgroundBrush" Color="Transparent" />
   <SolidColorBrush x:Key="SolidWindowBackgroundBrush" Color="#EEF2F6" />
-  <SolidColorBrush x:Key="TitleBarBrush" Color="#B8E8F3" Opacity="0.22" />
+  <SolidColorBrush x:Key="TitleBarBrush" Color="#38F0F7FC" />
 
   <!-- Level 1: clean, calm Fluent surfaces. -->
-  <SolidColorBrush x:Key="LiquidSurfaceBrush" Color="#F2F8FBFE" />
-  <SolidColorBrush x:Key="LiquidSurfaceStrongBrush" Color="#F8FBFEFF" />
-  <SolidColorBrush x:Key="LiquidSurfaceSubtleBrush" Color="#EAF2F9FD" />
-  <SolidColorBrush x:Key="LiquidSurfaceSoftBrush" Color="#E4F0F9FE" />
-  <SolidColorBrush x:Key="LiquidBorderBrush" Color="#44DCE5EF" />
-  <SolidColorBrush x:Key="LiquidInnerBorderBrush" Color="#30DCE5EF" />
+  <SolidColorBrush x:Key="LiquidSurfaceBrush" Color="#78F8FBFE" />
+  <SolidColorBrush x:Key="LiquidSurfaceStrongBrush" Color="#A6FBFDFF" />
+  <SolidColorBrush x:Key="LiquidSurfaceSubtleBrush" Color="#70F2F9FD" />
+  <SolidColorBrush x:Key="LiquidSurfaceSoftBrush" Color="#88F0F9FE" />
+  <SolidColorBrush x:Key="LiquidBorderBrush" Color="#70FFFFFF" />
+  <SolidColorBrush x:Key="LiquidInnerBorderBrush" Color="#48FFFFFF" />
   <SolidColorBrush x:Key="LiquidShadowBrush" Color="#120F2D58" />
-  <SolidColorBrush x:Key="RailSurfaceBrush" Color="#EEF4FAFD" />
-  <SolidColorBrush x:Key="DrawerSurfaceBrush" Color="#F6F8FCFE" />
-  <SolidColorBrush x:Key="DrawerBorderBrush" Color="#80DCE5EF" />
+  <SolidColorBrush x:Key="RailSurfaceBrush" Color="#94F9FCFF" />
+  <SolidColorBrush x:Key="DrawerSurfaceBrush" Color="#C2F8FCFE" />
+  <SolidColorBrush x:Key="DrawerBorderBrush" Color="#8AFFFFFF" />
 
   <!-- Level 2: content remains opaque and readable. -->
   <SolidColorBrush x:Key="ContentSurfaceBrush" Color="#FAFBFD" />

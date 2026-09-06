@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Numerics;
 using Microsoft.UI.Composition;
 using Microsoft.UI.Input;
@@ -21,6 +22,7 @@ public sealed partial class BrowserShell : UserControl
     private CompositionRoundedRectangleGeometry? _webClipGeometry;
     private CompositionGeometricClip? _webClip;
     private bool _loaded;
+    private bool _fitWidth = true;
     private string _fullAddress = "https://www.cctrcloud.net/";
 
     public BrowserShell()
@@ -35,6 +37,7 @@ public sealed partial class BrowserShell : UserControl
     public WebViewService Service => _service;
     public event EventHandler<BridgeMessageEventArgs>? BridgeMessageReceived;
     public event EventHandler<string>? ProcessFailed;
+    public event EventHandler? TaskRequested;
 
     private async void OnLoaded(object sender, RoutedEventArgs args)
     {
@@ -75,6 +78,25 @@ public sealed partial class BrowserShell : UserControl
     private void OnRefreshClick(object sender, RoutedEventArgs args) => _service.Refresh();
     private void OnHomeClick(object sender, RoutedEventArgs args) => _service.GoHome();
     private void OnExternalClick(object sender, RoutedEventArgs args) => _service.OpenExternal();
+
+    private void OnTaskClick(object sender, RoutedEventArgs args) => TaskRequested?.Invoke(this, EventArgs.Empty);
+
+    private async void OnFitWidthClick(object sender, RoutedEventArgs args)
+    {
+        _fitWidth = !_fitWidth;
+        if (_fitWidth)
+        {
+            await ApplyFitWidthAsync();
+            return;
+        }
+
+        if (_service.IsInitialized && WebViewService.IsAllowedHost(_service.CurrentUri))
+        {
+            await _service.ExecuteScriptAsync("document.documentElement.style.zoom = '100%';");
+        }
+        FitWidthButton.Content = "原始大小 · 100%";
+        StatusText.Text = "页面已恢复为 100% 缩放";
+    }
 
     private void OnInstallWebView2Click(object sender, RoutedEventArgs args)
     {
@@ -166,7 +188,7 @@ public sealed partial class BrowserShell : UserControl
         }
     }
 
-    private void OnNavigationChanged(object? sender, BrowserNavigationEventArgs args)
+    private async void OnNavigationChanged(object? sender, BrowserNavigationEventArgs args)
     {
         _fullAddress = args.Uri?.AbsoluteUri ?? _fullAddress;
         string display = FormatAddress(args.Uri);
@@ -179,6 +201,40 @@ public sealed partial class BrowserShell : UserControl
         App.Services.Workspace.BridgeInstalled = _service.IsBridgeInstalled;
         App.Services.Workspace.BrowserVersion = _service.BrowserVersion;
         App.Services.Workspace.BrowserStatus = args.Message;
+        if (args.Success && args.Message == "导航完成" && _fitWidth)
+        {
+            await ApplyFitWidthAsync();
+        }
+    }
+
+    private async Task ApplyFitWidthAsync()
+    {
+        if (!_service.IsInitialized || !WebViewService.IsAllowedHost(_service.CurrentUri)) return;
+        try
+        {
+            const string measureScript = "(() => { document.documentElement.style.zoom = '100%'; return Math.max(document.documentElement?.scrollWidth || 0, document.body?.scrollWidth || 0) + ':' + Math.max(document.documentElement?.clientWidth || 0, window.innerWidth || 0); })();";
+            string raw = await _service.ExecuteScriptAsync(measureScript);
+            string value = System.Text.Json.JsonSerializer.Deserialize<string>(raw) ?? "";
+            string[] dimensions = value.Split(':', 2);
+            if (dimensions.Length != 2
+                || !double.TryParse(dimensions[0], NumberStyles.Float, CultureInfo.InvariantCulture, out double scrollWidth)
+                || !double.TryParse(dimensions[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double viewportWidth)
+                || scrollWidth <= 0
+                || viewportWidth <= 0)
+            {
+                return;
+            }
+
+            double factor = Math.Clamp(viewportWidth / scrollWidth, 0.75, 1.0);
+            int percent = (int)Math.Round(factor * 100);
+            await _service.ExecuteScriptAsync($"document.documentElement.style.zoom = '{percent}%';");
+            FitWidthButton.Content = $"适应宽度 · {percent}%";
+            StatusText.Text = percent < 100 ? $"导航完成 · 页面已适配到当前视区（{percent}%）" : "导航完成 · 页面完整可见";
+        }
+        catch (Exception exception)
+        {
+            App.Services.Diagnostics.Warning("页面宽度适配失败：" + exception.Message);
+        }
     }
 
     private void OnAddressLostFocus(object sender, RoutedEventArgs args)
@@ -203,7 +259,7 @@ public sealed partial class BrowserShell : UserControl
         _webClipGeometry ??= compositor.CreateRoundedRectangleGeometry();
         _webClip ??= compositor.CreateGeometricClip(_webClipGeometry);
         _webClipGeometry.Size = new Vector2((float)WebView.ActualWidth, (float)WebView.ActualHeight);
-        _webClipGeometry.CornerRadius = new Vector2(17, 17);
+        _webClipGeometry.CornerRadius = new Vector2(14, 14);
         visual.Clip = _webClip;
     }
 

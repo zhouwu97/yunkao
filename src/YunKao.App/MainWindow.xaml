@@ -39,7 +39,7 @@
       </Grid>
     </Border>
 
-    <Grid Grid.Row="1" Padding="10,2,10,12" ColumnSpacing="12">
+    <Grid Grid.Row="1" Padding="10,8,12,12" ColumnSpacing="12">
       <Grid.ColumnDefinitions>
         <ColumnDefinition x:Name="NavigationColumn" Width="68" />
         <ColumnDefinition Width="*" />

@@ -7,7 +7,7 @@
     xmlns:controls="using:YunKao.Controls"
    Loaded="OnLoaded"
    KeyDown="OnRootKeyDown">
-  <Grid RowSpacing="10">
+  <Grid RowSpacing="7">
     <Grid.RowDefinitions>
       <RowDefinition Height="48" />
       <RowDefinition Height="*" />
@@ -22,6 +22,8 @@
           <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="Auto" />
           <ColumnDefinition Width="Auto" />
         </Grid.ColumnDefinitions>
         <Button Grid.Column="0" Click="OnBackClick" ToolTipService.ToolTip="后退" Style="{StaticResource IconButtonStyle}">
@@ -65,17 +67,34 @@
             </Grid>
           </Grid>
         </Border>
-        <Button Grid.Column="5" Click="OnExternalClick" ToolTipService.ToolTip="在系统浏览器中打开" Style="{StaticResource IconButtonStyle}">
+        <Button x:Name="FitWidthButton"
+                Grid.Column="5"
+                Content="适应宽度"
+                Click="OnFitWidthClick"
+                ToolTipService.ToolTip="在适应宽度和 100% 之间切换"
+                Height="32"
+                Padding="10,0"
+                FontSize="11"
+                Style="{StaticResource QuietButtonStyle}" />
+        <Button Grid.Column="6"
+                Content="提取任务"
+                Click="OnTaskClick"
+                Height="32"
+                Padding="11,0"
+                FontSize="11"
+                FontWeight="SemiBold"
+                Style="{StaticResource SecondaryButtonStyle}" />
+        <Button Grid.Column="7" Click="OnExternalClick" ToolTipService.ToolTip="在系统浏览器中打开" Style="{StaticResource IconButtonStyle}">
           <FontIcon Glyph="&#xE8A7;" />
         </Button>
       </Grid>
     </controls:LiquidCard>
 
     <Grid Grid.Row="1">
-      <Border Background="{StaticResource ContentSurfaceBrush}"
+      <Border Background="{StaticResource WebViewSurfaceBrush}"
               BorderBrush="{StaticResource LiquidInnerBorderBrush}"
               BorderThickness="1"
-              CornerRadius="18"
+              CornerRadius="15"
               Padding="1">
         <wv2:WebView2 x:Name="WebView" SizeChanged="OnWebViewSurfaceSizeChanged" />
       </Border>
@@ -84,7 +103,7 @@
               Background="{StaticResource ContentSurfaceBrush}"
               BorderBrush="{StaticResource LiquidInnerBorderBrush}"
               BorderThickness="1"
-              CornerRadius="18"
+              CornerRadius="15"
               Padding="24"
               Visibility="Collapsed">
         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="16" MaxWidth="420">

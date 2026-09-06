@@ -13,13 +13,13 @@ public enum BackdropMaterial
 }
 
 /// <summary>
-/// 窗口材质降级链：主窗口优先使用 Mica，临时浮层使用 Acrylic，不支持时安全降级为 Solid。
+/// 窗口材质降级链：工作区优先使用 Desktop Acrylic，不支持时依次降级为 Mica、Solid。
 /// </summary>
 public static class BackdropService
 {
     public static BackdropMaterial AppliedMaterial { get; private set; } = BackdropMaterial.Solid;
 
-    public static BackdropMaterial Apply(Window window, Panel? root, BackdropMaterial preferred = BackdropMaterial.Mica)
+    public static BackdropMaterial Apply(Window window, Panel? root, BackdropMaterial preferred = BackdropMaterial.DesktopAcrylic)
     {
         if (IsHighContrastEnabled())
         {
@@ -53,7 +53,7 @@ public static class BackdropService
         return AppliedMaterial;
     }
 
-    public static BackdropMaterial Apply(Window window, BackdropMaterial preferred = BackdropMaterial.Mica)
+    public static BackdropMaterial Apply(Window window, BackdropMaterial preferred = BackdropMaterial.DesktopAcrylic)
     {
         return Apply(window, null, preferred);
     }
@@ -109,5 +109,15 @@ public static class BackdropService
         {
             return false;
         }
+    }
+
+    public static BackdropMaterial Parse(string? material)
+    {
+        return material?.Trim().ToLowerInvariant() switch
+        {
+            "mica" => BackdropMaterial.Mica,
+            "solid" => BackdropMaterial.Solid,
+            _ => BackdropMaterial.DesktopAcrylic,
+        };
     }
 }

@@ -111,17 +111,26 @@
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0" Spacing="5">
               <TextBlock Text="背景材质" Style="{StaticResource SmallLabelStyle}" />
-               <RadioButton x:Name="AcrylicRadio" Content="Liquid Acrylic" IsChecked="True" GroupName="BackdropMaterial" />
-               <RadioButton x:Name="MicaRadio" Content="Mica" GroupName="BackdropMaterial" />
-               <RadioButton x:Name="SolidRadio" Content="Solid" GroupName="BackdropMaterial" />
+               <RadioButton x:Name="AcrylicRadio" Content="Liquid Acrylic" IsChecked="True" GroupName="BackdropMaterial" Checked="OnAppearanceChanged" />
+               <RadioButton x:Name="MicaRadio" Content="Mica" GroupName="BackdropMaterial" Checked="OnAppearanceChanged" />
+               <RadioButton x:Name="SolidRadio" Content="Solid" GroupName="BackdropMaterial" Checked="OnAppearanceChanged" />
             </StackPanel>
             <StackPanel Grid.Column="1" Spacing="5">
               <TextBlock Text="透明强度" Style="{StaticResource SmallLabelStyle}" />
-               <RadioButton x:Name="ClearRadio" Content="清晰" GroupName="BackdropClarity" />
-               <RadioButton x:Name="StandardRadio" Content="标准" IsChecked="True" GroupName="BackdropClarity" />
-               <RadioButton x:Name="TransparentRadio" Content="通透" GroupName="BackdropClarity" />
+               <RadioButton x:Name="ClearRadio" Content="清晰" GroupName="BackdropClarity" Checked="OnAppearanceChanged" />
+               <RadioButton x:Name="StandardRadio" Content="标准" IsChecked="True" GroupName="BackdropClarity" Checked="OnAppearanceChanged" />
+               <RadioButton x:Name="TransparentRadio" Content="通透" GroupName="BackdropClarity" Checked="OnAppearanceChanged" />
             </StackPanel>
           </Grid>
+          <Border Background="{StaticResource LiquidSurfaceSubtleBrush}"
+                  BorderBrush="{StaticResource LiquidInnerBorderBrush}"
+                  BorderThickness="1"
+                  CornerRadius="10"
+                  Padding="12,10">
+            <TextBlock Text="桌面壁纸会从窗口背后透进来；网页内容始终保持实体白底。"
+                       TextWrapping="Wrap"
+                       Style="{StaticResource SecondaryTextStyle}" />
+          </Border>
           <ToggleSwitch x:Name="ReduceMotionToggle" Header="减少动画" OffContent="标准动效" OnContent="已减少" Toggled="OnReduceMotionToggled" />
         </StackPanel>
       </controls:LiquidCard>

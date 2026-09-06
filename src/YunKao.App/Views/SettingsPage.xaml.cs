@@ -274,6 +274,7 @@ public sealed partial class SettingsPage : Page
                 : settings.RememberYunKaoPassword ? null : "";
             App.Services.Settings.Save(settings, apiKey, password);
             MotionService.SetReduceMotion(settings.ReduceMotion);
+            App.MainWindow?.ApplyAppearance(settings.AppearanceMaterial, settings.AppearanceClarity);
             AiKeyBox.Password = "";
             YunKaoPasswordBox.Password = "";
             AiKeyStatusText.Text = settings.AiKeySaved ? "Key 已保存" : "未保存 Key";
@@ -289,6 +290,26 @@ public sealed partial class SettingsPage : Page
     private void OnReduceMotionToggled(object sender, RoutedEventArgs args)
     {
         MotionService.SetReduceMotion(ReduceMotionToggle.IsOn);
+    }
+
+    private void OnAppearanceChanged(object sender, RoutedEventArgs args)
+    {
+        if (_loading
+            || AcrylicRadio is null
+            || MicaRadio is null
+            || SolidRadio is null
+            || ClearRadio is null
+            || StandardRadio is null
+            || TransparentRadio is null)
+        {
+            return;
+        }
+        string material = AcrylicRadio.IsChecked == true ? "acrylic"
+            : MicaRadio.IsChecked == true ? "mica" : "solid";
+        string clarity = ClearRadio.IsChecked == true ? "clear"
+            : TransparentRadio.IsChecked == true ? "transparent" : "standard";
+        App.MainWindow?.ApplyAppearance(material, clarity);
+        StatusText.Text = "外观预览中，保存后保留";
     }
 
     private static void SelectByTag(ComboBox comboBox, string value)

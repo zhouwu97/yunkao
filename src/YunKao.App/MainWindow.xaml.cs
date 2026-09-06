@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 using WinRT.Interop;
 using YunKao.Controls;
+using YunKao.Core.Models;
 using YunKao.Core.Services;
 using YunKao.Services;
 using YunKao.Views;
@@ -23,15 +24,64 @@ public sealed partial class MainWindow : Window
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
         ConfigureWindow();
-        BackdropMaterial material = BackdropService.Apply(this, RootSurface, BackdropMaterial.Mica);
-        RootSurface.Background = material == BackdropMaterial.Solid
-            ? (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["SolidWindowBackgroundBrush"]
-            : new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent);
+        AppSettings settings = App.Services.Settings.Load();
+        ApplyAppearance(settings.AppearanceMaterial, settings.AppearanceClarity);
+        MotionService.SetReduceMotion(settings.ReduceMotion);
 
         NavigationRail.NavigationRequested += OnNavigationRequested;
         RootFrame.Navigated += OnRootFrameNavigated;
         RootSurface.SizeChanged += OnRootGridSizeChanged;
         RootFrame.Navigate(typeof(WorkspacePage));
+    }
+
+    /// <summary>
+    /// 把设置页的材质选择立即应用到真实窗口。透明强度通过外壳 tint 控制，WebView 仍保持不透明。
+    /// </summary>
+    public void ApplyAppearance(string materialName, string clarityName)
+    {
+        BackdropMaterial requested = BackdropService.Parse(materialName);
+        BackdropMaterial applied = BackdropService.Apply(this, RootSurface, requested);
+
+        byte windowAlpha = clarityName switch
+        {
+            "clear" => 0x58,
+            "transparent" => 0x28,
+            _ => 0x40,
+        };
+        byte surfaceAlpha = clarityName switch
+        {
+            "clear" => 0xB2,
+            "transparent" => 0x72,
+            _ => 0x94,
+        };
+
+        if (applied == BackdropMaterial.Solid)
+        {
+            RootSurface.Background = (Brush)Application.Current.Resources["SolidWindowBackgroundBrush"];
+            SetBrushColor("TitleBarBrush", 0xFF, 0xEE, 0xF2, 0xF6);
+            SetBrushColor("RailSurfaceBrush", 0xFF, 0xF6, 0xF8, 0xFB);
+            SetBrushColor("LiquidSurfaceBrush", 0xFF, 0xF8, 0xFA, 0xFC);
+            SetBrushColor("LiquidSurfaceStrongBrush", 0xFF, 0xFB, 0xFC, 0xFE);
+            SetBrushColor("LiquidSurfaceSubtleBrush", 0xFF, 0xF3, 0xF6, 0xF9);
+            SetBrushColor("DrawerSurfaceBrush", 0xFF, 0xF8, 0xFA, 0xFC);
+            return;
+        }
+
+        RootSurface.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(windowAlpha, 0xF0, 0xF7, 0xFC));
+        SetBrushColor("TitleBarBrush", (byte)Math.Max(0x28, windowAlpha - 0x08), 0xF0, 0xF7, 0xFC);
+        SetBrushColor("RailSurfaceBrush", surfaceAlpha, 0xF9, 0xFC, 0xFF);
+        SetBrushColor("LiquidSurfaceBrush", (byte)Math.Max(0x62, surfaceAlpha - 0x1C), 0xF8, 0xFB, 0xFE);
+        SetBrushColor("LiquidSurfaceStrongBrush", (byte)Math.Min(0xD2, surfaceAlpha + 0x12), 0xFB, 0xFD, 0xFF);
+        SetBrushColor("LiquidSurfaceSubtleBrush", (byte)Math.Max(0x58, surfaceAlpha - 0x24), 0xF2, 0xF9, 0xFD);
+        SetBrushColor("DrawerSurfaceBrush", (byte)Math.Min(0xDC, surfaceAlpha + 0x2E), 0xF8, 0xFC, 0xFE);
+    }
+
+    private static void SetBrushColor(string resourceKey, byte alpha, byte red, byte green, byte blue)
+    {
+        if (Application.Current.Resources[resourceKey] is SolidColorBrush brush)
+        {
+            brush.Color = Windows.UI.Color.FromArgb(alpha, red, green, blue);
+        }
     }
 
     private void OnNavigationRequested(object? sender, NavigationRequestEventArgs args)
