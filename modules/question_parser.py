@@ -1,3 +1,4 @@
+import os
 import re
 
 from bs4 import BeautifulSoup
@@ -8,6 +9,16 @@ DEBUG = False  # 设为 True 开启判断题诊断日志
 
 def _debug_enabled():
     return DEBUG
+
+
+def _debug_file_path(filename):
+    """统一将解析诊断文件写入用户本地调试目录。"""
+    local_root = os.environ.get("LOCALAPPDATA") or os.path.join(
+        os.path.expanduser("~"), "AppData", "Local"
+    )
+    debug_dir = os.path.join(local_root, "YunKao", "debug")
+    os.makedirs(debug_dir, exist_ok=True)
+    return os.path.join(debug_dir, filename)
 
 
 PLACEHOLDER_ANSWERS = {"", "略", "暂无", "未知", "未提供", "无"}
@@ -342,7 +353,7 @@ def parse_active_question(html_content):
         answer_text = _normalize_judgment_answer(seed_answer, option_records)
         if _debug_enabled():
             try:
-                with open(r"e:\AI\yunkao\debug_judgment.html", "w", encoding="utf-8") as f:
+                with open(_debug_file_path("debug_judgment.html"), "w", encoding="utf-8") as f:
                     f.write(str(target))
                 print(f"[判断题] title={title_text[:40]}")
                 print(f"  option_records={[(r['label'], r['text'][:30], r['is_correct']) for r in option_records]}")
