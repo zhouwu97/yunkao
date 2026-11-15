@@ -31,7 +31,11 @@ function loadBridge(activeSelector) {
     document,
     chrome: {
       webview: {
-        postMessage: message => messages.push(message),
+        postMessage(message) {
+          // WebViewService reads messages through TryGetWebMessageAsString.
+          assert.equal(typeof message, 'string', 'WebView2 host must receive a string');
+          messages.push(JSON.parse(message));
+        },
         addEventListener() {},
       },
     },

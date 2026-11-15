@@ -1,63 +1,97 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  外壳布局（Studio）：
+    纸色外框（窗口材质 + 暖白纸面）
+    ├─ 左：侧边栏，直接放在外框上：浏览器控制 / 任务卡 / 页面导航
+    └─ 右：白色内容卡片（细线描边，无阴影）：常驻网页，或覆盖其上的历史、导出、诊断、设置页面
+-->
 <Window
     x:Class="YunKao.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:YunKao.Controls"
-    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    Title="融智云考"
-    mc:Ignorable="d">
-  <Grid x:Name="RootSurface" Background="Transparent">
+    Title="融智云考">
+  <Grid x:Name="RootSurface">
     <Grid.RowDefinitions>
-      <RowDefinition Height="48" />
+      <RowDefinition Height="44" />
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition x:Name="SidebarColumn" Width="248" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
 
-    <Border x:Name="AppTitleBar"
-            Grid.Row="0"
-            Background="{StaticResource TitleBarBrush}"
-            Padding="16,0,144,0">
-      <Grid VerticalAlignment="Center">
-        <StackPanel Orientation="Horizontal" Spacing="9">
-          <Border Width="26" Height="26" CornerRadius="9" Background="{StaticResource BluePrimaryBrush}">
-            <TextBlock Text="Y" FontSize="14" FontWeight="SemiBold" Foreground="White"
-                       HorizontalAlignment="Center" VerticalAlignment="Center" />
-          </Border>
-          <StackPanel VerticalAlignment="Center" Spacing="-2">
-            <TextBlock Text="融智云考" Style="{StaticResource TitleTextStyle}" />
-            <TextBlock Text="Desktop Workspace" Style="{StaticResource CaptionTextStyle}" />
-          </StackPanel>
-        </StackPanel>
+    <!-- 外框 -->
+    <Border x:Name="FrameTint" Grid.RowSpan="2" Grid.ColumnSpan="2" Background="{ThemeResource FrameGradientBrush}" IsHitTestVisible="False" />
+    <Grid x:Name="FrameGlow" Grid.RowSpan="2" Grid.ColumnSpan="2" IsHitTestVisible="False">
+      <Rectangle Fill="{ThemeResource FrameGlowPrimaryBrush}" />
+      <Rectangle Fill="{ThemeResource FrameGlowSecondaryBrush}" />
+    </Grid>
 
-        <Border HorizontalAlignment="Right" Background="#42CDEFF2" BorderBrush="#5CFFFFFF" BorderThickness="1" CornerRadius="16" Padding="9,4">
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <Ellipse x:Name="TaskStatusIndicator" Width="6" Height="6" Fill="{StaticResource CyanPrimaryBrush}" VerticalAlignment="Center" />
-            <TextBlock x:Name="TaskStatusText" Text="本地就绪" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11" />
-          </StackPanel>
-        </Border>
+    <!-- 标题栏（可拖动）：品牌 -->
+    <Grid x:Name="AppTitleBar" Grid.ColumnSpan="2" Background="Transparent" Padding="18,0,140,0">
+      <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+        <Grid Width="22" Height="22">
+          <Border CornerRadius="6" Background="{ThemeResource SidebarTextBrush}" />
+          <TextBlock Text="云" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource FrameGradientBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Grid>
+        <TextBlock x:Name="BrandText" Text="融智云考" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{ThemeResource SidebarTextBrush}" />
+      </StackPanel>
+    </Grid>
+
+    <!-- 侧边栏 -->
+    <Grid x:Name="Sidebar" Grid.Row="1" Padding="14,6,10,14">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+
+      <controls:BrowserBar x:Name="BrowserBar" />
+      <controls:TaskCard x:Name="TaskCard" Grid.Row="1" Margin="0,14,0,0" />
+      <TextBlock x:Name="PagesLabel" Grid.Row="2" Text="页面" Margin="12,20,0,6" Style="{StaticResource SidebarLabelStyle}" />
+      <controls:NavigationRail x:Name="NavigationRail" Grid.Row="3" />
+      <Button x:Name="CollapseButton"
+              Grid.Row="4"
+              Margin="0,6,0,0"
+              HorizontalAlignment="Left"
+              Click="OnCollapseClick"
+              AutomationProperties.Name="收起侧栏"
+              ToolTipService.ToolTip="收起侧栏"
+              Style="{StaticResource SidebarIconButtonStyle}">
+        <FontIcon x:Name="CollapseGlyph" Glyph="&#xE76B;" FontSize="12" />
+      </Button>
+    </Grid>
+
+    <!-- 内容卡片 -->
+    <Grid Grid.Row="1" Grid.Column="1" Margin="0,0,12,12">
+      <Border x:Name="ContentCard"
+              Background="{ThemeResource SurfaceBrush}"
+              BorderBrush="{ThemeResource SurfaceStrokeBrush}"
+              BorderThickness="1"
+              CornerRadius="{StaticResource ContentCornerRadius}" />
+      <Grid Margin="1">
+        <controls:BrowserShell x:Name="Browser" />
+        <Frame x:Name="RootFrame"
+               Visibility="Collapsed"
+               Background="{ThemeResource SurfaceBrush}"
+               CornerRadius="9"
+               HorizontalContentAlignment="Stretch"
+               VerticalContentAlignment="Stretch" />
+        <InfoBar x:Name="ShellBanner"
+                 IsOpen="False"
+                 IsClosable="True"
+                 Margin="16"
+                 MaxWidth="720"
+                 VerticalAlignment="Top"
+                 CornerRadius="12">
+          <InfoBar.ActionButton>
+            <Button x:Name="ShellBannerAction" Click="OnShellBannerActionClick" Style="{StaticResource SecondaryButtonStyle}" />
+          </InfoBar.ActionButton>
+        </InfoBar>
       </Grid>
-    </Border>
-
-    <Grid Grid.Row="1" Padding="10,8,12,12" ColumnSpacing="12">
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition x:Name="NavigationColumn" Width="68" />
-        <ColumnDefinition Width="*" />
-      </Grid.ColumnDefinitions>
-
-      <Grid x:Name="NavigationSurface" Grid.Column="0">
-        <Border Background="{StaticResource RailSurfaceBrush}"
-                BorderBrush="{StaticResource LiquidInnerBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="20" />
-        <controls:NavigationRail x:Name="NavigationRail" />
-      </Grid>
-
-      <Frame x:Name="RootFrame"
-             Grid.Column="1"
-             HorizontalContentAlignment="Stretch"
-             VerticalContentAlignment="Stretch"
-             Background="Transparent" />
     </Grid>
   </Grid>
 </Window>

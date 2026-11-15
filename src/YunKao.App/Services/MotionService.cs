@@ -23,7 +23,7 @@ public static class MotionService
 
     public static bool ReduceMotion { get; private set; } = DetectReducedMotion();
 
-    public static void SetReduceMotion(bool reduceMotion) => ReduceMotion = reduceMotion;
+    public static void SetReduceMotion(bool reduceMotion) => ReduceMotion = reduceMotion || DetectReducedMotion();
 
     public static void AnimateScale(FrameworkElement element, double target, double durationMs = 120)
         => AnimateScaleXY(element, target, target, durationMs);
@@ -217,7 +217,8 @@ public static class MotionService
     public static void SetSoftShadow(FrameworkElement element, bool enabled)
     {
         // WinUI 3 2.3.1 暴露的是 UIElement.Shadow；ThemeShadow 会随系统主题和环境自动调整。
-        element.Shadow = enabled ? new ThemeShadow() : null;
+        if (!enabled) element.Shadow = null;
+        else if (element.Shadow is null) element.Shadow = new ThemeShadow();
     }
 
     private static ScaleTransform EnsureScaleTransform(FrameworkElement element)

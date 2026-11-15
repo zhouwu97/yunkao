@@ -5,7 +5,7 @@
   if (window.__yunkaoBridgeInstalled) return;
   window.__yunkaoBridgeInstalled = true;
 
-  const post = (message) => chrome.webview.postMessage(message);
+  const post = (message) => chrome.webview.postMessage(JSON.stringify(message));
   let readyTimer = null;
   let lastMarker = "";
 

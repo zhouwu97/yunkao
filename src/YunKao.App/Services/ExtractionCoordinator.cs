@@ -4,29 +4,20 @@ using System.Threading.Channels;
 using Microsoft.UI.Xaml;
 using YunKao.Controls;
 using YunKao.Core.Models;
+using YunKao.Core.Presentation;
 using YunKao.Core.Services;
+using YunKao.ViewModels;
 
 namespace YunKao.Services;
-
-public sealed record WorkspaceBannerInfo(
-    string Title,
-    string Message,
-    Microsoft.UI.Xaml.Controls.InfoBarSeverity Severity,
-    string? ActionLabel,
-    Action? ActionCallback);
 
 /// <summary>
 /// 工作台提取控制器。Bridge 事件进入单消费者队列，页面生命周期不再决定业务会话生命周期。
 /// </summary>
-public sealed class ExtractionCoordinator : IAsyncDisposable
+public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
 {
     private readonly AppServices _services;
     private readonly BrowserShell _browser;
-    private readonly ExtractionPanel _panel;
-    private readonly ProgressCard _progress;
-    private readonly ExportCard _export;
-    private readonly AiStatusCard _aiStatus;
-    private readonly EventList _events;
+    private readonly TaskViewModel _task;
     private readonly ExtractionSession _session;
     private readonly HistoricalSessionRestorer _historicalRestorer;
     private readonly ImageResolver _imageResolver;
@@ -34,7 +25,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         new UnboundedChannelOptions { SingleReader = true, SingleWriter = false, AllowSynchronousContinuations = false });
     private readonly CancellationTokenSource _lifetimeCancellation = new();
     private readonly SemaphoreSlim _startGate = new(1, 1);
-    private readonly ConcurrentBag<Task> _backgroundTasks = [];
+    private readonly ConcurrentDictionary<Task, byte> _backgroundTasks = new();
     private readonly Task _markerLoop;
     private CancellationTokenSource? _extractionCancellation;
     private CancellationTokenSource? _aiCancellation;
@@ -47,40 +38,19 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
     private bool _restoredSessionPending;
     private bool _workerRestarted;
     private bool _disposed;
+    private bool _exportInProgress;
 
-    public event EventHandler<WorkspaceBannerInfo>? BannerRequested;
-
-    public ExtractionCoordinator(
-        AppServices services,
-        BrowserShell browser,
-        ExtractionPanel panel,
-        ProgressCard progress,
-        ExportCard export,
-        AiStatusCard aiStatus,
-        EventList events)
+    public ExtractionCoordinator(AppServices services, BrowserShell browser)
     {
         _services = services;
         _browser = browser;
-        _panel = panel;
-        _progress = progress;
-        _export = export;
-        _aiStatus = aiStatus;
-        _events = events;
+        _task = services.Task;
         _session = services.Workspace.Session;
         _historicalRestorer = new HistoricalSessionRestorer(_session);
         _services.RegisterWorkspaceCoordinator(this);
         _imageResolver = new ImageResolver(browser.Service);
         _markerLoop = ProcessMarkerQueueAsync(_lifetimeCancellation.Token);
 
-        _panel.StartRequested += (_, _) => Track(StartAsync());
-        _panel.PauseRequested += (_, _) => TogglePause();
-        _panel.StopRequested += (_, _) => Stop();
-        _panel.ClearRequested += (_, _) => ClearCurrentSession();
-        _panel.RestartRequested += (_, _) => RestartCurrentSession();
-        _panel.RestoreRequested += (_, _) => RestoreInterruptedSession();
-        _panel.ExportTriggerRequested += (_, _) => _export.TriggerDefaultExport();
-        _export.ExportRequested += (_, format) => Track(ExportAsync(format));
-        _export.PracticeModeChanged += OnPracticeModeChanged;
         _browser.BridgeMessageReceived += OnBridgeMessageReceived;
         _browser.ProcessFailed += OnBrowserProcessFailed;
         _browser.Service.RecoveryCompleted += OnBrowserRecoveryCompleted;
@@ -91,11 +61,24 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         _services.Exports.ProgressChanged += OnExportProgress;
         _services.Initialized += OnServicesInitialized;
         if (_browser.Service.IsBridgeInstalled) Track(FillCredentialsOnBridgeReadyAsync());
-        _export.SetPracticeMode(_services.Settings.Load().ExportWithoutAnswers);
-        _export.SetSavedCount(_session.SavedCount);
-        _panel.SetState(_session.Status, _session.SavedCount, isPracticeReady: false, isBrowserRecovering: false, isLoginPage: false);
+        _task.SetPracticeMode(_services.Settings.Load().ExportWithoutAnswers);
+        _task.Attach(this);
+        RenderPanelState();
+        RenderProgress();
         RenderInterruptedPrompt();
     }
+
+    // ---- ITaskActions：界面命令入口 ----
+    void ITaskActions.Start() => Track(StartAsync());
+    void ITaskActions.TogglePause() => TogglePause();
+    void ITaskActions.Stop() => Stop();
+    void ITaskActions.Clear() => ClearCurrentSession();
+    void ITaskActions.Restart() => RestartCurrentSession();
+    void ITaskActions.RestoreInterrupted() => RestoreInterruptedSession();
+    void ITaskActions.Export(string format) => Track(ExportAsync(ExportPathGenerator.NormalizeExtension(format)));
+    void ITaskActions.ExportDefault()
+        => Track(ExportAsync(ExportPathGenerator.NormalizeExtension(_services.Settings.Load().DefaultExportFormat)));
+    void ITaskActions.SetPracticeMode(bool enabled) => OnPracticeModeChanged(this, enabled);
 
     private void OnBrowserNavigationChanged(object? sender, BrowserNavigationEventArgs args)
     {
@@ -125,12 +108,12 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
             ApplyPageState(pageState);
             if (!pageState.IsPracticeReady)
             {
-                _events.Add("当前页面未检测到可解析的练习题，请先进入练习/题库页面", warning: true);
-                BannerRequested?.Invoke(this, new WorkspaceBannerInfo(
+                _task.AddActivity("当前页面未检测到可解析的练习题，请先进入练习/题库页面", warning: true);
+                _services.Notifications.Show(new WorkspaceBannerInfo(
                     pageState.IsLogin ? "请先登录" : "请先进入练习页面",
                     pageState.IsLogin
                         ? "当前页面需要登录云考账号，登录完成并进入具体练习题页面后才能开始提取。"
-                        : "当前页面未检测到考试/练习题。请在左侧浏览器导航至具体练习或刷题页面后，再点击开始提取。",
+                        : "当前页面未检测到考试/练习题。请在网页中进入具体练习或刷题页面后，再点击开始提取。",
                     Microsoft.UI.Xaml.Controls.InfoBarSeverity.Warning,
                     pageState.IsLogin ? null : "前往首页",
                     pageState.IsLogin ? null : () => _browser.Service.GoHome()));
@@ -162,7 +145,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
             _services.Workspace.AuthExpired = false;
             _services.Workspace.PermissionDenied = false;
             RenderPanelState();
-            _events.Add("开始提取：准备 Worker");
+            _task.AddActivity("开始提取：准备 Worker");
 
             CancellationToken extractionToken = _extractionCancellation!.Token;
             try
@@ -173,7 +156,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
                 string version = health.TryGetProperty("version", out JsonElement versionElement)
                     ? versionElement.GetString() ?? "unknown"
                     : "unknown";
-                _events.Add($"Parser Worker 已就绪：{version}");
+                _task.AddActivity($"Parser Worker 已就绪：{version}");
                 QueueCurrentQuestion();
             }
             catch (OperationCanceledException) when (extractionToken.IsCancellationRequested)
@@ -184,7 +167,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
             {
                 if (extractionToken.IsCancellationRequested || _session.Status != ExtractionStatus.Running) return;
                 _services.Diagnostics.Error("提取启动失败", exception);
-                _events.Add("提取启动失败：" + exception.Message, warning: true);
+                _task.AddActivity("提取启动失败：" + exception.Message, warning: true);
                 _session.Fail();
             }
         }
@@ -218,15 +201,15 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
             // 由去重逻辑跳过保存并推进到下一题，而不是在入口处静默丢掉推进动作。
             _lastProcessedMarker = "";
             _services.Workspace.CurrentCourse = snapshot.Course;
-            _panel.ClearInterrupted();
-            _events.Add($"已恢复历史任务：{snapshot.Questions.Count} 题；当前保持暂停，请确认页面后再开始");
+            _task.SetInterrupted(null);
+            _task.AddActivity($"已恢复历史任务：{snapshot.Questions.Count} 题；当前保持暂停，请确认页面后再开始");
 
             BrowserPageState pageState = await _browser.Service.GetPageStateAsync(_lifetimeCancellation.Token).ConfigureAwait(true);
             ApplyPageState(pageState);
 
             if (!string.IsNullOrWhiteSpace(snapshot.SourceUrl))
             {
-                BannerRequested?.Invoke(this, new WorkspaceBannerInfo(
+                _services.Notifications.Show(new WorkspaceBannerInfo(
                     "历史任务已恢复",
                     pageState.IsPracticeReady
                         ? $"已成功载入 {snapshot.Questions.Count} 道历史题目。确认题目页面后，可从工作台继续提取。"
@@ -255,7 +238,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         if (_session.Status == ExtractionStatus.Running)
         {
             _session.Pause();
-            _events.Add("已暂停：不会自动推进下一题");
+            _task.AddActivity("已暂停：不会自动推进下一题");
         }
         else if (_session.Status == ExtractionStatus.Paused)
         {
@@ -270,7 +253,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         InvalidateCurrentSession();
         // 停止提取不取消导出；已保存题目必须仍可导出。
         _session.Stop();
-        _events.Add("提取已停止，已保存题目仍可导出");
+        _task.AddActivity("提取已停止，已保存题目仍可导出");
         Track(PersistSessionAsync());
     }
 
@@ -285,7 +268,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         _lastProcessedMarker = "";
         _session.Clear();
         if (!string.IsNullOrWhiteSpace(clearedSessionId)) Track(_services.History.DeleteSessionAsync(clearedSessionId));
-        _events.Add("已清空本次题目，可重新开始提取");
+        _task.AddActivity("已清空本次题目，可重新开始提取");
     }
 
     private void InvalidateCurrentSession()
@@ -303,24 +286,26 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
 
     public async Task ExportAsync(string format)
     {
+        if (_exportInProgress) return;
         IReadOnlyList<Question> snapshot = _session.Questions;
         if (snapshot.Count == 0)
         {
-            _events.Add("没有可导出的题目", warning: true);
+            _task.AddActivity("没有可导出的题目", warning: true);
             return;
         }
 
-        AppSettings settings = _services.Settings.Load();
-        string directory = string.IsNullOrWhiteSpace(settings.DefaultExportDirectory)
-            ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
-            : settings.DefaultExportDirectory;
-        string extension = ExportPathGenerator.NormalizeExtension(format);
-        string path = ExportPathGenerator.CreateUniquePath(directory, settings.ExportPrefix, format);
-
+        _exportInProgress = true;
         try
         {
-            _export.SetExporting(true);
-            _events.Add($"开始导出 {extension.ToUpperInvariant()}：{snapshot.Count} 题");
+            _task.SetExporting(true);
+            AppSettings settings = _services.Settings.Load();
+            string directory = string.IsNullOrWhiteSpace(settings.DefaultExportDirectory)
+                ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
+                : settings.DefaultExportDirectory;
+            string extension = ExportPathGenerator.NormalizeExtension(format);
+            string path = ExportPathGenerator.CreateUniquePath(directory, settings.ExportPrefix, format);
+            string exportSessionId = _session.SessionId.ToString("N");
+            _task.AddActivity($"开始导出 {extension.ToUpperInvariant()}：{snapshot.Count} 题");
             var resolved = new List<Question>(snapshot.Count);
             foreach (Question question in snapshot)
             {
@@ -342,10 +327,10 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
                 result.QuestionCount,
                 DateTimeOffset.Now,
                 "completed",
-                _session.SessionId.ToString("N"),
+                exportSessionId,
                 !settings.ExportWithoutAnswers);
             await _services.History.SaveExportAsync(record).ConfigureAwait(true);
-            _events.Add($"导出完成：{result.FilePath}");
+            _task.AddActivity($"导出完成：{result.FilePath}");
             if (settings.AutoOpenAfterExport)
             {
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(result.FilePath) { UseShellExecute = true });
@@ -353,20 +338,21 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         }
         catch (ExportAlreadyRunningException exception)
         {
-            _events.Add(exception.Message, warning: true);
+            _task.AddActivity(exception.Message, warning: true);
         }
         catch (OperationCanceledException)
         {
-            _events.Add("导出已取消", warning: true);
+            _task.AddActivity("导出已取消", warning: true);
         }
         catch (Exception exception)
         {
             _services.Diagnostics.Error("导出失败", exception);
-            _events.Add("导出失败：" + exception.Message, warning: true);
+            _task.AddActivity("导出失败：" + exception.Message, warning: true);
         }
         finally
         {
-            _export.SetExporting(false);
+            _exportInProgress = false;
+            _task.SetExporting(false);
         }
     }
 
@@ -386,12 +372,12 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         _browser.Service.HttpStatusChanged -= OnHttpStatusChanged;
         _session.Changed -= OnSessionChanged;
         _services.Exports.ProgressChanged -= OnExportProgress;
-        _export.PracticeModeChanged -= OnPracticeModeChanged;
+        _task.Detach(this);
         _services.Initialized -= OnServicesInitialized;
         try
         {
             await _markerLoop.WaitAsync(TimeSpan.FromSeconds(3)).ConfigureAwait(false);
-            await Task.WhenAll(_backgroundTasks.ToArray()).WaitAsync(TimeSpan.FromSeconds(3)).ConfigureAwait(false);
+            await Task.WhenAll(_backgroundTasks.Keys.ToArray()).WaitAsync(TimeSpan.FromSeconds(3)).ConfigureAwait(false);
         }
         catch { }
         await PersistSessionAsync().ConfigureAwait(false);
@@ -449,9 +435,9 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
                 _extractionCancellation?.Cancel();
                 AdvanceSessionGeneration();
                 _session.Pause();
-                _events.Add("登录状态已失效，提取已暂停；已保存题目不会丢失", warning: true);
+                _task.AddActivity("登录状态已失效，提取已暂停；已保存题目不会丢失", warning: true);
             }
-            BannerRequested?.Invoke(this, new WorkspaceBannerInfo(
+            _services.Notifications.Show(new WorkspaceBannerInfo(
                 "登录已失效",
                 $"登录状态已过期，提取已暂停；已保存的 {_session.SavedCount} 道题目不会丢失。",
                 Microsoft.UI.Xaml.Controls.InfoBarSeverity.Warning,
@@ -466,9 +452,9 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
                 _extractionCancellation?.Cancel();
                 AdvanceSessionGeneration();
                 _session.Pause();
-                _events.Add("当前页面无访问权限，提取已暂停", warning: true);
+                _task.AddActivity("当前页面无访问权限，提取已暂停", warning: true);
             }
-            BannerRequested?.Invoke(this, new WorkspaceBannerInfo(
+            _services.Notifications.Show(new WorkspaceBannerInfo(
                 "无访问权限",
                 "当前账号没有访问此题库的权限，提取已暂停。",
                 Microsoft.UI.Xaml.Controls.InfoBarSeverity.Error,
@@ -482,9 +468,9 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
                 _extractionCancellation?.Cancel();
                 AdvanceSessionGeneration();
                 _session.Pause();
-                _events.Add($"云考服务暂时不可用 (HTTP {args.StatusCode})，提取已暂停", warning: true);
+                _task.AddActivity($"云考服务暂时不可用 (HTTP {args.StatusCode})，提取已暂停", warning: true);
             }
-            BannerRequested?.Invoke(this, new WorkspaceBannerInfo(
+            _services.Notifications.Show(new WorkspaceBannerInfo(
                 "服务暂时不可用",
                 $"云考服务器返回 HTTP {args.StatusCode}，提取已暂停；请检查网络或稍后重试。",
                 Microsoft.UI.Xaml.Controls.InfoBarSeverity.Error,
@@ -502,11 +488,11 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         if (_session.Status is ExtractionStatus.Running or ExtractionStatus.Paused)
         {
             _session.Pause();
-            _events.Add("WebView2 进程异常退出，正在自动恢复…", warning: true);
+            _task.AddActivity("WebView2 进程异常退出，正在自动恢复…", warning: true);
         }
         RenderPanelState();
         _services.Diagnostics.Warning(message);
-        BannerRequested?.Invoke(this, new WorkspaceBannerInfo(
+        _services.Notifications.Show(new WorkspaceBannerInfo(
             "页面组件异常退出",
             $"页面组件异常退出，正在自动恢复；已提取的 {_session.SavedCount} 道题目已安全保存。",
             Microsoft.UI.Xaml.Controls.InfoBarSeverity.Warning,
@@ -524,8 +510,8 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         _browserRecovering = false;
         _practiceReady = false;
         RenderPanelState();
-        _events.Add("WebView2 自动恢复失败：" + message, warning: true);
-        BannerRequested?.Invoke(this, new WorkspaceBannerInfo(
+        _task.AddActivity("WebView2 自动恢复失败：" + message, warning: true);
+        _services.Notifications.Show(new WorkspaceBannerInfo(
             "页面恢复失败",
             "页面组件自动恢复失败，请尝试刷新页面或重新启动应用。",
             Microsoft.UI.Xaml.Controls.InfoBarSeverity.Error,
@@ -541,11 +527,11 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
             BrowserPageState pageState = await _browser.Service.GetPageStateAsync(_lifetimeCancellation.Token).ConfigureAwait(true);
             _browserRecovering = false;
             ApplyPageState(pageState);
-            _events.Add("WebView2 自动恢复完成", warning: false);
+            _task.AddActivity("WebView2 自动恢复完成", warning: false);
 
             bool canContinue = pageState.IsPracticeReady
                 && _session.Status == ExtractionStatus.Paused;
-            BannerRequested?.Invoke(this, new WorkspaceBannerInfo(
+            _services.Notifications.Show(new WorkspaceBannerInfo(
                 "页面已恢复",
                 canContinue
                     ? $"页面组件已自动恢复；已保存 {_session.SavedCount} 道题目，可以继续提取。"
@@ -567,13 +553,8 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         ExtractionSessionSnapshot? snapshot = _services.InterruptedSessions.FirstOrDefault();
         if (snapshot is null || _session.SavedCount > 0) return;
 
-        void Render()
-        {
-            _panel.SetInterrupted(snapshot.Questions.Count);
-            _events.Add($"发现上次未完成任务：已保存 {snapshot.Questions.Count} 题，可恢复为当前题库");
-        }
-
-        if (!_panel.DispatcherQueue.TryEnqueue(Render)) Render();
+        _task.SetInterrupted(snapshot.Questions.Count);
+        _task.AddActivity($"发现上次未完成任务：已保存 {snapshot.Questions.Count} 题，可恢复为当前题库");
     }
 
     private void RestoreInterruptedSession()
@@ -638,11 +619,11 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
                 catch (WorkerCallException exception) when (exception.Code is "question_unsupported" or "question_not_ready")
                 {
                     if (item.Generation != CurrentSessionGeneration) continue;
-                    _events.Add("当前页面还没有可解析题目，已暂停等待页面稳定", warning: true);
+                    _task.AddActivity("当前页面还没有可解析题目，已暂停等待页面稳定", warning: true);
                     if (_session.Status == ExtractionStatus.Running)
                     {
                         _session.Pause();
-                        BannerRequested?.Invoke(this, new WorkspaceBannerInfo(
+                        _services.Notifications.Show(new WorkspaceBannerInfo(
                             "题目解析暂停",
                             "当前页面尚未检测到可解析的题目内容，已自动暂停；请确认页面题目已加载完全。",
                             Microsoft.UI.Xaml.Controls.InfoBarSeverity.Warning,
@@ -664,7 +645,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
                 {
                     if (item.Generation != CurrentSessionGeneration) continue;
                     _services.Diagnostics.Error("题目处理失败", exception);
-                    _events.Add("题目处理失败：" + exception.Message, warning: true);
+                    _task.AddActivity("题目处理失败：" + exception.Message, warning: true);
                     if (_session.Status == ExtractionStatus.Running)
                     {
                         _session.Fail();
@@ -709,12 +690,12 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         _lastProcessedMarker = question.Marker;
         if (!added)
         {
-            _events.Add($"跳过重复题：{TrimForEvent(question.Title)}");
+            _task.AddActivity($"跳过重复题：{TrimForEvent(question.Title)}");
             Track(PersistSessionAsync());
         }
         else
         {
-            _events.Add($"已保存第 {_session.SavedCount} 题：{TrimForEvent(question.Title)}");
+            _task.AddActivity($"已保存第 {_session.SavedCount} 题：{TrimForEvent(question.Title)}");
             Track(PersistSessionAsync());
             if (string.IsNullOrWhiteSpace(question.Answer) && _services.Settings.Load().AiEnabled)
             {
@@ -735,7 +716,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
         bool clicked = await _browser.Service.ClickNextAsync(cancellationToken).ConfigureAwait(true);
         if (!clicked)
         {
-            _events.Add("未找到下一题按钮，提取已暂停，请检查页面结构", warning: true);
+            _task.AddActivity("未找到下一题按钮，提取已暂停，请检查页面结构", warning: true);
             _session.Pause();
             return;
         }
@@ -766,7 +747,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
             && _session.IsCurrent(sessionId)
             && _session.Status == ExtractionStatus.Running)
         {
-            _events.Add("等待下一题超时，提取已暂停，请检查网络或页面", warning: true);
+            _task.AddActivity("等待下一题超时，提取已暂停，请检查网络或页面", warning: true);
             _session.Pause();
         }
     }
@@ -842,32 +823,14 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
 
     private void OnSessionChanged(object? sender, EventArgs args)
     {
-        void Render()
-        {
-            App.MainWindow?.SetTaskState(_session.Status);
-            _panel.SetState(
-                _session.Status,
-                _session.SavedCount,
-                _practiceReady,
-                _browserRecovering,
-                _loginPage);
-            _export.SetSavedCount(_session.SavedCount);
-            _progress.SetProgress(_session.Current, _session.Total,
-                $"已保存 {_session.SavedCount} 题 · AI 待处理 {_session.AiPending}", _session.SavedCount, _session.AiPending);
-        }
-
-        if (!_panel.DispatcherQueue.TryEnqueue(Render)) Render();
+        RenderPanelState();
+        RenderProgress();
     }
 
     private void OnExportProgress(object? sender, ExportProgress progress)
     {
-        void Render()
-        {
-            _export.SetExportProgress(progress.Current, progress.Total, progress.Message);
-            _events.Add(progress.Message);
-        }
-
-        if (!_progress.DispatcherQueue.TryEnqueue(Render)) Render();
+        _task.SetExportProgress(progress.Current, progress.Total, progress.Message);
+        _task.AddActivity(progress.Message);
     }
 
     private void OnPracticeModeChanged(object? sender, bool enabled)
@@ -877,7 +840,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
             AppSettings settings = _services.Settings.Load();
             settings.ExportWithoutAnswers = enabled;
             _services.Settings.Save(settings);
-            _events.Add(enabled ? "已切换为练习版导出" : "已切换为答案版导出");
+            _task.AddActivity(enabled ? "已切换为练习版导出" : "已切换为答案版导出");
         }
         catch (Exception exception)
         {
@@ -888,21 +851,18 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
     private void Track(Task task)
     {
         if (_disposed) return;
-        _backgroundTasks.Add(task);
+        _backgroundTasks.TryAdd(task, 0);
         _ = ObserveAsync(task);
     }
 
-    private void SetAiStatus(string status, string detail)
-    {
-        void Render() => _aiStatus.SetStatus(status, detail);
-        if (!_aiStatus.DispatcherQueue.TryEnqueue(Render)) Render();
-    }
+    private void SetAiStatus(string status, string detail) => _task.SetAiStatus(status, detail);
 
     private async Task ObserveAsync(Task task)
     {
         try { await task.ConfigureAwait(false); }
         catch (OperationCanceledException) { }
         catch (Exception exception) { _services.Diagnostics.Error("后台任务失败", exception); }
+        finally { _backgroundTasks.TryRemove(task, out _); }
     }
 
     private async Task PersistSessionAsync()
@@ -959,18 +919,15 @@ public sealed class ExtractionCoordinator : IAsyncDisposable
 
     private void RenderPanelState()
     {
-        void Render()
-        {
-            _panel.SetState(
-                _session.Status,
-                _session.SavedCount,
-                _practiceReady,
-                _browserRecovering,
-                _loginPage);
-        }
-
-        if (!_panel.DispatcherQueue.TryEnqueue(Render)) Render();
+        _task.ApplySnapshot(new TaskSnapshot(
+            _session.Status,
+            _session.SavedCount,
+            _practiceReady,
+            _browserRecovering,
+            _loginPage));
     }
+
+    private void RenderProgress() => _task.SetProgress(_session.Current, _session.Total, _session.AiPending);
 
     private static bool TryReadProgress(JsonElement root, out int current, out int total)
     {

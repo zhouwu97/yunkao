@@ -14,6 +14,7 @@ public partial class App : Application
 
     public App()
     {
+        UnhandledException += (_, args) => Services.Diagnostics.Error("界面发生未处理异常", args.Exception);
         InitializeComponent();
     }
 

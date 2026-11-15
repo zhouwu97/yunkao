@@ -2,28 +2,29 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
 using Microsoft.UI.Composition;
-using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Hosting;
-using Microsoft.UI.Xaml.Input;
 using Windows.System;
-using Windows.UI.Core;
+using YunKao.Core.Services;
 using YunKao.Services;
+using YunKao.ViewModels;
 
 namespace YunKao.Controls;
 
 /// <summary>
-/// WebView2 浏览器壳。它只负责浏览器生命周期和消息转发，不解析题目、不启动 Worker。
+/// WebView2 宿主。负责浏览器生命周期、页面宽度适配和消息转发；
+/// 地址、导航状态通过 <see cref="BrowserViewModel"/> 同步到侧边栏。不解析题目、不启动 Worker。
 /// </summary>
-public sealed partial class BrowserShell : UserControl
+public sealed partial class BrowserShell : UserControl, IBrowserActions
 {
     private readonly WebViewService _service = new();
-    private CompositionRoundedRectangleGeometry? _webClipGeometry;
-    private CompositionGeometricClip? _webClip;
+    private readonly SemaphoreSlim _fitWidthGate = new(1, 1);
+    private CancellationTokenSource? _fitWidthResizeCts;
     private bool _loaded;
     private bool _fitWidth = true;
-    private string _fullAddress = "https://www.cctrcloud.net/";
+    private long _navigationRevision;
+    private CompositionRoundedRectangleGeometry? _clipGeometry;
 
     public BrowserShell()
     {
@@ -31,13 +32,17 @@ public sealed partial class BrowserShell : UserControl
         _service.NavigationChanged += OnNavigationChanged;
         _service.StatusChanged += OnStatusChanged;
         _service.ProcessFailed += OnProcessFailed;
-        _service.BridgeMessageReceived += OnBridgeMessageReceived;
+        _service.BridgeMessageReceived += (_, args) => BridgeMessageReceived?.Invoke(this, args);
+        _service.AddressRequested += (_, _) => DispatcherQueue.TryEnqueue(ViewModel.RequestAddressEdit);
+        ViewModel.Attach(this);
     }
 
     public WebViewService Service => _service;
+    public BrowserViewModel ViewModel => App.Services.Browser;
     public event EventHandler<BridgeMessageEventArgs>? BridgeMessageReceived;
     public event EventHandler<string>? ProcessFailed;
-    public event EventHandler? TaskRequested;
+
+    private WorkspaceRuntime Workspace => App.Services.Workspace;
 
     private async void OnLoaded(object sender, RoutedEventArgs args)
     {
@@ -52,171 +57,216 @@ public sealed partial class BrowserShell : UserControl
         {
             WebViewErrorOverlay.Visibility = Visibility.Collapsed;
             await _service.InitializeAsync(WebView);
-            App.Services.Workspace.WebViewInitialized = true;
-            App.Services.Workspace.BrowserVersion = _service.BrowserVersion;
-            App.Services.Workspace.BrowserStatus = "WebView2 已就绪";
+            Workspace.WebViewInitialized = true;
+            Workspace.BrowserVersion = _service.BrowserVersion;
+            SetStatus("WebView2 已就绪");
             _service.Navigate(new Uri("https://www.cctrcloud.net/"));
+            // 启动后把焦点交给网页，避免侧边栏第一个按钮出现键盘焦点框。
+            WebView.Focus(FocusState.Programmatic);
         }
         catch (WebViewInitializationException exception)
         {
-            StatusText.Text = exception.Message + "，请安装 Evergreen Runtime。";
-            App.Services.Workspace.BrowserStatus = StatusText.Text;
+            SetStatus(exception.Message + "，请安装 Evergreen Runtime。");
             ErrorMessageText.Text = "融智云考需要 Microsoft Edge WebView2 Runtime。当前系统尚未安装或版本过低，请点击下方按钮下载安装。";
             WebViewErrorOverlay.Visibility = Visibility.Visible;
         }
         catch (Exception exception)
         {
-            StatusText.Text = "浏览器启动失败：" + exception.Message;
-            App.Services.Workspace.BrowserStatus = StatusText.Text;
+            SetStatus("浏览器启动失败：" + exception.Message);
             ErrorMessageText.Text = "浏览器启动失败：" + exception.Message;
             WebViewErrorOverlay.Visibility = Visibility.Visible;
         }
     }
 
-    private void OnBackClick(object sender, RoutedEventArgs args) => _service.Back();
-    private void OnForwardClick(object sender, RoutedEventArgs args) => _service.Forward();
-    private void OnRefreshClick(object sender, RoutedEventArgs args) => _service.Refresh();
-    private void OnHomeClick(object sender, RoutedEventArgs args) => _service.GoHome();
-    private void OnExternalClick(object sender, RoutedEventArgs args) => _service.OpenExternal();
+    // ---------------- IBrowserActions ----------------
 
-    private void OnTaskClick(object sender, RoutedEventArgs args) => TaskRequested?.Invoke(this, EventArgs.Empty);
+    public void Back() => _service.Back();
+    public void Forward() => _service.Forward();
+    public void Refresh() => _service.Refresh();
+    public void Home() => _service.GoHome();
+    public void OpenExternal() => _service.OpenExternal();
 
-    private async void OnFitWidthClick(object sender, RoutedEventArgs args)
+    public async void ToggleFitWidth()
     {
         _fitWidth = !_fitWidth;
-        if (_fitWidth)
+        _fitWidthResizeCts?.Cancel();
+        if (_fitWidth) await ApplyFitWidthAsync();
+        else await ApplyOriginalZoomAsync();
+    }
+
+    public string? Navigate(string input)
+    {
+        input = (input ?? "").Trim();
+        if (input.Length == 0) return "请输入网址";
+        if (input.Contains("://", StringComparison.Ordinal)
+            && !input.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
-            await ApplyFitWidthAsync();
-            return;
+            return "地址必须是 HTTPS URL。";
         }
-
-        if (_service.IsInitialized && WebViewService.IsAllowedHost(_service.CurrentUri))
-        {
-            await _service.ExecuteScriptAsync("document.documentElement.style.zoom = '100%';");
-        }
-        FitWidthButton.Content = "原始大小 · 100%";
-        StatusText.Text = "页面已恢复为 100% 缩放";
-    }
-
-    private void OnInstallWebView2Click(object sender, RoutedEventArgs args)
-    {
-        Process.Start(new ProcessStartInfo("https://go.microsoft.com/fwlink/p/?LinkId=2124703") { UseShellExecute = true });
-    }
-
-    private async void OnRetryWebView2Click(object sender, RoutedEventArgs args)
-    {
-        await InitializeBrowserAsync();
-    }
-
-    private void OnAddressDisplayTapped(object sender, TappedRoutedEventArgs args)
-    {
-        BeginAddressEdit();
-    }
-
-    private void BeginAddressEdit()
-    {
-        AddressDisplay.Visibility = Visibility.Collapsed;
-        AddressBox.Visibility = Visibility.Visible;
-        AddressBox.Text = _fullAddress;
-        AddressBox.Focus(FocusState.Programmatic);
-        AddressBox.SelectAll();
-    }
-
-    private void OnAddressKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs args)
-    {
-        if (args.Key == VirtualKey.Escape)
-        {
-            args.Handled = true;
-            OnAddressLostFocus(sender, args);
-            return;
-        }
-        if (args.Key != VirtualKey.Enter) return;
-        args.Handled = true;
-        string input = AddressBox.Text.Trim();
         if (!input.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) input = "https://" + input;
         if (!Uri.TryCreate(input, UriKind.Absolute, out Uri? uri)
             || !uri.Scheme.Equals(Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
         {
-            StatusText.Text = "地址必须是 HTTPS URL。";
-            return;
+            return "地址必须是 HTTPS URL。";
         }
 
         try
         {
             _service.Navigate(uri);
-            AddressBox.Visibility = Visibility.Collapsed;
-            AddressDisplay.Visibility = Visibility.Visible;
-            Focus(FocusState.Programmatic);
+            return null;
         }
-        catch (Exception exception) { StatusText.Text = "导航失败：" + exception.Message; }
+        catch (Exception exception)
+        {
+            return "导航失败：" + exception.Message;
+        }
     }
 
-    private void OnRootKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs args)
+    internal bool TryHandleShortcut(VirtualKey key, VirtualKeyModifiers modifiers)
     {
-        if (args.Key == VirtualKey.L && args.KeyStatus.IsExtendedKey == false)
+        if (key == VirtualKey.L && modifiers == VirtualKeyModifiers.Control)
         {
-            // Ctrl+L 是桌面浏览器约定的地址栏快捷键。
-            if (IsModifierDown(VirtualKey.Control))
-            {
-                BeginAddressEdit();
-                args.Handled = true;
-                return;
-            }
+            ViewModel.RequestAddressEdit();
+            return true;
         }
-
-        if (args.Key == VirtualKey.Left && args.KeyStatus.IsExtendedKey == false
-            && IsModifierDown(VirtualKey.Menu))
+        if (key == VirtualKey.Left && modifiers == VirtualKeyModifiers.Menu)
         {
             _service.Back();
-            args.Handled = true;
-            return;
+            return true;
         }
-
-        if (args.Key == VirtualKey.F5
-            || (args.Key == VirtualKey.R
-                && IsModifierDown(VirtualKey.Control)))
+        if (key == VirtualKey.Right && modifiers == VirtualKeyModifiers.Menu)
+        {
+            _service.Forward();
+            return true;
+        }
+        if ((key == VirtualKey.F5 && modifiers == VirtualKeyModifiers.None)
+            || (key == VirtualKey.R && modifiers == VirtualKeyModifiers.Control))
         {
             _service.Refresh();
-            args.Handled = true;
-            return;
+            return true;
         }
-
-        if (args.Key == VirtualKey.Escape && AddressBox.Visibility == Visibility.Visible)
-        {
-            OnAddressLostFocus(sender, args);
-            args.Handled = true;
-        }
+        return false;
     }
+
+    // ---------------- 浏览器事件 ----------------
 
     private async void OnNavigationChanged(object? sender, BrowserNavigationEventArgs args)
     {
-        _fullAddress = args.Uri?.AbsoluteUri ?? _fullAddress;
-        string display = FormatAddress(args.Uri);
-        AddressDisplay.Text = display;
-        AddressBox.Text = display;
-        ToolTipService.SetToolTip(AddressBox, _fullAddress);
-        ToolTipService.SetToolTip(AddressDisplay, _fullAddress);
-        StatusText.Text = args.Message;
-        App.Services.Workspace.CurrentUrl = args.Uri;
-        App.Services.Workspace.BridgeInstalled = _service.IsBridgeInstalled;
-        App.Services.Workspace.BrowserVersion = _service.BrowserVersion;
-        App.Services.Workspace.BrowserStatus = args.Message;
+        ++_navigationRevision;
+        ViewModel.SetNavigationState(_service.CanGoBack, _service.CanGoForward);
+        ViewModel.SetAddress(args.Uri);
+        SetStatus(args.Message);
+        Workspace.CurrentUrl = args.Uri;
+        Workspace.BridgeInstalled = _service.IsBridgeInstalled;
+        Workspace.BrowserVersion = _service.BrowserVersion;
+        if (args.Message == "导航完成")
+        {
+            Workspace.PageScrollWidth = 0;
+            Workspace.PageViewportWidth = 0;
+            Workspace.PageZoomPercent = 100;
+        }
+        Workspace.WebViewZoomMode = _fitWidth ? "FitWidth" : "100%";
         if (args.Success && args.Message == "导航完成" && _fitWidth)
         {
             await ApplyFitWidthAsync();
         }
     }
 
-    private async Task ApplyFitWidthAsync()
+    private void OnStatusChanged(object? sender, string message)
+    {
+        SetStatus(message);
+        Workspace.BridgeInstalled = _service.IsBridgeInstalled;
+    }
+
+    private void OnProcessFailed(object? sender, string message)
+    {
+        SetStatus(message + "，正在重建 WebView2。");
+        Workspace.WebViewInitialized = false;
+        Workspace.BridgeInstalled = false;
+        ProcessFailed?.Invoke(this, message);
+    }
+
+    private void SetStatus(string message)
+    {
+        ViewModel.StatusText = message;
+        Workspace.BrowserStatus = message;
+    }
+
+    private void OnInstallWebView2Click(object sender, RoutedEventArgs args)
+        => Process.Start(new ProcessStartInfo("https://go.microsoft.com/fwlink/p/?LinkId=2124703") { UseShellExecute = true });
+
+    private async void OnRetryWebView2Click(object sender, RoutedEventArgs args) => await InitializeBrowserAsync();
+
+    // ---------------- 页面宽度适配 ----------------
+
+    private async Task ApplyOriginalZoomAsync()
+    {
+        if (_service.IsInitialized && WebViewService.IsAllowedHost(_service.CurrentUri))
+        {
+            await _fitWidthGate.WaitAsync();
+            try
+            {
+                await _service.ExecuteScriptAsync("document.getElementById('__yunkaoLoginLayout')?.remove(); document.documentElement.style.zoom = '100%';");
+                Workspace.WebViewZoomMode = "100%";
+                Workspace.PageZoomPercent = 100;
+            }
+            catch (Exception exception)
+            {
+                App.Services.Diagnostics.Warning("恢复页面原始缩放失败：" + exception.Message);
+            }
+            finally
+            {
+                _fitWidthGate.Release();
+            }
+        }
+
+        ViewModel.ZoomLabel = "原始大小 100%";
+        SetStatus("页面已恢复为 100% 缩放");
+    }
+
+    private async Task ApplyFitWidthAsync(CancellationToken cancellationToken = default, bool fromResize = false)
     {
         if (!_service.IsInitialized || !WebViewService.IsAllowedHost(_service.CurrentUri)) return;
+
+        bool gateEntered = false;
+        long revision = _navigationRevision;
         try
         {
-            const string measureScript = "(() => { document.documentElement.style.zoom = '100%'; return Math.max(document.documentElement?.scrollWidth || 0, document.body?.scrollWidth || 0) + ':' + Math.max(document.documentElement?.clientWidth || 0, window.innerWidth || 0); })();";
-            string raw = await _service.ExecuteScriptAsync(measureScript);
+            await _fitWidthGate.WaitAsync(cancellationToken);
+            gateEntered = true;
+            if (!_fitWidth) return;
+
+            BrowserPageState pageState = await _service.GetPageStateAsync(cancellationToken);
+            const string measureScript = """
+                (() => {
+                    const root = document.documentElement;
+                    const previous = root.style.zoom;
+                    try {
+                        root.style.zoom = '100%';
+                        const viewport = Math.max(root.clientWidth, window.innerWidth || 0);
+                        const login = document.querySelector('.login_layouts');
+                        let layoutStyle = document.getElementById('__yunkaoLoginLayout');
+                        if (login && viewport < 860) {
+                            if (!layoutStyle) {
+                                layoutStyle = document.createElement('style');
+                                layoutStyle.id = '__yunkaoLoginLayout';
+                                document.head.appendChild(layoutStyle);
+                            }
+                            layoutStyle.textContent = '.login_layouts{width:600px!important;margin-left:-300px!important;height:700px!important;margin-top:-350px!important}.login_cont_left{display:none!important}';
+                        } else {
+                            layoutStyle?.remove();
+                        }
+                        const rect = login?.getBoundingClientRect();
+                        const width = Math.max(root.scrollWidth, document.body?.scrollWidth || 0, rect?.width || 0);
+                        return [width, viewport, Math.max(0, window.innerHeight - 24), rect?.height || 0].join(':');
+                    } finally {
+                        root.style.zoom = previous;
+                    }
+                })();
+                """;
+            string raw = await _service.ExecuteScriptAsync(measureScript, cancellationToken);
             string value = System.Text.Json.JsonSerializer.Deserialize<string>(raw) ?? "";
-            string[] dimensions = value.Split(':', 2);
-            if (dimensions.Length != 2
+            string[] dimensions = value.Split(':');
+            if (dimensions.Length != 4
                 || !double.TryParse(dimensions[0], NumberStyles.Float, CultureInfo.InvariantCulture, out double scrollWidth)
                 || !double.TryParse(dimensions[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double viewportWidth)
                 || scrollWidth <= 0
@@ -225,77 +275,74 @@ public sealed partial class BrowserShell : UserControl
                 return;
             }
 
-            double factor = Math.Clamp(viewportWidth / scrollWidth, 0.75, 1.0);
-            int percent = (int)Math.Round(factor * 100);
-            await _service.ExecuteScriptAsync($"document.documentElement.style.zoom = '{percent}%';");
-            FitWidthButton.Content = $"适应宽度 · {percent}%";
-            StatusText.Text = percent < 100 ? $"导航完成 · 页面已适配到当前视区（{percent}%）" : "导航完成 · 页面完整可见";
+            double.TryParse(dimensions[2], NumberStyles.Float, CultureInfo.InvariantCulture, out double viewportHeight);
+            double.TryParse(dimensions[3], NumberStyles.Float, CultureInfo.InvariantCulture, out double contentHeight);
+            BrowserZoomResult result = BrowserZoomCalculator.Calculate(viewportWidth, scrollWidth, pageState, viewportHeight, contentHeight);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!_fitWidth || revision != _navigationRevision) return;
+            await _service.ExecuteScriptAsync($"document.documentElement.style.zoom = '{result.Percent}%';", cancellationToken);
+            if (!_fitWidth || revision != _navigationRevision) return;
+
+            Workspace.WebViewActualWidth = WebView.ActualWidth;
+            Workspace.PageScrollWidth = result.ScrollWidth;
+            Workspace.PageViewportWidth = result.ViewportWidth;
+            Workspace.WebViewZoomMode = "FitWidth";
+            Workspace.PageZoomPercent = result.Percent;
+            ViewModel.ZoomLabel = $"适应宽度 {result.Percent}%";
+            SetStatus(result.Percent < 100
+                ? $"已缩放至 {result.Percent}% 以适应宽度"
+                : "页面完整显示");
+        }
+        catch (OperationCanceledException)
+        {
+            // 窗口继续变化时，丢弃过期的测量结果。
         }
         catch (Exception exception)
         {
             App.Services.Diagnostics.Warning("页面宽度适配失败：" + exception.Message);
         }
-    }
-
-    private void OnAddressLostFocus(object sender, RoutedEventArgs args)
-    {
-        if (Uri.TryCreate(_fullAddress, UriKind.Absolute, out Uri? uri))
+        finally
         {
-            AddressDisplay.Text = FormatAddress(uri);
-            AddressBox.Text = AddressDisplay.Text;
+            if (gateEntered) _fitWidthGate.Release();
         }
-
-        AddressBox.Visibility = Visibility.Collapsed;
-        AddressDisplay.Visibility = Visibility.Visible;
     }
 
-    private void OnWebViewSurfaceSizeChanged(object sender, SizeChangedEventArgs args)
+    /// <summary>WebView2 原生 surface 不受父级圆角裁切，在 Composition visual 上补圆角，与内容卡片一致。</summary>
+    private void ApplyRoundedClip()
     {
-        // Border 的圆角不一定能裁切 WebView2 原生 surface，因此在 Composition visual 上补真实圆角裁切。
-        if (WebView.ActualWidth <= 0 || WebView.ActualHeight <= 0) return;
-
         Visual visual = ElementCompositionPreview.GetElementVisual(WebView);
-        Compositor compositor = visual.Compositor;
-        _webClipGeometry ??= compositor.CreateRoundedRectangleGeometry();
-        _webClip ??= compositor.CreateGeometricClip(_webClipGeometry);
-        _webClipGeometry.Size = new Vector2((float)WebView.ActualWidth, (float)WebView.ActualHeight);
-        _webClipGeometry.CornerRadius = new Vector2(14, 14);
-        visual.Clip = _webClip;
+        if (_clipGeometry is null)
+        {
+            _clipGeometry = visual.Compositor.CreateRoundedRectangleGeometry();
+            _clipGeometry.CornerRadius = new Vector2(9, 9);
+            visual.Clip = visual.Compositor.CreateGeometricClip(_clipGeometry);
+        }
+        _clipGeometry.Size = new Vector2((float)WebView.ActualWidth, (float)WebView.ActualHeight);
     }
 
-    private static string FormatAddress(Uri? uri)
+    private async void OnWebViewSurfaceSizeChanged(object sender, SizeChangedEventArgs args)
     {
-        if (uri is null) return "cctrcloud.net";
-        string path = string.IsNullOrWhiteSpace(uri.AbsolutePath) || uri.AbsolutePath == "/"
-            ? ""
-            : uri.AbsolutePath.TrimEnd('/');
-        return string.IsNullOrWhiteSpace(path)
-            ? uri.Host
-            : $"{uri.Host} {path.Replace("/", " / ", StringComparison.Ordinal)}";
-    }
+        if (WebView.ActualWidth <= 0 || WebView.ActualHeight <= 0) return;
+        ApplyRoundedClip();
+        Workspace.WebViewActualWidth = WebView.ActualWidth;
+        if (!_fitWidth || !_service.IsInitialized) return;
 
-    private void OnStatusChanged(object? sender, string message)
-    {
-        StatusText.Text = message;
-        App.Services.Workspace.BrowserStatus = message;
-        App.Services.Workspace.BridgeInstalled = _service.IsBridgeInstalled;
-    }
-    private void OnProcessFailed(object? sender, string message)
-    {
-        StatusText.Text = message + "，正在重建 WebView2。";
-        App.Services.Workspace.WebViewInitialized = false;
-        App.Services.Workspace.BridgeInstalled = false;
-        App.Services.Workspace.BrowserStatus = StatusText.Text;
-        ProcessFailed?.Invoke(this, message);
-    }
-
-    private void OnBridgeMessageReceived(object? sender, BridgeMessageEventArgs args)
-    {
-        BridgeMessageReceived?.Invoke(this, args);
-    }
-
-    private static bool IsModifierDown(VirtualKey key)
-    {
-        return InputKeyboardSource.GetKeyStateForCurrentThread(key).HasFlag(CoreVirtualKeyStates.Down);
+        _fitWidthResizeCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _fitWidthResizeCts = cts;
+        try
+        {
+            await Task.Delay(120, cts.Token);
+            await ApplyFitWidthAsync(cts.Token, fromResize: true);
+        }
+        catch (OperationCanceledException)
+        {
+            // 仅保留最后一次尺寸变化的适配请求。
+        }
+        finally
+        {
+            cts.Dispose();
+            if (ReferenceEquals(_fitWidthResizeCts, cts)) _fitWidthResizeCts = null;
+        }
     }
 }

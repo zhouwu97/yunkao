@@ -31,6 +31,19 @@ public sealed class BrowserHttpEventArgs(Uri? uri, int statusCode, BrowserResour
 /// </summary>
 public sealed class WebViewService : IAsyncDisposable
 {
+    private const string AddressShortcutMessage = "__yunkao_ui_focus_address";
+    private const string AddressShortcutScript = """
+        (() => {
+            if (window.top !== window || window.__yunkaoAddressShortcut) return;
+            window.__yunkaoAddressShortcut = true;
+            document.addEventListener('keydown', event => {
+                if (!event.isTrusted || !event.ctrlKey || event.altKey || event.shiftKey || event.metaKey
+                    || event.key.toLowerCase() !== 'l') return;
+                event.preventDefault();
+                window.chrome?.webview?.postMessage('__yunkao_ui_focus_address');
+            }, true);
+        })();
+        """;
     private WebView2? _view;
     private CoreWebView2? _core;
     private string? _bridgeScript;
@@ -47,6 +60,7 @@ public sealed class WebViewService : IAsyncDisposable
     public string BrowserVersion => _core?.Environment.BrowserVersionString ?? "未初始化";
 
     public event EventHandler<BrowserNavigationEventArgs>? NavigationChanged;
+    public event EventHandler? AddressRequested;
     public event EventHandler<BridgeMessageEventArgs>? BridgeMessageReceived;
     public event EventHandler<string>? StatusChanged;
     public event EventHandler<string>? ProcessFailed;
@@ -148,7 +162,7 @@ public sealed class WebViewService : IAsyncDisposable
 
         try
         {
-            const string script = "(() => { const state = window.YunKaoBridge && window.YunKaoBridge.checkPracticeState ? window.YunKaoBridge.checkPracticeState() : { isLogin: false, isPractice: false, url: window.location.href, title: document.title }; return JSON.stringify(state); })();";
+            const string script = "(() => { const state = window.YunKaoBridge && window.YunKaoBridge.checkPracticeState ? window.YunKaoBridge.checkPracticeState() : { isLogin: !!document.querySelector('.login_layouts, input[type=password], #password_hide'), isPractice: false, url: window.location.href, title: document.title }; return JSON.stringify(state); })();";
             string result = await ExecuteScriptAsync(script, cancellationToken).ConfigureAwait(true);
             BrowserPageState state = DeserializePageState(DeserializeScriptString(result));
             PageState = state;
@@ -318,6 +332,12 @@ public sealed class WebViewService : IAsyncDisposable
         CurrentUri = uri;
         IsBridgeInstalled = false;
         PageState = new(false, false, uri?.AbsoluteUri ?? "", "");
+        if (args.IsSuccess && IsAllowedHost(uri))
+        {
+            // 仅转发地址栏操作，不安装题目 Bridge、不读取表单内容。
+            try { await sender.ExecuteScriptAsync(AddressShortcutScript); }
+            catch (Exception exception) { StatusChanged?.Invoke(this, "网页快捷键未就绪：" + exception.Message); }
+        }
         if (args.IsSuccess && IsAllowedBridgePage(uri) && !string.IsNullOrWhiteSpace(_bridgeScript))
         {
             try
@@ -364,6 +384,12 @@ public sealed class WebViewService : IAsyncDisposable
         try
         {
             string message = args.TryGetWebMessageAsString();
+            if (message == AddressShortcutMessage)
+            {
+                if (IsAllowedHost(CurrentUri) && IsCurrentDocumentUri(TryGetUri(args.Source)))
+                    AddressRequested?.Invoke(this, EventArgs.Empty);
+                return;
+            }
             ObserveBridgeLifecycle(message);
             BridgeMessageReceived?.Invoke(this, new BridgeMessageEventArgs(message));
         }

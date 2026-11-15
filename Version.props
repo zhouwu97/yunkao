@@ -2,5 +2,8 @@
   <PropertyGroup>
     <!-- WinUI、Worker 和 Python 发布物共享根目录 VERSION。 -->
     <YunKaoVersion>$([System.IO.File]::ReadAllText('$(MSBuildThisFileDirectory)VERSION').Trim())</YunKaoVersion>
+    <Version>$(YunKaoVersion)</Version>
+    <AssemblyVersion>$(YunKaoVersion).0</AssemblyVersion>
+    <FileVersion>$(YunKaoVersion).0</FileVersion>
   </PropertyGroup>
 </Project>

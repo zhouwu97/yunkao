@@ -52,6 +52,9 @@ public sealed class AppSettings
     [JsonPropertyName("appearance_clarity")]
     public string AppearanceClarity { get; set; } = "standard";
 
+    [JsonPropertyName("appearance_theme")]
+    public string AppearanceTheme { get; set; } = "system";
+
     [JsonPropertyName("reduce_motion")]
     public bool ReduceMotion { get; set; }
 }

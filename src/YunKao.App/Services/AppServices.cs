@@ -1,5 +1,6 @@
 using YunKao.Core.Models;
 using YunKao.Core.Services;
+using YunKao.ViewModels;
 
 namespace YunKao.Services;
 
@@ -32,6 +33,9 @@ public sealed class AppServices : IAsyncDisposable
     public AiService Ai { get; }
     public AiTaskQueue AiQueue { get; }
     public WorkspaceRuntime Workspace { get; } = new();
+    public TaskViewModel Task { get; } = new();
+    public BrowserViewModel Browser { get; } = new();
+    public NotificationService Notifications { get; } = new();
     public ExtractionCoordinator? Coordinator => _workspaceCoordinator as ExtractionCoordinator;
     public IReadOnlyList<ExtractionSessionSnapshot> InterruptedSessions { get; private set; } = Array.Empty<ExtractionSessionSnapshot>();
     public event EventHandler? Initialized;

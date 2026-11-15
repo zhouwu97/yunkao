@@ -24,6 +24,8 @@
 ## 当前范围
 
 - `YunKao.App`：WinUI 3 单项目 MSIX、Light Theme、Desktop Acrylic 降级链、标题栏、左侧导航、工作台、设置页、历史、导出和诊断页面。
+- `Views/WorkspacePage.xaml`：任务面板始终作为 Overlay Drawer 覆盖网页，宽度限制在 280–344 DIP，不因抽屉开合改变 WebView 视口。
+- `Controls/BrowserShell.xaml`：FitWidth 在导航完成和窗口尺寸稳定后重新测量，练习页、登录/首页使用不同缩放下限。
 - `Themes/`：颜色、排版、控件和玻璃卡片资源，冰蓝为主色，AI 使用淡紫，导出预留暖橙色。
 - `Scripts/yunkao-bridge.js`：受页面来源限制注入，负责题目标记、下一题点击和凭据桥接。
 - `Services/BackdropService.cs`：Desktop Acrylic → Mica → Solid，系统高对比度时主动关闭透明材质。

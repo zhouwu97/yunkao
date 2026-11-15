@@ -1,6 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Animation;
 using YunKao.Services;
 using Windows.Foundation;
 
@@ -20,90 +20,134 @@ public sealed class NavigationRequestEventArgs(NavigationTarget target) : EventA
     public NavigationTarget Target { get; } = target;
 }
 
+/// <summary>
+/// 侧边导航。选中指示是一块玻璃：移动时纵向拉伸、横向收窄，再弹回原形。
+/// </summary>
 public sealed partial class NavigationRail : UserControl
 {
     private NavigationTarget _activeTarget = NavigationTarget.Workspace;
     private bool _isLoaded;
-    private readonly Dictionary<NavigationTarget, double> _buttonY = [];
-    public event EventHandler<NavigationRequestEventArgs>? NavigationRequested;
+    private bool _compact;
+    private Storyboard? _moveStoryboard;
 
     public NavigationRail()
     {
         InitializeComponent();
-        Loaded += OnLoaded;
-        SetActive(NavigationTarget.Workspace);
+        Loaded += (_, _) =>
+        {
+            _isLoaded = true;
+            ApplyStyles();
+            MoveSelection(animate: false);
+        };
+        SizeChanged += OnLayoutChanged;
     }
+
+    public event EventHandler<NavigationRequestEventArgs>? NavigationRequested;
 
     public void SetActive(NavigationTarget target)
     {
         bool changed = _activeTarget != target;
         _activeTarget = target;
-        Brush transparent = (Brush)Application.Current.Resources["TransparentBrush"];
-        WorkspaceButton.Background = transparent;
-        HistoryButton.Background = transparent;
-        ExportButton.Background = transparent;
-        DiagnosticsButton.Background = transparent;
-        SettingsButton.Background = transparent;
-        WorkspaceButton.BorderBrush = transparent;
-        HistoryButton.BorderBrush = transparent;
-        ExportButton.BorderBrush = transparent;
-        DiagnosticsButton.BorderBrush = transparent;
-        SettingsButton.BorderBrush = transparent;
-        if (_isLoaded) MoveSelectionBlob(changed);
+        ApplyStyles();
+        if (_isLoaded) MoveSelection(changed);
     }
 
+    /// <summary>紧凑模式只显示图标，按钮与选中块收为方形。</summary>
     public void SetCompact(bool compact)
     {
-        // 68/64/60px rail 都使用同一套图标模式，避免在阈值附近抖动布局。
+        _compact = compact;
+        ApplyStyles();
+        SelectionBlob.Width = compact ? 44 : double.NaN;
+        SelectionBlob.HorizontalAlignment = compact ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
+        if (_isLoaded) DispatcherQueue.TryEnqueue(() => MoveSelection(animate: false));
     }
 
-    private void OnLoaded(object sender, RoutedEventArgs args)
+    private void OnLayoutChanged(object sender, SizeChangedEventArgs args)
     {
-        _isLoaded = true;
-        MotionService.SetSoftShadow(SelectionShape, enabled: true);
-        CacheButtonPositions();
-        MoveSelectionBlob(animate: false);
+        if (_isLoaded) MoveSelection(animate: false);
     }
 
-    private void OnNavigationAreaSizeChanged(object sender, SizeChangedEventArgs args)
+    private void ApplyStyles()
     {
-        if (_isLoaded)
-        {
-            CacheButtonPositions();
-            MoveSelectionBlob(animate: false);
-        }
-    }
-
-    private void MoveSelectionBlob(bool animate)
-    {
-        if (_buttonY.Count == 0) CacheButtonPositions();
-        double firstY = _buttonY.GetValueOrDefault(NavigationTarget.Workspace);
-        double targetY = _buttonY.GetValueOrDefault(_activeTarget, firstY);
-        SelectionBlob.Margin = new Thickness(0, firstY, 0, 0);
-        double translation = targetY - firstY;
-        if (!animate)
-        {
-            SelectionTranslation.Y = translation;
-            SelectionScale.ScaleX = 1;
-            SelectionScale.ScaleY = 1;
-            return;
-        }
-
-        MotionService.AnimateTranslateY(SelectionBlob, translation, 180);
-        SelectionScale.ScaleX = 0.90;
-        SelectionScale.ScaleY = 1.20;
-        MotionService.AnimateScaleXY(SelectionShape, 1.08, 0.94, 90, () =>
-            MotionService.AnimateScaleXY(SelectionShape, 1, 1, 130));
-    }
-
-    private void CacheButtonPositions()
-    {
-        _buttonY.Clear();
+        var normal = (Style)Application.Current.Resources["SidebarNavItemStyle"];
+        var selected = (Style)Application.Current.Resources["SidebarNavItemSelectedStyle"];
         foreach (NavigationTarget target in Enum.GetValues<NavigationTarget>())
         {
             Button button = GetButton(target);
-            _buttonY[target] = button.TransformToVisual(NavigationArea).TransformPoint(new Point(0, 0)).Y;
+            Style style = target == _activeTarget ? selected : normal;
+            if (!ReferenceEquals(button.Style, style)) button.Style = style;
+
+            // 样式切换会重置本地值，紧凑尺寸在样式之后应用。
+            button.Width = _compact ? 44 : double.NaN;
+            button.HorizontalAlignment = _compact ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
+            button.HorizontalContentAlignment = _compact ? HorizontalAlignment.Center : HorizontalAlignment.Left;
+            button.Padding = _compact ? new Thickness(0) : new Thickness(12, 0, 12, 0);
+            if (button.Content is StackPanel content && content.Children.Count > 1)
+            {
+                content.Children[1].Visibility = _compact ? Visibility.Collapsed : Visibility.Visible;
+            }
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetItemStatus(button, target == _activeTarget ? "当前页" : "");
         }
+    }
+
+    private void MoveSelection(bool animate)
+    {
+        Button button = GetButton(_activeTarget);
+        if (button.ActualHeight <= 0) return;
+        double translation = button.TransformToVisual(NavigationItems).TransformPoint(new Point(0, 0)).Y;
+
+        _moveStoryboard?.Stop();
+        if (!animate || MotionService.ReduceMotion)
+        {
+            SelectionTransform.TranslateY = translation;
+            SelectionTransform.ScaleX = 1;
+            SelectionTransform.ScaleY = 1;
+            return;
+        }
+
+        double distance = Math.Abs(translation - SelectionTransform.TranslateY);
+        double stretch = 1 + Math.Min(0.12, distance / 800);
+        var storyboard = new Storyboard();
+        var move = new DoubleAnimation
+        {
+            To = translation,
+            Duration = new Duration(TimeSpan.FromMilliseconds(340)),
+            EasingFunction = new ExponentialEase { EasingMode = EasingMode.EaseOut, Exponent = 5 },
+        };
+        Storyboard.SetTarget(move, SelectionTransform);
+        Storyboard.SetTargetProperty(move, "TranslateY");
+        storyboard.Children.Add(move);
+        storyboard.Children.Add(Wobble("ScaleY", stretch));
+        _moveStoryboard = storyboard;
+        storyboard.Begin();
+    }
+
+    /// <summary>形变关键帧：拉伸 → 轻微过冲 → 复原。</summary>
+    private DoubleAnimationUsingKeyFrames Wobble(string property, double peak)
+    {
+        var frames = new DoubleAnimationUsingKeyFrames();
+        frames.KeyFrames.Add(new EasingDoubleKeyFrame { KeyTime = TimeSpan.Zero, Value = 1 });
+        frames.KeyFrames.Add(new EasingDoubleKeyFrame
+        {
+            KeyTime = TimeSpan.FromMilliseconds(120),
+            Value = peak,
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+        });
+        frames.KeyFrames.Add(new EasingDoubleKeyFrame
+        {
+            KeyTime = TimeSpan.FromMilliseconds(260),
+            Value = 1 - (peak - 1) * 0.3,
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut },
+        });
+        frames.KeyFrames.Add(new EasingDoubleKeyFrame
+        {
+            KeyTime = TimeSpan.FromMilliseconds(400),
+            Value = 1,
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+        });
+        Storyboard.SetTarget(frames, SelectionTransform);
+        Storyboard.SetTargetProperty(frames, property);
+        return frames;
     }
 
     private Button GetButton(NavigationTarget target) => target switch
@@ -115,28 +159,11 @@ public sealed partial class NavigationRail : UserControl
         _ => WorkspaceButton,
     };
 
-    private void OnWorkspaceClick(object sender, RoutedEventArgs e)
+    private void OnItemClick(object sender, RoutedEventArgs args)
     {
-        NavigationRequested?.Invoke(this, new NavigationRequestEventArgs(NavigationTarget.Workspace));
-    }
-
-    private void OnSettingsClick(object sender, RoutedEventArgs e)
-    {
-        NavigationRequested?.Invoke(this, new NavigationRequestEventArgs(NavigationTarget.Settings));
-    }
-
-    private void OnHistoryClick(object sender, RoutedEventArgs e)
-    {
-        NavigationRequested?.Invoke(this, new NavigationRequestEventArgs(NavigationTarget.History));
-    }
-
-    private void OnExportClick(object sender, RoutedEventArgs e)
-    {
-        NavigationRequested?.Invoke(this, new NavigationRequestEventArgs(NavigationTarget.Export));
-    }
-
-    private void OnDiagnosticsClick(object sender, RoutedEventArgs e)
-    {
-        NavigationRequested?.Invoke(this, new NavigationRequestEventArgs(NavigationTarget.Diagnostics));
+        if (sender is Button { Tag: string tag } && Enum.TryParse(tag, out NavigationTarget target))
+        {
+            NavigationRequested?.Invoke(this, new NavigationRequestEventArgs(target));
+        }
     }
 }

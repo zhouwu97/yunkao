@@ -16,4 +16,12 @@ public sealed class WorkspaceRuntime
     public bool BridgeInstalled { get; set; }
     public string BrowserVersion { get; set; } = "未初始化";
     public string BrowserStatus { get; set; } = "等待 WebView2";
+    public string RequestedAppearanceMaterial { get; set; } = "acrylic";
+    public string AppliedAppearanceMaterial { get; set; } = "solid";
+    public string AppearanceClarity { get; set; } = "standard";
+    public double WebViewActualWidth { get; set; }
+    public double PageScrollWidth { get; set; }
+    public double PageViewportWidth { get; set; }
+    public string WebViewZoomMode { get; set; } = "FitWidth";
+    public int PageZoomPercent { get; set; } = 100;
 }

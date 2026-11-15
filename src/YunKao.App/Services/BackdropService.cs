@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using Windows.UI.ViewManagement;
+using YunKao.Core.Services;
 
 namespace YunKao.Services;
 
@@ -113,10 +114,10 @@ public static class BackdropService
 
     public static BackdropMaterial Parse(string? material)
     {
-        return material?.Trim().ToLowerInvariant() switch
+        return AppearancePolicy.ResolveMaterial(material) switch
         {
-            "mica" => BackdropMaterial.Mica,
-            "solid" => BackdropMaterial.Solid,
+            AppearanceMaterial.Mica => BackdropMaterial.Mica,
+            AppearanceMaterial.Solid => BackdropMaterial.Solid,
             _ => BackdropMaterial.DesktopAcrylic,
         };
     }

@@ -358,17 +358,10 @@ public sealed class SettingsService
         settings.SchemaVersion = CurrentSchemaVersion;
         settings.AiProvider = string.IsNullOrWhiteSpace(settings.AiProvider) ? "custom" : settings.AiProvider.Trim();
         settings.ExportPrefix = string.IsNullOrWhiteSpace(settings.ExportPrefix) ? "基础题库导出" : settings.ExportPrefix.Trim();
-        settings.DefaultExportFormat = string.IsNullOrWhiteSpace(settings.DefaultExportFormat) ? "PDF" : settings.DefaultExportFormat.ToUpperInvariant();
-        settings.AppearanceMaterial = settings.AppearanceMaterial.ToLowerInvariant() switch
-        {
-            "acrylic" or "mica" or "solid" => settings.AppearanceMaterial.ToLowerInvariant(),
-            _ => "acrylic",
-        };
-        settings.AppearanceClarity = settings.AppearanceClarity.ToLowerInvariant() switch
-        {
-            "clear" or "standard" or "transparent" => settings.AppearanceClarity.ToLowerInvariant(),
-            _ => "standard",
-        };
+        settings.DefaultExportFormat = ExportPathGenerator.NormalizeExtension(settings.DefaultExportFormat).ToUpperInvariant();
+        settings.AppearanceMaterial = AppearancePolicy.NormalizeMaterial(settings.AppearanceMaterial);
+        settings.AppearanceClarity = AppearancePolicy.NormalizeClarity(settings.AppearanceClarity);
+        settings.AppearanceTheme = AppearancePolicy.NormalizeTheme(settings.AppearanceTheme);
     }
 
     private static void Migrate(AppSettings settings)

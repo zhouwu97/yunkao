@@ -2,21 +2,23 @@
 
 - framework: WinUI 3 / Windows App SDK (C# + XAML)
 - design system: Windows 11 Fluent Design System
-- primary material: Mica (Window background) + Content Surface (Navigation Rail & Cards)
-- responsive model: Browser-first (Overlay Drawer < 1396px content width; Docked Sidebar >= 1396px)
+- primary material: Desktop Acrylic (fallback Mica → Solid) + Content Surface (Navigation Rail & Cards)
+- responsive model: Browser-first (任务抽屉始终 Overlay，浏览器列不因抽屉改变宽度)
 
 ## 核心设计验收基线
 
 ### 1. 视区与布局响应式矩阵
 
+窗口尺寸按物理像素记录；`ActualWidth` 是 DIP，需结合实际 DPI 换算。2026-10-07 实测结果和未覆盖范围见 [ui-validation-report.md](ui-validation-report.md)。
+
 | 窗口分辨率 | 预期布局模式 | 抽屉行为 | WebView 宽度保护 |
 | :--- | :--- | :--- | :--- |
-| **1024 × 768** | Narrow | Overlay Drawer | 占满全宽（~950px），不因抽屉展开而变化 |
-| **1280 × 800** | **Narrow (核心基线)** | **Overlay Drawer** | **ActualWidth 恒定保持约 1170px，网页无横向滚动条** |
-| **1366 × 768** | Narrow | Overlay Drawer | 占满全宽（~1250px），抽屉平滑浮层覆盖 |
-| **1440 × 900** | Narrow | Overlay Drawer | 占满全宽（~1320px），无网页排版抖动 |
-| **1600 × 900** | Wide (Docked) | 344px 常驻右栏 | 浏览器宽度仍稳定保留 >= 1150px |
-| **1920 × 1080** | ExtraWide (Docked) | 344px 常驻右栏 | 浏览器宽度保留 >= 1470px 宽广视区 |
+| **1024 × 768** | Narrow | Overlay Drawer | 占满浏览器可用区，不因抽屉展开而变化 |
+| **1280 × 800** | **Narrow (核心基线)** | **Overlay Drawer** | **打开/关闭抽屉时 ActualWidth 恒定，网页无横向滚动条** |
+| **1366 × 768** | Narrow | Overlay Drawer | 占满浏览器可用区，抽屉平滑浮层覆盖 |
+| **1440 × 900** | Narrow | Overlay Drawer | 占满浏览器可用区，无网页排版抖动 |
+| **1600 × 900** | Overlay Drawer | 最大 344px 浮层 | 浏览器宽度不因抽屉改变 |
+| **1920 × 1080** | Overlay Drawer | 最大 344px 浮层 | 浏览器宽度不因抽屉改变 |
 
 ### 2. 1280×800 核心基准测试要求 (P0)
 
@@ -29,11 +31,10 @@
 
 ### 3. Fluent 材质与对比度规范 (P0)
 
-1. **主窗背景**：默认优先使用 `Mica` 材质；系统不支持时优雅降级为 `Solid` (`#EEF2F6`)。
+1. **主窗背景**：默认请求 `Desktop Acrylic`；不可用时依次降级为 `Mica` 和 `Solid` (`#EEF2F6`)。
 2. **左侧 Rail**：纯净 `RailSurfaceBrush`（~95% 不透明度），不嵌套独立 DesktopAcrylicBackdrop。
 3. **任务抽屉**：
-   - Overlay 态：使用 `DrawerSurfaceBrush`（高 Tint 不透明度），背底网页文字只能轻微透出轮廓，不得干扰按钮与状态标签阅读。
-   - Docked 态：使用透明/实体卡片 Surface，不使用 Acrylic 穿透。
+    - Overlay 态：使用唯一的 Composition backdrop host + `DrawerSurfaceBrush` Tint；Composition 不可用时保留高 Tint fallback，背底网页文字不得干扰按钮与状态标签阅读。
 4. **网页容器**：保持 `#FFFFFF` / 实色白底，确保 WebView2 网页对比度与清晰度。
 
 ### 4. 状态机与操作焦点规范 (P1)

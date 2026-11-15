@@ -178,7 +178,11 @@ def _run_request(request, runtime):
 def main():
     runtime = WorkerRuntime()
     executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="yunkao-worker")
-    futures = []
+
+    def report_failure(future):
+        # 完成的请求不留在列表中；连续提取时避免长期保留结果和题目 HTML。
+        if not future.cancelled() and future.exception():
+            traceback.print_exception(future.exception(), file=sys.stderr)
     try:
         while not runtime.stopping.is_set():
             try:
@@ -194,12 +198,9 @@ def main():
                 runtime.response(str(request.get("id") or ""), {"status": "shutting_down"})
                 runtime.stopping.set()
                 break
-            futures.append(executor.submit(_run_request, request, runtime))
+            executor.submit(_run_request, request, runtime).add_done_callback(report_failure)
     finally:
         executor.shutdown(wait=True, cancel_futures=True)
-        for future in futures:
-            if future.done() and future.exception():
-                traceback.print_exception(future.exception(), file=sys.stderr)
 
 
 if __name__ == "__main__":

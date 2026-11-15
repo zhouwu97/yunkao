@@ -66,8 +66,7 @@ $releaseManifest = [ordered]@{
 }
 $releaseManifest | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $artifactDir "release-manifest.json") -Encoding UTF8
 
-& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $projectRoot "tools\verify-release.ps1") -ArtifactPath $artifactDir -ExpectedVersion $version
-if ($LASTEXITCODE -ne 0) { throw "Release integrity verification failed: exit code $LASTEXITCODE" }
+& (Join-Path $projectRoot "tools\verify-release.ps1") -ArtifactPath $artifactDir -ExpectedVersion $version
 
 & tar.exe -a -c -f $zipPath -C $distRoot $artifactName
 if ($LASTEXITCODE -ne 0) { throw "Archive creation failed: exit code $LASTEXITCODE" }

@@ -3,29 +3,92 @@
     x:Class="YunKao.Views.HistoryPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:controls="using:YunKao.Controls">
-  <Grid Padding="14,12,14,14" RowSpacing="12">
+    xmlns:controls="using:YunKao.Controls"
+    xmlns:helpers="using:YunKao.Helpers"
+    xmlns:vm="using:YunKao.ViewModels"
+    Background="Transparent">
+  <Grid>
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
-    <Grid>
-      <StackPanel Spacing="3">
-        <TextBlock Text="历史记录" Style="{StaticResource PageTitleStyle}" />
-        <TextBlock Text="查看提取会话、题目数量和历史任务，可恢复为当前工作台任务。" Style="{StaticResource SecondaryTextStyle}" />
-      </StackPanel>
-       <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Center">
-         <TextBlock x:Name="StatusText" VerticalAlignment="Center" Style="{StaticResource SecondaryTextStyle}" />
-         <controls:LiquidButton Label="刷新" Click="OnRefreshClick" Variant="Soft" />
-         <controls:LiquidButton x:Name="MoreButton" Label="加载更多" Click="OnMoreClick" Variant="Ghost" IsEnabled="False" />
-       </StackPanel>
+
+    <controls:PageHeader Title="历史记录"
+                         Description="已保存的题库任务。恢复后可以继续提取或直接导出。"
+                         Status="{x:Bind ViewModel.StatusText, Mode=OneWay}">
+      <controls:PageHeader.Actions>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Content="加载更多" Click="OnMoreClick" Visibility="{x:Bind ViewModel.CanLoadMore, Mode=OneWay}" Style="{StaticResource SubtleButtonStyle}" />
+          <Button Click="OnRefreshClick" IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}" Style="{StaticResource SecondaryButtonStyle}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <FontIcon Glyph="&#xE72C;" FontSize="12" />
+              <TextBlock Text="刷新" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </controls:PageHeader.Actions>
+    </controls:PageHeader>
+
+    <Grid Grid.Row="1" Margin="32,0,32,28">
+      <Border Style="{StaticResource GroupStyle}"
+              VerticalAlignment="Top"
+              Visibility="{x:Bind helpers:Ui.Collapsed(ViewModel.IsEmpty), Mode=OneWay}">
+        <ListView ItemsSource="{x:Bind ViewModel.Items}"
+                  SelectionMode="None"
+                  Padding="0,4"
+                  ItemContainerStyle="{StaticResource RowItemStyle}">
+          <ListView.ItemTemplate>
+            <DataTemplate x:DataType="vm:SessionRow">
+              <Grid ColumnSpacing="14">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <Border Width="38" Height="38" CornerRadius="11" Background="{ThemeResource SurfaceSubtleBrush}" BorderBrush="{ThemeResource SurfaceStrokeBrush}" BorderThickness="1" VerticalAlignment="Center">
+                  <FontIcon Glyph="&#xE81C;" FontSize="15" Foreground="{ThemeResource TextSecondaryBrush}" />
+                </Border>
+                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                  <TextBlock Text="{x:Bind Title}" TextTrimming="CharacterEllipsis" Style="{StaticResource CardTitleStyle}" />
+                  <TextBlock Style="{StaticResource CaptionTextStyle}" TextTrimming="CharacterEllipsis">
+                    <Run Text="{x:Bind Meta}" /><Run Text="  ·  " /><Run Text="{x:Bind Counts}" />
+                  </TextBlock>
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                  <Button Content="恢复任务"
+                          Tag="{x:Bind}"
+                          Visibility="{x:Bind CanRestore}"
+                          Click="OnRestoreClick"
+                          MinHeight="30"
+                          Padding="12,4"
+                          Style="{StaticResource SecondaryButtonStyle}" />
+                  <Button AutomationProperties.Name="更多历史记录操作" ToolTipService.ToolTip="更多操作" Style="{StaticResource IconButtonStyle}">
+                    <FontIcon Glyph="&#xE712;" FontSize="14" />
+                    <Button.Flyout>
+                      <MenuFlyout Placement="BottomEdgeAlignedRight">
+                        <MenuFlyoutItem Text="复制题库链接" Tag="{x:Bind}" IsEnabled="{x:Bind HasUrl}" Click="OnCopyUrlClick">
+                          <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE8C8;" /></MenuFlyoutItem.Icon>
+                        </MenuFlyoutItem>
+                        <MenuFlyoutItem Text="删除记录" Tag="{x:Bind}" Click="OnDeleteClick">
+                          <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE74D;" /></MenuFlyoutItem.Icon>
+                        </MenuFlyoutItem>
+                      </MenuFlyout>
+                    </Button.Flyout>
+                  </Button>
+                </StackPanel>
+              </Grid>
+            </DataTemplate>
+          </ListView.ItemTemplate>
+        </ListView>
+      </Border>
+
+      <controls:EmptyState Glyph="&#xE81C;"
+                           Title="{x:Bind ViewModel.EmptyTitle, Mode=OneWay}"
+                           Text="{x:Bind ViewModel.EmptyText, Mode=OneWay}"
+                           ActionLabel="前往工作台"
+                           ActionClick="OnGoToWorkspaceClick"
+                           Margin="0,0,0,60"
+                           Visibility="{x:Bind ViewModel.IsEmpty, Mode=OneWay}" />
     </Grid>
-    <controls:LiquidCard Grid.Row="1" Padding="8">
-      <Grid>
-        <ListView x:Name="SessionsList" BorderThickness="0" Background="Transparent" />
-        <TextBlock x:Name="EmptyText" Text="还没有提取记录" HorizontalAlignment="Center" VerticalAlignment="Center"
-                   Style="{StaticResource SecondaryTextStyle}" />
-      </Grid>
-    </controls:LiquidCard>
   </Grid>
 </Page>

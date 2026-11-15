@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.ApplicationModel.DataTransfer;
@@ -9,20 +10,30 @@ using YunKao.Services;
 
 namespace YunKao.Views;
 
+/// <summary>
+/// 设置页：普通选项改动后 600 ms 自动保存；外观即时生效；
+/// 密码与 API Key 属于敏感信息，只在点击对应按钮时写入系统凭据库。
+/// </summary>
 public sealed partial class SettingsPage : Page
 {
+    private readonly DispatcherQueueTimer _saveTimer;
     private bool _loading;
+    private bool _savePending;
     private string _previousProvider = "custom";
 
     public SettingsPage()
     {
         InitializeComponent();
-        Loaded += OnLoaded;
-    }
-
-    private void OnLoaded(object sender, RoutedEventArgs args)
-    {
-        LoadSettings();
+        _saveTimer = DispatcherQueue.CreateTimer();
+        _saveTimer.Interval = TimeSpan.FromMilliseconds(600);
+        _saveTimer.IsRepeating = false;
+        _saveTimer.Tick += (_, _) => SaveNow();
+        Loaded += (_, _) => LoadSettings();
+        Unloaded += (_, _) =>
+        {
+            _saveTimer.Stop();
+            if (_savePending) SaveNow();
+        };
     }
 
     private void LoadSettings()
@@ -33,21 +44,25 @@ public sealed partial class SettingsPage : Page
             AppSettings settings = App.Services.Settings.Load();
             YunKaoUserBox.Text = settings.YunKaoUser;
             YunKaoPasswordBox.Password = "";
-            RememberPasswordCheckBox.IsChecked = settings.RememberYunKaoPassword;
+            RememberPasswordToggle.IsOn = settings.RememberYunKaoPassword;
             ExportDirectoryBox.Text = settings.DefaultExportDirectory;
             ExportPrefixBox.Text = settings.ExportPrefix;
             SelectByTag(ExportFormatCombo, settings.DefaultExportFormat);
-            AutoOpenCheckBox.IsChecked = settings.AutoOpenAfterExport;
-            ExportWithoutAnswersCheckBox.IsChecked = settings.ExportWithoutAnswers;
-            AiEnabledCheckBox.IsChecked = settings.AiEnabled;
+            AutoOpenToggle.IsOn = settings.AutoOpenAfterExport;
+            ExportWithoutAnswersToggle.IsOn = settings.ExportWithoutAnswers;
+            AiEnabledToggle.IsOn = settings.AiEnabled;
             SelectByTag(ProviderCombo, settings.AiProvider);
             _previousProvider = settings.AiProvider;
             AiBaseUrlBox.Text = settings.AiBaseUrl;
             AiModelBox.Text = settings.AiModel;
             AiKeyBox.Password = "";
-            ClearAiKeyCheckBox.IsChecked = false;
-            AiSupportsImagesCheckBox.IsChecked = settings.AiSupportsImages;
+            AiSupportsImagesToggle.IsOn = settings.AiSupportsImages;
             AiKeyStatusText.Text = settings.AiKeySaved ? "Key 已保存" : "未保存 Key";
+
+            string theme = AppearancePolicy.NormalizeTheme(settings.AppearanceTheme);
+            ThemeSystemRadio.IsChecked = theme == "system";
+            ThemeLightRadio.IsChecked = theme == "light";
+            ThemeDarkRadio.IsChecked = theme == "dark";
             AcrylicRadio.IsChecked = settings.AppearanceMaterial == "acrylic";
             MicaRadio.IsChecked = settings.AppearanceMaterial == "mica";
             SolidRadio.IsChecked = settings.AppearanceMaterial == "solid";
@@ -55,15 +70,163 @@ public sealed partial class SettingsPage : Page
             StandardRadio.IsChecked = settings.AppearanceClarity == "standard";
             TransparentRadio.IsChecked = settings.AppearanceClarity == "transparent";
             ReduceMotionToggle.IsOn = settings.ReduceMotion;
-            StatusText.Text = "";
+
+            SetStatus("");
             AiTestResultText.Visibility = Visibility.Collapsed;
             ApplyPresetButton.Visibility = Visibility.Collapsed;
         }
         finally
         {
-            _loading = false;
+            // TextChanged 等事件在赋值后异步触发；低优先级放开标记，避免打开页面就误报"已保存"。
+            if (!DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => _loading = false)) _loading = false;
         }
     }
+
+    // ---------------- 自动保存 ----------------
+
+    private void OnSettingChanged(object sender, RoutedEventArgs args) => ScheduleSave();
+    private void OnTextSettingChanged(object sender, TextChangedEventArgs args) => ScheduleSave();
+    private void OnSelectionSettingChanged(object sender, SelectionChangedEventArgs args) => ScheduleSave();
+
+    private void ScheduleSave()
+    {
+        if (_loading) return;
+        _savePending = true;
+        _saveTimer.Stop();
+        _saveTimer.Start();
+        SetStatus("正在保存…");
+    }
+
+    /// <summary>
+    /// 写入配置。apiKey / password 为 null 时保持凭据库中的现有值，空字符串表示清除。
+    /// </summary>
+    private void SaveNow(string? apiKey = null, string? password = null)
+    {
+        _savePending = false;
+        try
+        {
+            AppSettings settings = App.Services.Settings.Load();
+            settings.YunKaoUser = YunKaoUserBox.Text.Trim();
+            settings.RememberYunKaoPassword = RememberPasswordToggle.IsOn;
+            settings.DefaultExportDirectory = ExportDirectoryBox.Text.Trim();
+            settings.ExportPrefix = ExportPrefixBox.Text.Trim();
+            settings.DefaultExportFormat = ReadTag(ExportFormatCombo, "PDF");
+            settings.AutoOpenAfterExport = AutoOpenToggle.IsOn;
+            settings.ExportWithoutAnswers = ExportWithoutAnswersToggle.IsOn;
+            settings.AiEnabled = AiEnabledToggle.IsOn;
+            settings.AiProvider = ReadTag(ProviderCombo, "custom");
+            settings.AiBaseUrl = AiBaseUrlBox.Text.Trim();
+            settings.AiModel = AiModelBox.Text.Trim();
+            settings.AiSupportsImages = AiSupportsImagesToggle.IsOn;
+            settings.AppearanceTheme = ReadTheme();
+            settings.AppearanceMaterial = ReadMaterial();
+            settings.AppearanceClarity = ReadClarity();
+            settings.ReduceMotion = ReduceMotionToggle.IsOn;
+
+            // 取消"记住密码"时同步清除已保存的密码。
+            password ??= settings.RememberYunKaoPassword ? null : "";
+            App.Services.Settings.Save(settings, apiKey, password);
+            App.Services.Task.SetPracticeMode(settings.ExportWithoutAnswers);
+            AiKeyStatusText.Text = settings.AiKeySaved ? "Key 已保存" : "未保存 Key";
+            SetStatus($"已自动保存 · {DateTime.Now:HH:mm:ss}");
+        }
+        catch (Exception exception)
+        {
+            SetStatus("保存失败：" + exception.Message);
+            App.Services.Diagnostics.Error("设置保存失败", exception);
+        }
+    }
+
+    private void OnSavePasswordClick(object sender, RoutedEventArgs args)
+    {
+        if (string.IsNullOrWhiteSpace(YunKaoPasswordBox.Password))
+        {
+            SetStatus("请输入密码后再保存。");
+            return;
+        }
+        _saveTimer.Stop();
+        SaveNow(password: YunKaoPasswordBox.Password);
+        YunKaoPasswordBox.Password = "";
+        SetStatus("密码已保存到系统凭据库");
+    }
+
+    private void OnSaveAiKeyClick(object sender, RoutedEventArgs args)
+    {
+        if (string.IsNullOrWhiteSpace(AiKeyBox.Password))
+        {
+            SetStatus("请输入 API Key 后再保存。");
+            return;
+        }
+        _saveTimer.Stop();
+        SaveNow(apiKey: AiKeyBox.Password.Trim());
+        AiKeyBox.Password = "";
+        SetStatus("API Key 已保存");
+    }
+
+    private async void OnClearAiKeyClick(object sender, RoutedEventArgs args)
+    {
+        var dialog = new ContentDialog
+        {
+            XamlRoot = XamlRoot,
+            Title = "清除已保存的 API Key？",
+            Content = "清除后 AI 补全将无法使用，直到重新填写 Key。",
+            PrimaryButtonText = "清除",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Close,
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        _saveTimer.Stop();
+        SaveNow(apiKey: "");
+        AiKeyBox.Password = "";
+        SetStatus("API Key 已清除");
+    }
+
+    private void UpdateAiKeyStatus()
+    {
+        string provider = ReadTag(ProviderCombo, "custom");
+        AiKeyStatusText.Text = string.IsNullOrWhiteSpace(App.Services.Settings.GetAiKey(provider)) ? "未保存 Key" : "Key 已保存";
+    }
+
+    // ---------------- 外观（即时生效） ----------------
+
+    private void OnThemeChanged(object sender, RoutedEventArgs args)
+    {
+        if (_loading || ThemeSystemRadio is null || ThemeLightRadio is null || ThemeDarkRadio is null) return;
+        App.MainWindow?.ApplyTheme(ReadTheme());
+        ScheduleSave();
+    }
+
+    private void OnAppearanceChanged(object sender, RoutedEventArgs args)
+    {
+        if (_loading
+            || AcrylicRadio is null || MicaRadio is null || SolidRadio is null
+            || ClearRadio is null || StandardRadio is null || TransparentRadio is null)
+        {
+            return;
+        }
+        App.MainWindow?.ApplyAppearance(ReadMaterial(), ReadClarity());
+        ScheduleSave();
+    }
+
+    private void OnReduceMotionToggled(object sender, RoutedEventArgs args)
+    {
+        if (_loading) return;
+        MotionService.SetReduceMotion(ReduceMotionToggle.IsOn);
+        ScheduleSave();
+    }
+
+    private string ReadTheme() => ThemeLightRadio.IsChecked == true ? "light"
+        : ThemeDarkRadio.IsChecked == true ? "dark" : "system";
+
+    private string ReadMaterial() => MicaRadio.IsChecked == true ? "mica"
+        : SolidRadio.IsChecked == true ? "solid" : "acrylic";
+
+    private string ReadClarity() => ClearRadio.IsChecked == true ? "clear"
+        : TransparentRadio.IsChecked == true ? "transparent" : "standard";
+
+    private void SetStatus(string text) => Header.Status = text;
+
+    // ---------------- AI 与目录操作 ----------------
 
     private void OnProviderChanged(object sender, SelectionChangedEventArgs args)
     {
@@ -86,12 +249,14 @@ public sealed partial class SettingsPage : Page
             AiModelBox.Text = newPreset.Model;
         }
 
-        AiSupportsImagesCheckBox.IsChecked = newPreset.SupportsImages;
+        AiSupportsImagesToggle.IsOn = newPreset.SupportsImages;
         _previousProvider = newProvider;
 
         bool hasCustomMismatch = !string.Equals(AiBaseUrlBox.Text.Trim(), newPreset.BaseUrl.Trim(), StringComparison.OrdinalIgnoreCase)
             || !string.Equals(AiModelBox.Text.Trim(), newPreset.Model.Trim(), StringComparison.OrdinalIgnoreCase);
         ApplyPresetButton.Visibility = (hasCustomMismatch && newProvider != "custom") ? Visibility.Visible : Visibility.Collapsed;
+        UpdateAiKeyStatus();
+        ScheduleSave();
     }
 
     private void OnApplyPresetClick(object sender, RoutedEventArgs args)
@@ -100,10 +265,11 @@ public sealed partial class SettingsPage : Page
         AiProviderPreset preset = AiProviderRegistry.Get(provider);
         AiBaseUrlBox.Text = preset.BaseUrl;
         AiModelBox.Text = preset.Model;
-        AiSupportsImagesCheckBox.IsChecked = preset.SupportsImages;
+        AiSupportsImagesToggle.IsOn = preset.SupportsImages;
         ApplyPresetButton.Visibility = Visibility.Collapsed;
         AiTestResultText.Text = $"已应用 {preset.Label} 推荐配置";
         AiTestResultText.Visibility = Visibility.Visible;
+        ScheduleSave();
     }
 
     private async void OnTestAiConnectionClick(object sender, RoutedEventArgs args)
@@ -131,7 +297,7 @@ public sealed partial class SettingsPage : Page
             BaseUrl = baseUrl,
             Model = model,
             ApiKey = apiKey,
-            SupportsImages = AiSupportsImagesCheckBox.IsChecked == true,
+            SupportsImages = AiSupportsImagesToggle.IsOn,
         };
 
         AiConnectionTestResult result = await App.Services.Ai.TestConnectionAsync(config);
@@ -196,11 +362,12 @@ public sealed partial class SettingsPage : Page
             if (folder is not null)
             {
                 ExportDirectoryBox.Text = folder.Path;
+                ScheduleSave();
             }
         }
         catch (Exception ex)
         {
-            StatusText.Text = "选择目录失败：" + ex.Message;
+            SetStatus("选择目录失败：" + ex.Message);
         }
     }
 
@@ -235,81 +402,12 @@ public sealed partial class SettingsPage : Page
             string info = $"YunKao v2.0\nOS: {Environment.OSVersion}\nRuntime: .NET {Environment.Version}\nWebView2: {App.Services.Workspace.BrowserVersion}\nTime: {DateTimeOffset.Now}";
             package.SetText(info);
             Clipboard.SetContent(package);
-            StatusText.Text = "已复制诊断信息到剪贴板";
+            SetStatus("已复制诊断信息到剪贴板");
         }
         catch (Exception ex)
         {
-            StatusText.Text = "复制失败：" + ex.Message;
+            SetStatus("复制失败：" + ex.Message);
         }
-    }
-
-    private void OnSaveClick(object sender, RoutedEventArgs args)
-    {
-        try
-        {
-            AppSettings settings = App.Services.Settings.Load();
-            settings.YunKaoUser = YunKaoUserBox.Text.Trim();
-            settings.RememberYunKaoPassword = RememberPasswordCheckBox.IsChecked == true;
-            settings.DefaultExportDirectory = ExportDirectoryBox.Text.Trim();
-            settings.ExportPrefix = ExportPrefixBox.Text.Trim();
-            settings.DefaultExportFormat = ReadTag(ExportFormatCombo, "PDF");
-            settings.AutoOpenAfterExport = AutoOpenCheckBox.IsChecked == true;
-            settings.ExportWithoutAnswers = ExportWithoutAnswersCheckBox.IsChecked == true;
-            settings.AiEnabled = AiEnabledCheckBox.IsChecked == true;
-            settings.AiProvider = ReadTag(ProviderCombo, "custom");
-            settings.AiBaseUrl = AiBaseUrlBox.Text.Trim();
-            settings.AiModel = AiModelBox.Text.Trim();
-            settings.AiSupportsImages = AiSupportsImagesCheckBox.IsChecked == true;
-            settings.AppearanceMaterial = AcrylicRadio.IsChecked == true ? "acrylic"
-                : MicaRadio.IsChecked == true ? "mica" : "solid";
-            settings.AppearanceClarity = ClearRadio.IsChecked == true ? "clear"
-                : TransparentRadio.IsChecked == true ? "transparent" : "standard";
-            settings.ReduceMotion = ReduceMotionToggle.IsOn;
-
-            string? apiKey = ClearAiKeyCheckBox.IsChecked == true
-                ? ""
-                : string.IsNullOrWhiteSpace(AiKeyBox.Password) ? null : AiKeyBox.Password;
-            string? password = !string.IsNullOrWhiteSpace(YunKaoPasswordBox.Password)
-                ? YunKaoPasswordBox.Password
-                : settings.RememberYunKaoPassword ? null : "";
-            App.Services.Settings.Save(settings, apiKey, password);
-            MotionService.SetReduceMotion(settings.ReduceMotion);
-            App.MainWindow?.ApplyAppearance(settings.AppearanceMaterial, settings.AppearanceClarity);
-            AiKeyBox.Password = "";
-            YunKaoPasswordBox.Password = "";
-            AiKeyStatusText.Text = settings.AiKeySaved ? "Key 已保存" : "未保存 Key";
-            StatusText.Text = "已保存";
-        }
-        catch (Exception exception)
-        {
-            StatusText.Text = "保存失败：" + exception.Message;
-            App.Services.Diagnostics.Error("设置保存失败", exception);
-        }
-    }
-
-    private void OnReduceMotionToggled(object sender, RoutedEventArgs args)
-    {
-        MotionService.SetReduceMotion(ReduceMotionToggle.IsOn);
-    }
-
-    private void OnAppearanceChanged(object sender, RoutedEventArgs args)
-    {
-        if (_loading
-            || AcrylicRadio is null
-            || MicaRadio is null
-            || SolidRadio is null
-            || ClearRadio is null
-            || StandardRadio is null
-            || TransparentRadio is null)
-        {
-            return;
-        }
-        string material = AcrylicRadio.IsChecked == true ? "acrylic"
-            : MicaRadio.IsChecked == true ? "mica" : "solid";
-        string clarity = ClearRadio.IsChecked == true ? "clear"
-            : TransparentRadio.IsChecked == true ? "transparent" : "standard";
-        App.MainWindow?.ApplyAppearance(material, clarity);
-        StatusText.Text = "外观预览中，保存后保留";
     }
 
     private static void SelectByTag(ComboBox comboBox, string value)
