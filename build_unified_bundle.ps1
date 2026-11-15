@@ -10,10 +10,12 @@ $version = (Get-Content -Raw -LiteralPath $versionPath).Trim()
 if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Invalid VERSION: $version" }
 
 if (-not $SkipTests) {
-    & dotnet test (Join-Path $projectRoot "src\YunKao.Tests\YunKao.Tests.csproj") --configuration Debug --no-restore --verbosity minimal
+    & dotnet test (Join-Path $projectRoot "src\YunKao.Tests\YunKao.Tests.csproj") --configuration Debug --verbosity minimal
     if ($LASTEXITCODE -ne 0) { throw "Core regression tests failed: exit code $LASTEXITCODE" }
     & python -m pytest (Join-Path $projectRoot "tests") -q
     if ($LASTEXITCODE -ne 0) { throw "Worker regression tests failed: exit code $LASTEXITCODE" }
+    & node --test (Join-Path $projectRoot "tests\bridge.test.js")
+    if ($LASTEXITCODE -ne 0) { throw "Bridge regression tests failed: exit code $LASTEXITCODE" }
 }
 
 $artifactName = "yunkao-desktop-v$version-windows-x64"
@@ -67,6 +69,8 @@ $releaseManifest = [ordered]@{
 $releaseManifest | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $artifactDir "release-manifest.json") -Encoding UTF8
 
 & (Join-Path $projectRoot "tools\verify-release.ps1") -ArtifactPath $artifactDir -ExpectedVersion $version
+& python (Join-Path $projectRoot "tools\smoke-worker.py") (Join-Path $artifactDir "worker\YunKao.Worker.exe")
+if ($LASTEXITCODE -ne 0) { throw "Packaged Worker smoke test failed: exit code $LASTEXITCODE" }
 
 & tar.exe -a -c -f $zipPath -C $distRoot $artifactName
 if ($LASTEXITCODE -ne 0) { throw "Archive creation failed: exit code $LASTEXITCODE" }

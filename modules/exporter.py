@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 
 
 MAX_IMAGE_WIDTH_PT = 420.0
@@ -343,10 +344,10 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True,
                                         position.set(qn('w:val'), str(int(offset_pt * 2)))
                                         rPr.append(position)
                             except Exception as e_offset:
-                                print("Failed to apply vertical-align offset:", e_offset)
+                                print("Failed to apply vertical-align offset:", e_offset, file=sys.stderr)
                             
                     except Exception as e:
-                        print(f"PyMuPDF failed to render SVG: {e}")
+                        print(f"PyMuPDF failed to render SVG: {e}", file=sys.stderr)
                         current_p.add_run("[图片加载失败]")
                     
                     last_end = match.end()
@@ -424,7 +425,7 @@ def export_to_docx(questions, file_path, progress_callback=None, watermark=True,
                 else:
                     current_p.add_run("[图片加载失败]")
             except Exception as e:
-                print(f"Failed to load image: {url}, Error: {e}")
+                print(f"Failed to load image: {url}, Error: {e}", file=sys.stderr)
                 current_p.add_run("[图片加载失败]")
                 
             last_end = match.end()

@@ -229,16 +229,15 @@ def _normalize_judgment_answer(answer_text, option_records):
             negative_label = record["label"]
             negative_text = "错"
 
-    # 匹配正面答案
-    if normalized.upper() in {"A", "对", "正确", "TRUE", "YES", "√", "是"}:
-        return "对"
-    # 匹配负面答案
-    if normalized.upper() in {"B", "错", "错误", "FALSE", "NO", "×", "否"}:
-        return "错"
-    # 如果匹配到选项 label
+    # 字母应先按页面上的选项映射，部分题库将“错误”放在 A。
     if normalized.upper() == positive_label.upper():
         return "对"
     if normalized.upper() == negative_label.upper():
+        return "错"
+    if normalized.upper() in {"对", "正确", "TRUE", "YES", "√", "是"}:
+        return "对"
+    # 匹配负面答案
+    if normalized.upper() in {"错", "错误", "FALSE", "NO", "×", "否"}:
         return "错"
 
     # 兜底：如果原文包含"正确"或"错误"关键词
@@ -327,7 +326,7 @@ def parse_active_question(html_content, base_url=None):
 
     target = soup.select_one(".swiper-slide-active")
     if not target:
-        target = soup.select_one(".practice_slide_content")
+        target = soup.select_one(".practice_slide_content, .question-content, .exam-item, .exam_question, .subject_item")
     if not target:
         return None
 
@@ -336,7 +335,7 @@ def parse_active_question(html_content, base_url=None):
 
     content_div = target
     if "practice_slide_content" not in target.get("class", []):
-        content_div = target.select_one(".practice_slide_content")
+        content_div = target.select_one(".practice_slide_content") or target
 
     type_tag = target.select_one(".practice_slide_title .type")
     question_type = type_tag.get_text(strip=True) if type_tag else ""

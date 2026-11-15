@@ -49,6 +49,18 @@ public sealed class HistoryStoreTests
         Assert.Contains("[REDACTED]", DiagnosticLog.Sanitize("password=secret"));
     }
 
+    [Theory]
+    [InlineData("{\"password\":\"hidden value\",\"api_key\":\"hidden-key\"}")]
+    [InlineData("https://www.cctrcloud.net/?access_token=hidden-token&refresh_token=hidden-refresh")]
+    [InlineData("Authorization: Bearer hidden-token")]
+    [InlineData("Cookie: SESSION=hidden-session; other=hidden-cookie")]
+    public void Diagnostic_redaction_covers_json_query_strings_and_headers(string message)
+    {
+        string sanitized = DiagnosticLog.Sanitize(message);
+        Assert.DoesNotContain("hidden", sanitized);
+        Assert.Contains("[REDACTED]", sanitized);
+    }
+
     [Fact]
     public async Task Concurrent_session_saves_upsert_one_row()
     {

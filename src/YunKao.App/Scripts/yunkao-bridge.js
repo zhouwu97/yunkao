@@ -10,10 +10,10 @@
   let lastMarker = "";
 
   const QUESTION_ROOT_SELECTOR =
-    ".swiper-slide-active, .practice_slide_content, .question-content, .exam-item, .exam_question, .subject_item";
+    ".practice_slide_content, .question-content, .exam-item, .exam_question, .subject_item";
 
   function findActiveQuestionRoot() {
-    return document.querySelector(QUESTION_ROOT_SELECTOR);
+    return document.querySelector(".swiper-slide-active") || document.querySelector(QUESTION_ROOT_SELECTOR);
   }
 
   function getPageState() {
@@ -33,7 +33,9 @@
     const active = findActiveQuestionRoot();
     if (!active) return null;
 
-    const questionId = active.dataset.questionid || active.dataset.questionId || active.dataset.id || "";
+    const content = active.querySelector(".practice_slide_content[data-questionid], .practice_slide_content[data-question-id], .practice_slide_content[data-id]");
+    const questionId = active.dataset.questionid || active.dataset.questionId || active.dataset.id
+      || content?.dataset?.questionid || content?.dataset?.questionId || content?.dataset?.id || "";
     const currentText = current ? current.textContent.trim() : "";
     const totalText = total ? total.textContent.trim() : "";
     const title = active.querySelector(".practice_slide_title, .title, .txt");
@@ -82,10 +84,10 @@
   }
 
   function fillCredentials(data) {
-    if (!data || typeof data !== "object") return;
-    setValue("input[name='school'], input[name='schoolCode'], #schoolCode", data.schoolCode);
-    setValue("input[name='username'], input[name='user'], input[name='account'], #username", data.user);
-    setValue("input[type='password'], input[name='password'], #password", data.password);
+    if (!data || typeof data !== "object" || !getPageState().isLogin) return;
+    if (data.schoolCode) setValue("input[name='school'], input[name='schoolCode'], input[name='schoolcode'], #schoolCode, #schoolcode, #school_code, input[placeholder*='学校']", data.schoolCode);
+    if (data.user) setValue("input[name='username'], input[name='user'], input[name='account'], #username, input[placeholder*='账号']", data.user);
+    if (data.password) setValue("input[type='password'], input[name='password'], #password, #password_hide", data.password);
     post({ type: "credentialsFilled" });
   }
 

@@ -8,7 +8,10 @@ namespace YunKao.Core.Services;
 public sealed class DiagnosticLog
 {
     private static readonly Regex SecretPattern = new(
-        "(?i)(api[_-]?key|authorization|password|token)\\s*[:=]\\s*(?:Bearer\\s+)?[^,;\\s]+",
+        """(?i)(["']?(?:api[_-]?key|authorization|password|passwd|(?:access[_-]?|refresh[_-]?|id[_-]?)?token|session[_-]?id)["']?\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|(?:Bearer\s+)?[^,;&\s"'<>]+)""",
+        RegexOptions.Compiled);
+    private static readonly Regex CookiePattern = new(
+        @"(?im)(\b(?:set-cookie|cookie)\s*:\s*)[^\r\n]+",
         RegexOptions.Compiled);
     private readonly object _gate = new();
     private readonly ObservableCollection<DiagnosticRecord> _entries = [];
@@ -65,6 +68,7 @@ public sealed class DiagnosticLog
 
     public static string Sanitize(string message)
     {
-        return SecretPattern.Replace(message ?? "", "$1=[REDACTED]");
+        string safe = CookiePattern.Replace(message ?? "", "$1[REDACTED]");
+        return SecretPattern.Replace(safe, "$1[REDACTED]");
     }
 }

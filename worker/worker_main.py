@@ -72,6 +72,11 @@ class WorkerRuntime:
                 return True
         return False
 
+    def cancel_all(self):
+        with self.cancel_lock:
+            for event in self.cancel_events.values():
+                event.set()
+
 
 def _ensure_not_cancelled(cancel_event):
     if cancel_event.is_set():
@@ -124,7 +129,7 @@ def _export(params, runtime, cancel_event, request_id):
     return {"filePath": file_path, "format": export_format, "count": total}
 
 
-def _run_request(request, runtime):
+def _run_request(request, runtime, cancel_event=None):
     request_id = str(request.get("id") or "")
     method = str(request.get("method") or "")
     params = request.get("params") or {}
@@ -145,13 +150,16 @@ def _run_request(request, runtime):
     if method == "shutdown":
         runtime.response(request_id, {"status": "shutting_down"})
         runtime.stopping.set()
+        runtime.cancel_all()
         return
 
-    cancel_event = runtime.cancellation_event(request_id)
+    cancel_event = cancel_event if cancel_event is not None else runtime.cancellation_event(request_id)
     try:
+        _ensure_not_cancelled(cancel_event)
         if method == "parseQuestion":
             html = str(params.get("html") or "")
             result = parse_active_question(html, str(params.get("baseUrl") or ""))
+            _ensure_not_cancelled(cancel_event)
             if result is None:
                 runtime.response(
                     request_id,
@@ -175,6 +183,16 @@ def _run_request(request, runtime):
         runtime.remove_cancellation_event(request_id)
 
 
+def dispatch_request(request, runtime, executor):
+    # Control requests must remain responsive when every worker is exporting.
+    # Register before queuing so cancellation also reaches requests not started yet.
+    if str(request.get("method") or "") in {"health", "cancel", "shutdown"}:
+        _run_request(request, runtime)
+        return None
+    cancel_event = runtime.cancellation_event(str(request.get("id") or ""))
+    return executor.submit(_run_request, request, runtime, cancel_event)
+
+
 def main():
     runtime = WorkerRuntime()
     executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="yunkao-worker")
@@ -192,14 +210,11 @@ def main():
                 break
             if request is None:
                 break
-            # shutdown 必须由读取线程直接处理，否则线程池设置 stopping 后，
-            # 主线程仍会阻塞在下一次 stdin.readline()，进程无法自然退出。
-            if str(request.get("method") or "") == "shutdown":
-                runtime.response(str(request.get("id") or ""), {"status": "shutting_down"})
-                runtime.stopping.set()
-                break
-            executor.submit(_run_request, request, runtime).add_done_callback(report_failure)
+            future = dispatch_request(request, runtime, executor)
+            if future is not None:
+                future.add_done_callback(report_failure)
     finally:
+        runtime.cancel_all()
         executor.shutdown(wait=True, cancel_futures=True)
 
 

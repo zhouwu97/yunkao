@@ -4,7 +4,7 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 
-function loadBridge(activeSelector) {
+function loadBridge(activeSelector, { inactiveFirst = false, loginFields = null } = {}) {
   const messages = [];
   const active = {
     dataset: { questionid: 'q-42' },
@@ -16,9 +16,17 @@ function loadBridge(activeSelector) {
     title: '练习',
     body: {},
     querySelector(selector) {
+      if (loginFields) {
+        if (selector.includes('password')) return loginFields.password;
+        if (selector.includes('school')) return loginFields.school;
+        if (selector.includes('username')) return loginFields.user;
+        return null;
+      }
       if (selector.includes('password')) return null;
       if (selector === '.swiper-pagination-current') return { textContent: '42' };
       if (selector === '#swiper-total') return { textContent: '100' };
+      if (selector === '.swiper-slide-active') return inactiveFirst ? active : null;
+      if (inactiveFirst && selector.includes(',')) return { dataset: { id: 'old' }, outerHTML: 'old question', querySelector: () => null };
       if (selector.includes(activeSelector)) return active;
       return null;
     },
@@ -36,18 +44,19 @@ function loadBridge(activeSelector) {
           assert.equal(typeof message, 'string', 'WebView2 host must receive a string');
           messages.push(JSON.parse(message));
         },
-        addEventListener() {},
+        addEventListener(type, callback) { this.receive = callback; },
       },
     },
     MutationObserver: class { observe() {} },
     setTimeout(callback) { callback(); return 1; },
     clearTimeout() {},
+    Event: class { constructor(type) { this.type = type; } },
   };
   context.window.chrome = context.chrome;
   vm.runInNewContext(
     fs.readFileSync(path.resolve(__dirname, '../src/YunKao.App/Scripts/yunkao-bridge.js'), 'utf8'),
     context);
-  return { bridge: context.window.YunKaoBridge, messages, active };
+  return { bridge: context.window.YunKaoBridge, messages, active, receive: context.chrome.webview.receive };
 }
 
 test('all question operations use the same active root for question-content pages', () => {
@@ -64,4 +73,27 @@ test('exam-item pages also produce the same ready and marker signals', () => {
 
   assert.equal(bridge.isPracticeReady(), true);
   assert.equal(bridge.readMarkerValue(), 'q-42');
+});
+
+test('active swiper slide takes priority over an earlier inactive question', () => {
+  const { bridge, active } = loadBridge('.practice_slide_content', { inactiveFirst: true });
+  assert.equal(bridge.getActiveQuestionHtml(), active.outerHTML);
+  assert.equal(bridge.readMarkerValue(), 'q-42');
+});
+
+test('school code is filled without clearing an account or password already typed', () => {
+  const field = value => ({ value, dispatchEvent() {} });
+  const loginFields = { school: field(''), user: field('typed-user'), password: field('typed-password') };
+  const { receive, messages } = loadBridge('', { loginFields });
+  receive({ data: { type: 'fillCredentials', schoolCode: 'u101441', user: '', password: '' } });
+  assert.equal(loginFields.school.value, 'u101441');
+  assert.equal(loginFields.user.value, 'typed-user');
+  assert.equal(loginFields.password.value, 'typed-password');
+  assert.equal(messages.at(-1).type, 'credentialsFilled');
+});
+
+test('credential messages cannot fill inputs on a practice page', () => {
+  const { receive, messages } = loadBridge('.exam-item');
+  receive({ data: { type: 'fillCredentials', schoolCode: 'u101441', user: 'user', password: 'password' } });
+  assert.equal(messages.some(message => message.type === 'credentialsFilled'), false);
 });

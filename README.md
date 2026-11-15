@@ -87,3 +87,5 @@ powershell -ExecutionPolicy Bypass -File build_unified_bundle.ps1
 | `tools` | Worker 构建、发布检查与性能测量 |
 
 此前的性能与窗口验收记录见 [ui-validation-report.md](ui-validation-report.md)，体验复测见 [experience-review.md](experience-review.md)，最新界面调整见 [frontend-review.md](frontend-review.md)。
+
+2026-11-15 的项目检查、修复清单、发布包验证与在线验收边界见 [PROJECT_AUDIT.md](PROJECT_AUDIT.md)。打包流程也会运行桥接测试，并在独立临时目录验证冻结 Worker 的解析和 MD/TXT/DOCX 导出。

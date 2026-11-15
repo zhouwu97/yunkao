@@ -2,7 +2,7 @@
 
 ## 目的与边界
 
-本矩阵以当前工作区的 `feature/winui3-migration` 为验收对象。正式应用是 WinUI 3；Python 代码仅作为 Parser / Exporter Worker。`ui/` 中的 PySide6 实现和它的回归测试不能作为 WinUI 发布验收的唯一依据。
+本矩阵以当前工作区的 `main` 为验收对象。正式应用是 WinUI 3；Python 代码仅作为 Parser / Exporter Worker。`ui/` 中的 PySide6 实现和它的回归测试不能作为 WinUI 发布验收的唯一依据。最新检查与验收边界见 [PROJECT_AUDIT.md](PROJECT_AUDIT.md)。
 
 `PASS` 表示已有 WinUI / Worker 实现且已被自动化测试覆盖；`PARTIAL` 表示实现存在，但仍缺少真实云考站点的端到端验证；`REMOVED_BY_DESIGN` 表示不属于当前独立本地工具的产品范围。
 
@@ -18,7 +18,7 @@
 | 题目去重 | PASS | `ExtractionSession.TryAddQuestion`、`ExtractionSessionTests` | 真实跨页重复题 |
 | 单选、多选、判断、图片、MathJax、长题解析 | PASS | `tests/test_parser_fixtures.py` | 真实页面 DOM 变更 |
 | 仅传输当前题 DOM | PASS | `WebViewService.GetActiveQuestionHtmlAsync` 使用 `outerHTML` | 复杂真实题目的传输耗时 |
-| 开始、暂停、继续、结束 | PASS | `ExtractionStatus`、`ExtractionSessionTests`、`ExtractionPanel` | 真实页面暂停后的继续行为 |
+| 开始、暂停、继续、结束 | PASS | `ExtractionStatus`、`ExtractionSessionTests`、`TaskViewModel`、`TaskCard` | 真实页面暂停后的继续行为 |
 | 清空当前题目 | PASS | `更多 → 清空本次题目`、`ExtractionCoordinator.ClearCurrentSession` | 提取中清空与立即重开 |
 | AI 缺失答案补全 | PARTIAL | `AiService`、`AiServiceTests` | 实际供应商、模型、图片输入 |
 | AI 并发限制与 429/5xx/超时重试 | PASS | `AiTaskQueue` 固定并发 3、1/2/4/8 秒重试、`AiServiceTests` | 真实 429、超时、连接重置 |
@@ -43,13 +43,14 @@
 
 ## 当前自动化基线
 
-运行时间：2026-08-26。
+运行时间：2026-11-15。
 
 | 命令 | 结果 | 覆盖重点 |
 |---|---:|---|
-| `dotnet test src/YunKao.Tests/YunKao.Tests.csproj --no-restore --configuration Debug` | 16 passed | 配置/凭据、会话状态、AI 并发限制、历史 SQLite、协议 framing |
-| `python -m pytest tests -q` | 34 passed | Worker 协议、六类解析 Fixture、旧 UI 兼容回归、导出格式 |
-| `build_unified_bundle.ps1 -SkipWorker` | passed | 发布包包含 Worker/Bridge、版本和 SHA-256 完整性清单 |
+| `dotnet test src/YunKao.Tests/YunKao.Tests.csproj --configuration Debug` | 130 passed | 配置/凭据、会话状态、AI 图片与并发、历史 SQLite、协议、桥接边界、导出路径 |
+| `python -m pytest tests -q` | 37 passed | Worker 协议与取消、六类解析 Fixture、反向判断题、旧 UI 兼容回归、导出格式 |
+| `node --test tests/bridge.test.js` | 5 passed | 活动题选择、标识与登录填写 |
+| `build_unified_bundle.ps1` | passed | 重建 Worker、自包含发布、版本与 SHA-256 完整性清单；冻结 Worker 门禁另经复用构建验证 |
 
 ## 发布门禁：真实站点 E2E
 

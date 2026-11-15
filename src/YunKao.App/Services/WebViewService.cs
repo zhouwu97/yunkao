@@ -237,8 +237,7 @@ public sealed class WebViewService : IAsyncDisposable
 
     public static bool IsAllowedBridgePage(Uri? uri)
     {
-        if (!IsAllowedHost(uri)) return false;
-        return CloudResourceClassifier.Classify(uri, "") is not BrowserResourceKind.Other;
+        return CloudResourceClassifier.IsAllowedBridgePage(uri);
     }
 
     public async Task<bool> RecoverAsync(CancellationToken cancellationToken = default)
@@ -390,6 +389,7 @@ public sealed class WebViewService : IAsyncDisposable
                     AddressRequested?.Invoke(this, EventArgs.Empty);
                 return;
             }
+            if (!CloudResourceClassifier.IsTrustedBridgeMessage(TryGetUri(args.Source), CurrentUri)) return;
             ObserveBridgeLifecycle(message);
             BridgeMessageReceived?.Invoke(this, new BridgeMessageEventArgs(message));
         }

@@ -46,6 +46,25 @@ public static class CloudResourceClassifier
             && AllowedHosts.Contains(uri.Host);
     }
 
+    public static bool IsAllowedBridgePage(Uri? uri)
+    {
+        if (!IsAllowedHost(uri)) return false;
+        // The public login page redirects to this PHP front controller. Its
+        // query selects the page, so API path classification alone misses it.
+        string path = uri!.AbsolutePath.TrimEnd('/');
+        return path.Equals("/admin", StringComparison.OrdinalIgnoreCase)
+            || path.Equals("/admin/index.php", StringComparison.OrdinalIgnoreCase)
+            || Classify(uri, "") != BrowserResourceKind.Other;
+    }
+
+    public static bool IsTrustedBridgeMessage(Uri? source, Uri? current)
+    {
+        return IsAllowedBridgePage(current)
+            && IsAllowedHost(source)
+            && Uri.Compare(source, current, UriComponents.HttpRequestUrl,
+                UriFormat.UriEscaped, StringComparison.Ordinal) == 0;
+    }
+
     public static BrowserResourceKind Classify(Uri? uri, string? resourceContext)
     {
         if (!IsAllowedHost(uri)) return BrowserResourceKind.Other;

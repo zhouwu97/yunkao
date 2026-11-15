@@ -37,6 +37,24 @@ class ParserFixtureTests(unittest.TestCase):
         self.assertEqual(question["question_type"], "判断题")
         self.assertEqual(question["answer"], "对")
 
+    def test_judgment_respects_reversed_option_labels(self):
+        # Use a dedicated reversed order to keep the expected answer unambiguous.
+        html = '''<div class="swiper-slide-active"><div class="practice_slide_content" data-answer="A">
+          <div class="practice_slide_title"><span class="type">判断题</span><span class="title">反向选项</span></div>
+          <ul class="options"><li><span class="letter">A</span><span class="txt">错误</span></li>
+          <li><span class="letter">B</span><span class="txt">正确</span></li></ul></div></div>'''
+        self.assertEqual(parse_active_question(html)["answer"], "错")
+
+    def test_bridge_question_roots_are_supported_by_the_parser(self):
+        html = (FIXTURES / "single.html").read_text(encoding="utf-8")
+        for selector in ("question-content", "exam-item", "exam_question", "subject_item"):
+            with self.subTest(selector=selector):
+                alternative = html.replace('class="swiper-slide-active"', f'class="{selector}"').replace('class="practice_slide_content"', 'class="content"')
+                question = parse_active_question(alternative)
+                self.assertIsNotNone(question)
+                self.assertEqual(question["question_id"], "single-001")
+                self.assertEqual(question["answer"], "A")
+
     def test_image_fixture_resolves_relative_urls(self):
         question = self.parse("image.html")
         self.assertIn("![img]<https://www.cctrcloud.net/assets/icon.png|w:48px|h:24px>", question["title"])

@@ -22,16 +22,41 @@ public sealed partial class DiagnosticsPage : Page
 
     public DiagnosticsViewModel ViewModel { get; } = new();
 
+    private void OnLayoutSizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        bool narrow = args.NewSize.Width < 720;
+        DiagnosticsLayout.Height = narrow ? 1120 : Math.Max(0, args.NewSize.Height);
+        DiagnosticsLayout.ColumnDefinitions[1].Width = new GridLength(narrow ? 0 : 2, GridUnitType.Star);
+        DiagnosticsLayout.ColumnSpacing = narrow ? 0 : 20;
+        DiagnosticsLayout.RowDefinitions[0].Height = narrow ? new GridLength(420) : new GridLength(3, GridUnitType.Star);
+        DiagnosticsLayout.RowDefinitions[1].Height = narrow ? new GridLength(280) : new GridLength(2, GridUnitType.Star);
+        if (narrow && DiagnosticsLayout.RowDefinitions.Count == 2)
+            DiagnosticsLayout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(380) });
+        Grid.SetColumn(ActivitySection, narrow ? 0 : 1);
+        Grid.SetRow(ActivitySection, narrow ? 2 : 0);
+        Grid.SetRowSpan(ActivitySection, narrow ? 1 : 2);
+        if (!narrow && DiagnosticsLayout.RowDefinitions.Count == 3)
+            DiagnosticsLayout.RowDefinitions.RemoveAt(2);
+    }
+
     private async void OnRefreshClick(object sender, RoutedEventArgs args) => await RefreshAsync();
     private async void OnMoreClick(object sender, RoutedEventArgs args) => await ViewModel.LoadAsync(reset: false);
 
     private async void OnCopyClick(object sender, RoutedEventArgs args)
     {
-        string report = await BuildReportAsync();
-        var data = new DataPackage();
-        data.SetText(report);
-        Clipboard.SetContent(data);
-        ViewModel.StatusText = "诊断信息已复制";
+        try
+        {
+            string report = await BuildReportAsync();
+            var data = new DataPackage();
+            data.SetText(report);
+            Clipboard.SetContent(data);
+            ViewModel.StatusText = "诊断信息已复制";
+        }
+        catch (Exception exception)
+        {
+            ViewModel.StatusText = "复制诊断失败：" + exception.Message;
+            App.Services.Diagnostics.Error("复制诊断失败", exception);
+        }
     }
 
     private async void OnExportLogClick(object sender, RoutedEventArgs args)
@@ -59,14 +84,29 @@ public sealed partial class DiagnosticsPage : Page
             ViewModel.StatusText = "日志目录不可用";
             return;
         }
-        Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true });
-        ViewModel.StatusText = "已打开日志目录";
+        try
+        {
+            Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true });
+            ViewModel.StatusText = "已打开日志目录";
+        }
+        catch (Exception exception)
+        {
+            ViewModel.StatusText = "打开日志目录失败：" + exception.Message;
+        }
     }
 
     private async Task RefreshAsync()
     {
-        ViewModel.Report = await BuildReportAsync();
-        await ViewModel.LoadAsync(reset: true);
+        try
+        {
+            ViewModel.Report = await BuildReportAsync();
+            await ViewModel.LoadAsync(reset: true);
+        }
+        catch (Exception exception)
+        {
+            ViewModel.StatusText = "读取诊断失败：" + exception.Message;
+            App.Services.Diagnostics.Error("读取诊断失败", exception);
+        }
     }
 
     private async Task<string> BuildReportAsync()
@@ -107,7 +147,7 @@ public sealed partial class DiagnosticsPage : Page
         report.AppendLine($"进程内存：{process.WorkingSet64 / 1024d / 1024d:0.0} MB · CPU 逻辑核心：{Environment.ProcessorCount}");
         report.AppendLine($"界面主题：{settings.AppearanceTheme} · 玻璃{(GlassSettings.IsSolid ? "已降级为实体" : $"着色 {GlassSettings.TintOpacity:P0}")}");
         report.AppendLine($"导出设置：{settings.DefaultExportFormat} · {(settings.ExportWithoutAnswers ? "练习版" : "答案版")}");
-        return report.ToString().TrimEnd();
+        return DiagnosticLog.Sanitize(report.ToString().TrimEnd());
     }
 
     private static string FormatMaterial(string value)

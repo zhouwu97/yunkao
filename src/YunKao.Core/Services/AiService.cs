@@ -353,7 +353,7 @@ public sealed class AiService(HttpClient httpClient)
             int start = 0;
             while ((start = text.IndexOf("![img]<", start, StringComparison.Ordinal)) >= 0)
             {
-                start += 8;
+                start += "![img]<".Length;
                 int end = text.IndexOf('>', start);
                 if (end <= start) break;
                 string url = text[start..end].Split('|')[0].Trim();

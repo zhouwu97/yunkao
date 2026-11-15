@@ -100,7 +100,7 @@ public sealed partial class SettingsPage : Page
     /// <summary>
     /// 写入配置。apiKey / password 为 null 时保持凭据库中的现有值，空字符串表示清除。
     /// </summary>
-    private void SaveNow(string? apiKey = null, string? password = null)
+    private bool SaveNow(string? apiKey = null, string? password = null)
     {
         _savePending = false;
         try
@@ -129,23 +129,30 @@ public sealed partial class SettingsPage : Page
             App.Services.Task.SetPracticeMode(settings.ExportWithoutAnswers);
             AiKeyStatusText.Text = settings.AiKeySaved ? "Key 已保存" : "未保存 Key";
             SetStatus($"已自动保存 · {DateTime.Now:HH:mm:ss}");
+            return true;
         }
         catch (Exception exception)
         {
             SetStatus("保存失败：" + exception.Message);
             App.Services.Diagnostics.Error("设置保存失败", exception);
+            return false;
         }
     }
 
     private void OnSavePasswordClick(object sender, RoutedEventArgs args)
     {
+        if (string.IsNullOrWhiteSpace(YunKaoUserBox.Text) || !RememberPasswordToggle.IsOn)
+        {
+            SetStatus("请先填写账号并开启记住密码，再保存密码。");
+            return;
+        }
         if (string.IsNullOrWhiteSpace(YunKaoPasswordBox.Password))
         {
             SetStatus("请输入密码后再保存。");
             return;
         }
         _saveTimer.Stop();
-        SaveNow(password: YunKaoPasswordBox.Password);
+        if (!SaveNow(password: YunKaoPasswordBox.Password)) return;
         YunKaoPasswordBox.Password = "";
         SetStatus("密码已保存到系统凭据库");
     }
@@ -158,7 +165,7 @@ public sealed partial class SettingsPage : Page
             return;
         }
         _saveTimer.Stop();
-        SaveNow(apiKey: AiKeyBox.Password.Trim());
+        if (!SaveNow(apiKey: AiKeyBox.Password.Trim())) return;
         AiKeyBox.Password = "";
         SetStatus("API Key 已保存");
     }
@@ -176,7 +183,7 @@ public sealed partial class SettingsPage : Page
         };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
         _saveTimer.Stop();
-        SaveNow(apiKey: "");
+        if (!SaveNow(apiKey: "")) return;
         AiKeyBox.Password = "";
         SetStatus("API Key 已清除");
     }

@@ -34,12 +34,14 @@ public sealed class ImageResolver : IDisposable
     {
         ArgumentNullException.ThrowIfNull(question);
         Question resolved = question.Clone();
-        resolved.Title = await ReplaceImagesAsync(resolved.Title, cancellationToken).ConfigureAwait(false);
-        resolved.Answer = await ReplaceImagesAsync(resolved.Answer, cancellationToken).ConfigureAwait(false);
-        resolved.Analysis = await ReplaceImagesAsync(resolved.Analysis, cancellationToken).ConfigureAwait(false);
+        // CookieManager is a WebView2 COM object; retain the caller's UI
+        // context across images even when the first one requires disk/network IO.
+        resolved.Title = await ReplaceImagesAsync(resolved.Title, cancellationToken).ConfigureAwait(true);
+        resolved.Answer = await ReplaceImagesAsync(resolved.Answer, cancellationToken).ConfigureAwait(true);
+        resolved.Analysis = await ReplaceImagesAsync(resolved.Analysis, cancellationToken).ConfigureAwait(true);
         for (int index = 0; index < resolved.Options.Count; index++)
         {
-            resolved.Options[index] = await ReplaceImagesAsync(resolved.Options[index], cancellationToken).ConfigureAwait(false);
+            resolved.Options[index] = await ReplaceImagesAsync(resolved.Options[index], cancellationToken).ConfigureAwait(true);
         }
         return resolved;
     }
@@ -58,7 +60,7 @@ public sealed class ImageResolver : IDisposable
         {
             builder.Append(text, lastIndex, match.Index - lastIndex);
             string source = match.Groups[1].Value.Trim();
-            string resolved = await ResolveSourceAsync(source, cancellationToken).ConfigureAwait(false);
+            string resolved = await ResolveSourceAsync(source, cancellationToken).ConfigureAwait(true);
             builder.Append("![img]<").Append(resolved).Append(match.Groups[2].Value).Append('>');
             lastIndex = match.Index + match.Length;
         }
@@ -87,7 +89,9 @@ public sealed class ImageResolver : IDisposable
             }
 
             using var request = new HttpRequestMessage(HttpMethod.Get, uri);
-            request.Headers.Referrer = _webView.CurrentUri;
+            // Referrers must not disclose query-string tokens to image hosts.
+            if (_webView.CurrentUri is { } pageUri)
+                request.Headers.Referrer = new Uri(pageUri.GetLeftPart(UriPartial.Authority));
             string cookies = await _webView.GetCookieHeaderAsync(uri, cancellationToken).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(cookies)) request.Headers.TryAddWithoutValidation("Cookie", cookies);
             request.Headers.UserAgent.Add(new ProductInfoHeaderValue("YunKaoDesktop", "2.0"));
@@ -95,10 +99,16 @@ public sealed class ImageResolver : IDisposable
                 request, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             string mime = response.Content.Headers.ContentType?.MediaType?.ToLowerInvariant() ?? InferMime(uri);
-            if (!AllowedMimeTypes.Contains(mime)) return source;
+            if (!AllowedMimeTypes.Contains(mime) || response.Content.Headers.ContentLength > MaxImageBytes) return source;
             await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
             using var buffer = new MemoryStream();
-            await stream.CopyToAsync(buffer, cancellationToken).ConfigureAwait(false);
+            byte[] chunk = new byte[81920];
+            int read;
+            while ((read = await stream.ReadAsync(chunk, cancellationToken).ConfigureAwait(false)) > 0)
+            {
+                if (buffer.Length + read > MaxImageBytes) return source;
+                buffer.Write(chunk, 0, read);
+            }
             if (buffer.Length == 0 || buffer.Length > MaxImageBytes) return source;
             byte[] bytes = buffer.ToArray();
             string tempData = dataPath + ".tmp";
@@ -106,6 +116,10 @@ public sealed class ImageResolver : IDisposable
             File.Move(tempData, dataPath, true);
             await File.WriteAllTextAsync(mimePath, mime, Encoding.UTF8, cancellationToken).ConfigureAwait(false);
             return ToDataUri(bytes, mime);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch
         {

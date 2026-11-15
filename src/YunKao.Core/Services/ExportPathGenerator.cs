@@ -14,6 +14,11 @@ public static class ExportPathGenerator
 
         string ext = NormalizeExtension(format);
         string cleanPrefix = string.IsNullOrWhiteSpace(prefix) ? "云考题库导出" : prefix.Trim();
+        char[] invalid = Path.GetInvalidFileNameChars();
+        cleanPrefix = new string(cleanPrefix.Select(character => invalid.Contains(character)
+            || character is '/' or '\\' ? '_' : character).ToArray()).Trim(' ', '.');
+        if (cleanPrefix.Length == 0) cleanPrefix = "云考题库导出";
+        if (cleanPrefix.Length > 80) cleanPrefix = cleanPrefix[..80];
         string baseName = $"{cleanPrefix}_{DateTime.Now:yyyyMMdd_HHmmss}";
 
         string candidate = Path.Combine(targetDir, $"{baseName}.{ext}");

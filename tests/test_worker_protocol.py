@@ -10,14 +10,51 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from unittest.mock import patch
 
 from worker.protocol import read_message, write_message
+from worker.worker_main import WorkerRuntime, WorkerCancelled, dispatch_request
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class WorkerProtocolTests(unittest.TestCase):
+    def test_cancellation_and_health_bypass_a_saturated_worker_pool(self):
+        runtime = WorkerRuntime()
+        messages = []
+        runtime.send = messages.append
+        started = threading.Event()
+        exported = []
+
+        def blocking_export(params, runtime, cancel_event, request_id):
+            exported.append(request_id)
+            started.set()
+            if cancel_event.wait(timeout=3):
+                raise WorkerCancelled()
+            raise AssertionError("control request failed to cancel the running export")
+
+        def request(request_id, method, params=None):
+            return {"id": request_id, "method": method, "params": params or {}}
+
+        with patch("worker.worker_main._export", blocking_export), ThreadPoolExecutor(max_workers=1) as executor:
+            active = dispatch_request(request("active", "export"), runtime, executor)
+            self.assertTrue(started.wait(timeout=2))
+            queued = dispatch_request(request("queued", "export"), runtime, executor)
+            dispatch_request(request("cancel-queued", "cancel", {"targetId": "queued"}), runtime, executor)
+            dispatch_request(request("health", "health"), runtime, executor)
+            self.assertTrue(next(message for message in messages if message["id"] == "health")["ok"])
+            self.assertTrue(next(message for message in messages if message["id"] == "cancel-queued")["result"]["cancelled"])
+            dispatch_request(request("cancel-active", "cancel", {"targetId": "active"}), runtime, executor)
+            active.result(timeout=2)
+            queued.result(timeout=2)
+
+        self.assertEqual(exported, ["active"])
+        self.assertEqual(next(message for message in messages if message["id"] == "queued")["error"]["code"], "cancelled")
+        self.assertFalse(runtime.cancel_events)
+
     def test_unicode_content_length_round_trip(self):
         stream = io.BytesIO()
         write_message({"message": "中文题目 ✅"}, stream)

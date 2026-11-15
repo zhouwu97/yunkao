@@ -370,6 +370,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
         _browser.Service.RecoveryCompleted -= OnBrowserRecoveryCompleted;
         _browser.Service.RecoveryFailed -= OnBrowserRecoveryFailed;
         _browser.Service.HttpStatusChanged -= OnHttpStatusChanged;
+        _browser.Service.NavigationChanged -= OnBrowserNavigationChanged;
         _session.Changed -= OnSessionChanged;
         _services.Exports.ProgressChanged -= OnExportProgress;
         _task.Detach(this);
@@ -569,8 +570,8 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
         try
         {
             AppSettings settings = _services.Settings.Load();
-            if (string.IsNullOrWhiteSpace(settings.YunKaoUser)) return;
             string password = settings.RememberYunKaoPassword
+                && !string.IsNullOrWhiteSpace(settings.YunKaoUser)
                 ? _services.Settings.GetYunKaoPassword(settings.YunKaoUser)
                 : "";
             await _browser.Service.FillCredentialsAsync(
@@ -597,7 +598,9 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
     {
         try
         {
-            await foreach (QuestionMarker item in _markerQueue.Reader.ReadAllAsync(lifetimeToken).ConfigureAwait(false))
+            // WebView2 calls below must resume on the UI context that created
+            // this coordinator, including after the queue was initially empty.
+            await foreach (QuestionMarker item in _markerQueue.Reader.ReadAllAsync(lifetimeToken).ConfigureAwait(true))
             {
                 if (!IsCurrentMarker(item) || _session.Status != ExtractionStatus.Running) continue;
                 try

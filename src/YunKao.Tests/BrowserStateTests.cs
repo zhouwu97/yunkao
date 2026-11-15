@@ -4,6 +4,30 @@ namespace YunKao.Tests;
 
 public sealed class BrowserStateTests
 {
+    [Theory]
+    [InlineData("https://www.cctrcloud.net/admin/index.php?act=login&op=login", true)]
+    [InlineData("https://www.cctrcloud.net/admin/", true)]
+    [InlineData("https://www.cctrcloud.net/practice/subject_practice.html?id=123", true)]
+    [InlineData("https://example.com/admin/index.php?act=login", false)]
+    [InlineData("http://www.cctrcloud.net/admin/index.php", false)]
+    [InlineData("https://www.cctrcloud.net/assets/banner.png", false)]
+    public void Bridge_supports_the_actual_login_router_and_practice_pages(string url, bool expected)
+    {
+        Assert.Equal(expected, CloudResourceClassifier.IsAllowedBridgePage(new Uri(url)));
+    }
+
+    [Theory]
+    [InlineData("https://www.cctrcloud.net/admin/index.php?act=login", true)]
+    [InlineData("https://www.cctrcloud.net/admin/index.php?act=login#form", true)]
+    [InlineData("https://www.cctrcloud.net/admin/index.php?act=other", false)]
+    [InlineData("https://www.cctrcloud.net/practice/other.html", false)]
+    [InlineData("https://example.com/admin/index.php?act=login", false)]
+    public void Bridge_messages_must_originate_from_the_current_trusted_document(string source, bool expected)
+    {
+        var current = new Uri("https://www.cctrcloud.net/admin/index.php?act=login");
+        Assert.Equal(expected, CloudResourceClassifier.IsTrustedBridgeMessage(new Uri(source), current));
+    }
+
     [Fact]
     public void Practice_ready_requires_a_non_login_practice_page()
     {

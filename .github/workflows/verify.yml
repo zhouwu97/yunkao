@@ -24,17 +24,28 @@ jobs:
         with:
           node-version: 22.x
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt pytest
+
       - name: Restore .NET dependencies
         run: dotnet restore YunKao.sln
 
       - name: Run .NET tests
-        run: dotnet test YunKao.sln --no-restore
+        run: dotnet test src\YunKao.Tests\YunKao.Tests.csproj --no-restore
 
       - name: Build WinUI app
         run: dotnet build src\YunKao.App\YunKao.App.csproj --no-restore -c Release -p:Platform=x64
 
       - name: Run bridge tests
         run: node --test tests\bridge.test.js
+
+      - name: Run Python regression tests
+        run: python -m pytest tests -q
 
       - name: Check bridge syntax
         run: node --check src\YunKao.App\Scripts\yunkao-bridge.js

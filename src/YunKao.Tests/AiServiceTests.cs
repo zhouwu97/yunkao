@@ -7,6 +7,24 @@ namespace YunKao.Tests;
 
 public sealed class AiServiceTests
 {
+    [Theory]
+    [InlineData("https://www.cctrcloud.net/assets/question.png")]
+    [InlineData("data:image/png;base64,aGVsbG8=")]
+    public async Task Vision_request_preserves_the_complete_image_url(string imageUrl)
+    {
+        var handler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("""{"choices":[{"message":{"content":"{\"answer\":\"A\"}"}}]}"""),
+        });
+        using var client = new HttpClient(handler);
+        await new AiService(client).InferAsync(
+            new Question { Title = $"图片题 ![img]<{imageUrl}|w:48px>" },
+            new AiRequestConfiguration { BaseUrl = "https://api.example.com/v1", Model = "vision", ApiKey = "test", SupportsImages = true },
+            CancellationToken.None);
+        var content = handler.LastBody!.Value.GetProperty("messages")[0].GetProperty("content");
+        Assert.Equal(imageUrl, content[1].GetProperty("image_url").GetProperty("url").GetString());
+    }
+
     [Fact]
     public async Task Sends_openai_compatible_request_and_parses_json_result()
     {

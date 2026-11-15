@@ -4,6 +4,25 @@ namespace YunKao.Tests;
 
 public sealed class ExportPathGeneratorTests
 {
+    [Theory]
+    [InlineData("../outside")]
+    [InlineData("..\\outside")]
+    [InlineData("题库:章节?*")]
+    public void Prefix_is_a_safe_filename_inside_the_selected_directory(string prefix)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "yunkao-prefix-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            string path = ExportPathGenerator.CreateUniquePath(directory, prefix, "txt");
+            Assert.Equal(Path.GetFullPath(directory), Path.GetDirectoryName(Path.GetFullPath(path)));
+            Assert.DoesNotContain(Path.GetFileName(path), c => Path.GetInvalidFileNameChars().Contains(c));
+        }
+        finally
+        {
+            if (Directory.Exists(directory)) Directory.Delete(directory, true);
+        }
+    }
+
     [Fact]
     public void CreateUniquePath_generates_clean_path_without_guid()
     {
