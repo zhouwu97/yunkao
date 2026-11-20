@@ -136,7 +136,8 @@
                     <TextBlock Text="只保存在系统凭据库，不进入导出文件和日志" Style="{StaticResource RowDescriptionStyle}" />
                   </StackPanel>
                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <PasswordBox x:Name="YunKaoPasswordBox" Width="200" PlaceholderText="留空保持现有凭据" />
+                    <PasswordBox x:Name="YunKaoPasswordBox" Width="200" PasswordRevealMode="Hidden"
+                                 PlaceholderText="输入密码" AutomationProperties.Name="密码" />
                     <Button Content="保存" Click="OnSavePasswordClick" Style="{StaticResource SecondaryButtonStyle}" />
                   </StackPanel>
                 </Grid>
@@ -265,7 +266,8 @@
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                   <TextBlock Text="API Key" VerticalAlignment="Center" Style="{StaticResource RowTitleStyle}" />
                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                    <PasswordBox x:Name="AiKeyBox" Width="200" PlaceholderText="留空保持已保存的 Key" />
+                    <PasswordBox x:Name="AiKeyBox" Width="200" PasswordRevealMode="Hidden"
+                                 PlaceholderText="输入 API Key" AutomationProperties.Name="API Key" />
                     <Button Content="保存" Click="OnSaveAiKeyClick" Style="{StaticResource SecondaryButtonStyle}" />
                     <Button Content="清除" Click="OnClearAiKeyClick" Style="{StaticResource SubtleButtonStyle}" />
                   </StackPanel>

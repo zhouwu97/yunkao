@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage.Pickers;
@@ -17,6 +18,7 @@ namespace YunKao.Views;
 public sealed partial class SettingsPage : Page
 {
     private readonly DispatcherQueueTimer _saveTimer;
+    private const string SavedCredentialMask = "●●●●●●●●";
     private bool _loading;
     private bool _savePending;
     private string _previousProvider = "custom";
@@ -57,7 +59,7 @@ public sealed partial class SettingsPage : Page
             AiModelBox.Text = settings.AiModel;
             AiKeyBox.Password = "";
             AiSupportsImagesToggle.IsOn = settings.AiSupportsImages;
-            AiKeyStatusText.Text = settings.AiKeySaved ? "Key 已保存" : "未保存 Key";
+            UpdateCredentialIndicators(settings);
 
             string theme = AppearancePolicy.NormalizeTheme(settings.AppearanceTheme);
             ThemeSystemRadio.IsChecked = theme == "system";
@@ -127,7 +129,7 @@ public sealed partial class SettingsPage : Page
             password ??= settings.RememberYunKaoPassword ? null : "";
             App.Services.Settings.Save(settings, apiKey, password);
             App.Services.Task.SetPracticeMode(settings.ExportWithoutAnswers);
-            AiKeyStatusText.Text = settings.AiKeySaved ? "Key 已保存" : "未保存 Key";
+            UpdateCredentialIndicators(settings);
             SetStatus($"已自动保存 · {DateTime.Now:HH:mm:ss}");
             return true;
         }
@@ -188,10 +190,21 @@ public sealed partial class SettingsPage : Page
         SetStatus("API Key 已清除");
     }
 
-    private void UpdateAiKeyStatus()
+    private void UpdateCredentialIndicators(AppSettings settings)
     {
-        string provider = ReadTag(ProviderCombo, "custom");
-        AiKeyStatusText.Text = string.IsNullOrWhiteSpace(App.Services.Settings.GetAiKey(provider)) ? "未保存 Key" : "Key 已保存";
+        bool passwordSaved = settings.RememberYunKaoPassword
+            && !string.IsNullOrWhiteSpace(settings.YunKaoUser)
+            && !string.IsNullOrEmpty(App.Services.Settings.GetYunKaoPassword(settings.YunKaoUser));
+        YunKaoPasswordBox.PlaceholderText = passwordSaved ? SavedCredentialMask : "输入密码";
+        AutomationProperties.SetHelpText(YunKaoPasswordBox, passwordSaved ? "密码已保存，输入新密码可替换" : "未保存密码");
+        UpdateAiKeyStatus(settings.AiKeySaved);
+    }
+
+    private void UpdateAiKeyStatus(bool keySaved)
+    {
+        AiKeyBox.PlaceholderText = keySaved ? SavedCredentialMask : "输入 API Key";
+        AiKeyStatusText.Text = keySaved ? "Key 已保存" : "未保存 Key";
+        AutomationProperties.SetHelpText(AiKeyBox, keySaved ? "API Key 已保存，输入新 Key 可替换" : "未保存 API Key");
     }
 
     // ---------------- 外观（即时生效） ----------------
@@ -262,7 +275,8 @@ public sealed partial class SettingsPage : Page
         bool hasCustomMismatch = !string.Equals(AiBaseUrlBox.Text.Trim(), newPreset.BaseUrl.Trim(), StringComparison.OrdinalIgnoreCase)
             || !string.Equals(AiModelBox.Text.Trim(), newPreset.Model.Trim(), StringComparison.OrdinalIgnoreCase);
         ApplyPresetButton.Visibility = (hasCustomMismatch && newProvider != "custom") ? Visibility.Visible : Visibility.Collapsed;
-        UpdateAiKeyStatus();
+        AiKeyBox.Password = "";
+        UpdateAiKeyStatus(!string.IsNullOrWhiteSpace(App.Services.Settings.GetAiKey(newProvider)));
         ScheduleSave();
     }
 
