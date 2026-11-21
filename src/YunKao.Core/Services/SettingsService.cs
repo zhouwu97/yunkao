@@ -38,6 +38,9 @@ public sealed class InMemoryCredentialStore : ICredentialStore
 /// </summary>
 public sealed class WindowsCredentialStore : ICredentialStore
 {
+    private const string PythonKeyringComment = "Stored using python-keyring";
+    private const string YunKaoCredentialComment = "Stored using YunKao Desktop (UTF-16LE)";
+
     public string? Get(string service, string account)
     {
         CredentialSnapshot? direct = Read(service);
@@ -72,7 +75,7 @@ public sealed class WindowsCredentialStore : ICredentialStore
 
     private static void Write(string target, string account, string secret)
     {
-        byte[] bytes = Encoding.UTF8.GetBytes(secret ?? "");
+        byte[] bytes = Encoding.Unicode.GetBytes(secret ?? "");
         IntPtr blob = Marshal.AllocCoTaskMem(Math.Max(1, bytes.Length));
         try
         {
@@ -81,6 +84,7 @@ public sealed class WindowsCredentialStore : ICredentialStore
             {
                 Type = CredentialType.Generic,
                 TargetName = target,
+                Comment = YunKaoCredentialComment,
                 CredentialBlob = blob,
                 CredentialBlobSize = (uint)bytes.Length,
                 Persist = CredentialPersistence.LocalMachine,
@@ -121,7 +125,10 @@ public sealed class WindowsCredentialStore : ICredentialStore
                 ? []
                 : new byte[credential.CredentialBlobSize];
             if (bytes.Length > 0) Marshal.Copy(credential.CredentialBlob, bytes, 0, bytes.Length);
-            return new CredentialSnapshot(credential.UserName ?? "", Encoding.UTF8.GetString(bytes));
+            Encoding encoding = credential.Comment is PythonKeyringComment or YunKaoCredentialComment
+                ? Encoding.Unicode
+                : Encoding.UTF8;
+            return new CredentialSnapshot(credential.UserName ?? "", encoding.GetString(bytes));
         }
         finally
         {

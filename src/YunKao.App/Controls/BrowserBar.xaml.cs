@@ -29,6 +29,7 @@ public sealed partial class BrowserBar : UserControl
 
     public void BeginAddressEdit()
     {
+        AddressError.Visibility = Visibility.Collapsed;
         if (_compact)
         {
             AddressFlyout.ShowAt(CompactAddressButton);
@@ -41,7 +42,7 @@ public sealed partial class BrowserBar : UserControl
         AddressBox.SelectAll();
     }
 
-    private void OnAddressTapped(object sender, TappedRoutedEventArgs args) => BeginAddressEdit();
+    private void OnAddressClick(object sender, RoutedEventArgs args) => BeginAddressEdit();
 
     private void OnAddressKeyDown(object sender, KeyRoutedEventArgs args)
     {
@@ -56,7 +57,8 @@ public sealed partial class BrowserBar : UserControl
         string? error = ViewModel.Navigate(AddressBox.Text);
         if (error is not null)
         {
-            ViewModel.StatusText = error;
+            AddressError.Text = error;
+            AddressError.Visibility = Visibility.Visible;
             return;
         }
         EndAddressEdit();
@@ -67,6 +69,7 @@ public sealed partial class BrowserBar : UserControl
 
     private void EndAddressEdit()
     {
+        AddressError.Visibility = Visibility.Collapsed;
         AddressBox.Visibility = Visibility.Collapsed;
         AddressDisplay.Visibility = Visibility.Visible;
     }

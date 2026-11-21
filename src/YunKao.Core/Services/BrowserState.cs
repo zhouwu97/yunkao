@@ -25,6 +25,8 @@ public enum BrowserResourceKind
 /// </summary>
 public static class CloudResourceClassifier
 {
+    public static Uri StudentLoginUri { get; } = new("https://www.cctrcloud.net/practice/login.html");
+
     private static readonly HashSet<string> AllowedHosts = new(StringComparer.OrdinalIgnoreCase)
     {
         "cctrcloud.net",

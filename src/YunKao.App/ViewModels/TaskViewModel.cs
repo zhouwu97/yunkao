@@ -43,7 +43,8 @@ public sealed class TaskViewModel : ObservableObject
 
     public TaskViewModel()
     {
-        PrimaryCommand = new RelayCommand(ExecutePrimary, () => _presentation.IsActionEnabled && _actions is not null);
+        PrimaryCommand = new RelayCommand(ExecutePrimary, () => _presentation.IsActionEnabled && _actions is not null
+            && !(_isExporting && _presentation.PrimaryAction == TaskPrimaryAction.Export));
         StopCommand = new RelayCommand(() => _actions?.Stop(), () => _presentation.ShowStop);
         ClearCommand = new RelayCommand(() => _actions?.Clear(), () => _presentation.CanClear);
         RestartCommand = new RelayCommand(() => _actions?.Restart(), () => _presentation.CanRestart);
@@ -69,7 +70,8 @@ public sealed class TaskViewModel : ObservableObject
     public string StateText => _presentation.StateText;
     public string StepText => _presentation.StepText;
     public string HintText => _presentation.HintText;
-    public string ActionLabel => _presentation.ActionLabel;
+    public string ActionLabel => _isExporting && _presentation.PrimaryAction == TaskPrimaryAction.Export
+        ? "正在导出…" : _presentation.ActionLabel;
     public bool IsActionEnabled => _presentation.IsActionEnabled;
     public TaskActionTone Tone => _presentation.Tone;
     public bool ShowStop => _presentation.ShowStop;
@@ -94,6 +96,7 @@ public sealed class TaskViewModel : ObservableObject
     public bool IsExporting => _isExporting;
     public bool CanExport => HasQuestions && !_isExporting;
     public string ExportStateText => _exportStateText;
+    public string ExportVersionText => _practiceMode ? "练习版 · 隐藏答案与解析" : "答案版 · 包含答案与解析";
 
     public bool PracticeMode
     {
@@ -101,6 +104,7 @@ public sealed class TaskViewModel : ObservableObject
         set
         {
             if (!SetProperty(ref _practiceMode, value)) return;
+            OnPropertyChanged(nameof(ExportVersionText));
             _actions?.SetPracticeMode(value);
         }
     }
@@ -171,6 +175,7 @@ public sealed class TaskViewModel : ObservableObject
         _isExporting = exporting;
         OnPropertyChanged(nameof(IsExporting));
         OnPropertyChanged(nameof(CanExport));
+        OnPropertyChanged(nameof(ActionLabel));
         SetExportState(exporting ? "正在导出…" : HasQuestions ? "就绪" : "待机");
         RefreshCommands();
     });
@@ -184,6 +189,7 @@ public sealed class TaskViewModel : ObservableObject
         if (_practiceMode == enabled) return;
         _practiceMode = enabled;
         OnPropertyChanged(nameof(PracticeMode));
+        OnPropertyChanged(nameof(ExportVersionText));
     });
 
     public void SetInterrupted(int? questionCount) => Post(() =>

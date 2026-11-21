@@ -39,6 +39,8 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
     private bool _workerRestarted;
     private bool _disposed;
     private bool _exportInProgress;
+    private bool _resetInProgress;
+    private ExtractionStatus _lastPresentedStatus;
 
     public ExtractionCoordinator(AppServices services, BrowserShell browser)
     {
@@ -57,8 +59,10 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
         _browser.Service.RecoveryFailed += OnBrowserRecoveryFailed;
         _browser.Service.HttpStatusChanged += OnHttpStatusChanged;
         _browser.Service.NavigationChanged += OnBrowserNavigationChanged;
+        _browser.Service.LoadingChanged += OnBrowserLoadingChanged;
         _session.Changed += OnSessionChanged;
         _services.Exports.ProgressChanged += OnExportProgress;
+        _services.Exports.ExportingChanged += OnExportingChanged;
         _services.Initialized += OnServicesInitialized;
         if (_browser.Service.IsBridgeInstalled) Track(FillCredentialsOnBridgeReadyAsync());
         _task.SetPracticeMode(_services.Settings.Load().ExportWithoutAnswers);
@@ -72,8 +76,8 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
     void ITaskActions.Start() => Track(StartAsync());
     void ITaskActions.TogglePause() => TogglePause();
     void ITaskActions.Stop() => Stop();
-    void ITaskActions.Clear() => ClearCurrentSession();
-    void ITaskActions.Restart() => RestartCurrentSession();
+    void ITaskActions.Clear() => Track(ResetCurrentSessionAsync(restart: false));
+    void ITaskActions.Restart() => Track(ResetCurrentSessionAsync(restart: true));
     void ITaskActions.RestoreInterrupted() => RestoreInterruptedSession();
     void ITaskActions.Export(string format) => Track(ExportAsync(ExportPathGenerator.NormalizeExtension(format)));
     void ITaskActions.ExportDefault()
@@ -83,6 +87,11 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
     private void OnBrowserNavigationChanged(object? sender, BrowserNavigationEventArgs args)
     {
         if (!_browserRecovering) Track(UpdatePageReadinessAsync());
+    }
+
+    private void OnBrowserLoadingChanged(object? sender, bool loading)
+    {
+        if (loading) ApplyPageState(new BrowserPageState(false, false));
     }
 
     private async Task UpdatePageReadinessAsync()
@@ -133,6 +142,12 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
                 if (!_session.Resume()) return;
                 _sessionId = _session.SessionId;
             }
+            else if (_session.ContinueStopped())
+            {
+                _sessionId = _session.SessionId;
+                _aiCancellation?.Cancel();
+                _aiCancellation = new CancellationTokenSource();
+            }
             else
             {
                 _aiCancellation?.Cancel();
@@ -169,6 +184,8 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
                 _services.Diagnostics.Error("提取启动失败", exception);
                 _task.AddActivity("提取启动失败：" + exception.Message, warning: true);
                 _session.Fail();
+                _services.Notifications.Show("提取未能启动", exception.Message + "。请检查诊断页后重试，已保存题目仍可导出。",
+                    Microsoft.UI.Xaml.Controls.InfoBarSeverity.Error);
             }
         }
         finally
@@ -249,7 +266,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
 
     public void Stop()
     {
-        if (_session.Status is not (ExtractionStatus.Running or ExtractionStatus.Paused)) return;
+        if (_session.Status is not (ExtractionStatus.Running or ExtractionStatus.Paused or ExtractionStatus.Completing)) return;
         InvalidateCurrentSession();
         // 停止提取不取消导出；已保存题目必须仍可导出。
         _session.Stop();
@@ -258,17 +275,37 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
     }
 
     /// <summary>
-    /// 清空当前题目并取消其提取/AI 生命周期；正在导出的快照不受影响。
+    /// 先保存当前任务，再移出工作台；历史快照和正在导出的快照均保留。
     /// </summary>
-    public void ClearCurrentSession()
+    private async Task ResetCurrentSessionAsync(bool restart)
     {
-        string clearedSessionId = _session.SessionId == Guid.Empty ? "" : _session.SessionId.ToString("N");
-        InvalidateCurrentSession();
-        _restoredSessionPending = false;
-        _lastProcessedMarker = "";
-        _session.Clear();
-        if (!string.IsNullOrWhiteSpace(clearedSessionId)) Track(_services.History.DeleteSessionAsync(clearedSessionId));
-        _task.AddActivity("已清空本次题目，可重新开始提取");
+        if (_resetInProgress) return;
+        _resetInProgress = true;
+        bool reset = false;
+        await _startGate.WaitAsync().ConfigureAwait(true);
+        try
+        {
+            InvalidateCurrentSession();
+            _session.Stop();
+            await PersistCurrentSessionForRestoreAsync().ConfigureAwait(true);
+            _restoredSessionPending = false;
+            _lastProcessedMarker = "";
+            _session.Clear();
+            reset = true;
+            _task.AddActivity("已移出工作台，原题目保留在历史记录中");
+        }
+        catch (Exception exception)
+        {
+            _services.Diagnostics.Error("保存当前任务失败", exception);
+            _services.Notifications.Show("未能新建任务", "保存失败，当前题目已保留。请重试：" + exception.Message,
+                Microsoft.UI.Xaml.Controls.InfoBarSeverity.Error);
+        }
+        finally
+        {
+            _startGate.Release();
+            _resetInProgress = false;
+        }
+        if (reset && restart) await StartAsync().ConfigureAwait(true);
     }
 
     private void InvalidateCurrentSession()
@@ -276,12 +313,6 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
         _extractionCancellation?.Cancel();
         _aiCancellation?.Cancel();
         AdvanceSessionGeneration();
-    }
-
-    public void RestartCurrentSession()
-    {
-        ClearCurrentSession();
-        Track(StartAsync());
     }
 
     public async Task ExportAsync(string format)
@@ -331,14 +362,23 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
                 !settings.ExportWithoutAnswers);
             await _services.History.SaveExportAsync(record).ConfigureAwait(true);
             _task.AddActivity($"导出完成：{result.FilePath}");
-            if (settings.AutoOpenAfterExport)
+            _services.Notifications.Show(new WorkspaceBannerInfo(
+                $"已导出 {result.QuestionCount} 题 · {extension.ToUpperInvariant()}",
+                $"{(settings.ExportWithoutAnswers ? "练习版（隐藏答案与解析）" : "答案版")}已保存：{result.FilePath}",
+                Microsoft.UI.Xaml.Controls.InfoBarSeverity.Success,
+                "打开文件夹", () => FileActions.OpenExportFolder(result.FilePath), ReturnToWorkspace: false));
+            if (settings.AutoOpenAfterExport && !FileActions.TryOpen(result.FilePath, out string openError))
             {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(result.FilePath) { UseShellExecute = true });
+                _services.Notifications.Show(new WorkspaceBannerInfo(
+                    "导出已完成，未能自动打开", openError + "。文件已保存：" + result.FilePath,
+                    Microsoft.UI.Xaml.Controls.InfoBarSeverity.Warning,
+                    "打开文件夹", () => FileActions.OpenExportFolder(result.FilePath), ReturnToWorkspace: false));
             }
         }
         catch (ExportAlreadyRunningException exception)
         {
             _task.AddActivity(exception.Message, warning: true);
+            _services.Notifications.Show("正在导出", exception.Message);
         }
         catch (OperationCanceledException)
         {
@@ -348,11 +388,17 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
         {
             _services.Diagnostics.Error("导出失败", exception);
             _task.AddActivity("导出失败：" + exception.Message, warning: true);
+            _services.Notifications.Show(new WorkspaceBannerInfo(
+                "导出未完成", exception.Message + (format == "pdf"
+                    ? "。PDF 需要本机 Word/WPS，也可先导出 DOCX。" : "。请检查保存目录和磁盘空间后重试。"),
+                Microsoft.UI.Xaml.Controls.InfoBarSeverity.Error,
+                format == "pdf" ? "改为导出 DOCX" : null,
+                format == "pdf" ? () => Track(ExportAsync("docx")) : null));
         }
         finally
         {
             _exportInProgress = false;
-            _task.SetExporting(false);
+            _task.SetExporting(_services.Exports.IsExporting);
         }
     }
 
@@ -371,8 +417,10 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
         _browser.Service.RecoveryFailed -= OnBrowserRecoveryFailed;
         _browser.Service.HttpStatusChanged -= OnHttpStatusChanged;
         _browser.Service.NavigationChanged -= OnBrowserNavigationChanged;
+        _browser.Service.LoadingChanged -= OnBrowserLoadingChanged;
         _session.Changed -= OnSessionChanged;
         _services.Exports.ProgressChanged -= OnExportProgress;
+        _services.Exports.ExportingChanged -= OnExportingChanged;
         _task.Detach(this);
         _services.Initialized -= OnServicesInitialized;
         try
@@ -443,7 +491,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
                 $"登录状态已过期，提取已暂停；已保存的 {_session.SavedCount} 道题目不会丢失。",
                 Microsoft.UI.Xaml.Controls.InfoBarSeverity.Warning,
                 "重新登录",
-                () => _browser.Service.Navigate(new Uri("https://www.cctrcloud.net/"))));
+                () => _browser.Service.GoHome()));
         }
         else if (args.StatusCode == 403)
         {
@@ -631,7 +679,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
                             "当前页面尚未检测到可解析的题目内容，已自动暂停；请确认页面题目已加载完全。",
                             Microsoft.UI.Xaml.Controls.InfoBarSeverity.Warning,
                             "重新提取",
-                            () => QueueCurrentQuestion()));
+                            () => Track(StartAsync())));
                     }
                 }
                 catch (OperationCanceledException) when (lifetimeToken.IsCancellationRequested)
@@ -653,6 +701,8 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
                     {
                         _session.Fail();
                         Track(PersistSessionAsync());
+                        _services.Notifications.Show("提取已中断", exception.Message + "。已保存题目仍可导出。",
+                            Microsoft.UI.Xaml.Controls.InfoBarSeverity.Error);
                     }
                 }
             }
@@ -721,6 +771,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
         {
             _task.AddActivity("未找到下一题按钮，提取已暂停，请检查页面结构", warning: true);
             _session.Pause();
+            ShowPausedNotification("当前题目已保存，未找到下一题按钮。请手动打开下一题，再继续提取。");
             return;
         }
 
@@ -752,8 +803,13 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
         {
             _task.AddActivity("等待下一题超时，提取已暂停，请检查网络或页面", warning: true);
             _session.Pause();
+            ShowPausedNotification("等待下一题超时。请确认网络和网页中的题目，再继续提取。");
         }
     }
+
+    private void ShowPausedNotification(string message) => _services.Notifications.Show(new WorkspaceBannerInfo(
+        "提取已暂停", message, Microsoft.UI.Xaml.Controls.InfoBarSeverity.Warning,
+        "继续提取", () => Track(StartAsync())));
 
     private async Task FillAiAsync(Guid sessionId, Question question, CancellationToken parentToken)
     {
@@ -770,6 +826,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
                 ApiKey = _services.Settings.GetAiKey(settings.AiProvider),
             };
             AiResult result = await _services.AiQueue.EnqueueAsync(question, configuration, parentToken).ConfigureAwait(false);
+            parentToken.ThrowIfCancellationRequested();
             bool updated = _session.TryUpdateQuestion(sessionId, question, item =>
             {
                 item.Answer = result.Answer;
@@ -796,7 +853,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
         }
         finally
         {
-            if (_session.CompleteAiTask(sessionId, succeeded)) Track(PersistSessionAsync());
+            if (!parentToken.IsCancellationRequested && _session.CompleteAiTask(sessionId, succeeded)) Track(PersistSessionAsync());
         }
     }
 
@@ -826,8 +883,13 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
 
     private void OnSessionChanged(object? sender, EventArgs args)
     {
+        ExtractionStatus previous = _lastPresentedStatus;
+        _lastPresentedStatus = _session.Status;
         RenderPanelState();
         RenderProgress();
+        if (_session.Status == ExtractionStatus.Completed && previous != ExtractionStatus.Completed)
+            _services.Notifications.Show("提取完成", $"已保存 {_session.SavedCount} 道题目，请在左侧任务卡选择导出格式。",
+                Microsoft.UI.Xaml.Controls.InfoBarSeverity.Success);
     }
 
     private void OnExportProgress(object? sender, ExportProgress progress)
@@ -836,11 +898,15 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
         _task.AddActivity(progress.Message);
     }
 
+    private void OnExportingChanged(object? sender, bool exporting) => _task.SetExporting(exporting);
+
     private void OnPracticeModeChanged(object? sender, bool enabled)
     {
+        bool previous = !enabled;
         try
         {
             AppSettings settings = _services.Settings.Load();
+            previous = settings.ExportWithoutAnswers;
             settings.ExportWithoutAnswers = enabled;
             _services.Settings.Save(settings);
             _task.AddActivity(enabled ? "已切换为练习版导出" : "已切换为答案版导出");
@@ -848,6 +914,9 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
         catch (Exception exception)
         {
             _services.Diagnostics.Error("保存练习版设置失败", exception);
+            _task.SetPracticeMode(previous);
+            _services.Notifications.Show("导出版本未能切换", "仍使用原导出版本，请重试：" + exception.Message,
+                Microsoft.UI.Xaml.Controls.InfoBarSeverity.Error);
         }
     }
 

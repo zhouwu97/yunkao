@@ -33,4 +33,4 @@
 - `Services/ExtractionCoordinator.cs`：Worker 解析、题目队列、AI、会话持久化、断点恢复和导出生命周期协调。
 - `worker/`：由 `tools/build-worker.ps1` 生成的独立 Worker，可被 WinUI 应用直接拉起。
 
-正式版本号统一读取根目录 `VERSION`，当前为 `2.0.0`。发布脚本只清理自身的 `dist/<artifact>` 与 `build/<artifact>` 目录；旧 Python UI 打包脚本不属于正式发布入口。
+正式版本号统一读取根目录 `VERSION`。发布脚本只清理自身的 `dist/<artifact>` 与 `build/<artifact>` 目录；旧 Python UI 打包脚本不属于正式发布入口。

@@ -80,14 +80,17 @@
     element.value = value;
     element.dispatchEvent(new Event("input", { bubbles: true }));
     element.dispatchEvent(new Event("change", { bubbles: true }));
+    // The current admin login page populates hidden school and encrypted
+    // password fields from its blur handlers before submitting the form.
+    element.dispatchEvent(new Event("blur", { bubbles: true }));
     return true;
   }
 
   function fillCredentials(data) {
     if (!data || typeof data !== "object" || !getPageState().isLogin) return;
-    if (data.schoolCode) setValue("input[name='school'], input[name='schoolCode'], input[name='schoolcode'], #schoolCode, #schoolcode, #school_code, input[placeholder*='学校']", data.schoolCode);
-    if (data.user) setValue("input[name='username'], input[name='user'], input[name='account'], #username, input[placeholder*='账号']", data.user);
-    if (data.password) setValue("input[type='password'], input[name='password'], #password, #password_hide", data.password);
+    if (data.schoolCode) setValue("input[name='user_school'], input[name='schoolinput'], input[name='school'], input[name='schoolCode'], input[name='schoolcode'], #user_school, #schoolinput, #schoolCode, #schoolcode, #school_code, input[placeholder*='学校']", data.schoolCode);
+    if (data.user) setValue("input[name='user_name'], input[name='accountnum'], input[name='username'], input[name='user'], input[name='account'], #user_name, #accountnum, #username, input[placeholder*='账号']", data.user);
+    if (data.password) setValue("input[name='pwdnum'], input[type='password'], input[name='password'], #pwdnum, #password_hide, #password", data.password);
     post({ type: "credentialsFilled" });
   }
 

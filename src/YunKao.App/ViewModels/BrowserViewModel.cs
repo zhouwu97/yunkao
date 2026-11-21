@@ -1,4 +1,5 @@
 using YunKao.Core.Presentation;
+using YunKao.Core.Services;
 
 namespace YunKao.ViewModels;
 
@@ -25,23 +26,30 @@ public sealed class BrowserViewModel : ObservableObject
     private bool _canGoBack;
     private bool _canGoForward;
     private string _host = "cctrcloud.net";
-    private string _path = "";
-    private string _fullAddress = "https://www.cctrcloud.net/";
+    private string _path = CloudResourceClassifier.StudentLoginUri.AbsolutePath;
+    private string _fullAddress = CloudResourceClassifier.StudentLoginUri.AbsoluteUri;
     private string _statusText = "正在准备 WebView2…";
     private string _zoomLabel = "适应宽度";
 
     public BrowserViewModel()
     {
-        BackCommand = new RelayCommand(() => _actions?.Back(), () => _canGoBack);
-        ForwardCommand = new RelayCommand(() => _actions?.Forward(), () => _canGoForward);
-        RefreshCommand = new RelayCommand(() => _actions?.Refresh());
-        HomeCommand = new RelayCommand(() => _actions?.Home());
+        BackCommand = new RelayCommand(() => NavigateInWorkspace(() => _actions?.Back()), () => _canGoBack);
+        ForwardCommand = new RelayCommand(() => NavigateInWorkspace(() => _actions?.Forward()), () => _canGoForward);
+        RefreshCommand = new RelayCommand(() => NavigateInWorkspace(() => _actions?.Refresh()));
+        HomeCommand = new RelayCommand(() => NavigateInWorkspace(() => _actions?.Home()));
         ExternalCommand = new RelayCommand(() => _actions?.OpenExternal());
-        FitWidthCommand = new RelayCommand(() => _actions?.ToggleFitWidth());
+        FitWidthCommand = new RelayCommand(() => NavigateInWorkspace(() => _actions?.ToggleFitWidth()));
     }
 
     /// <summary>网页内按下 Ctrl+L 等需要侧边栏进入地址编辑时触发。</summary>
     public event EventHandler? AddressEditRequested;
+    public event EventHandler? WorkspaceRequested;
+
+    private void NavigateInWorkspace(Action action)
+    {
+        WorkspaceRequested?.Invoke(this, EventArgs.Empty);
+        action();
+    }
 
     public RelayCommand BackCommand { get; }
     public RelayCommand ForwardCommand { get; }

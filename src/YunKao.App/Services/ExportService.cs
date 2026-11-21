@@ -26,6 +26,7 @@ public sealed class ExportService(PythonWorkerClient worker) : IAsyncDisposable
     private CancellationTokenSource? _activeCancellation;
 
     public event EventHandler<ExportProgress>? ProgressChanged;
+    public event EventHandler<bool>? ExportingChanged;
     public bool IsExporting => _exportGate.CurrentCount == 0;
 
     public async Task<ExportResult> ExportAsync(
@@ -45,6 +46,7 @@ public sealed class ExportService(PythonWorkerClient worker) : IAsyncDisposable
         CancellationTokenSource? linked = null;
         try
         {
+            ExportingChanged?.Invoke(this, true);
             string? directory = Path.GetDirectoryName(request.FilePath);
             if (!string.IsNullOrWhiteSpace(directory)) Directory.CreateDirectory(directory);
 
@@ -83,6 +85,7 @@ public sealed class ExportService(PythonWorkerClient worker) : IAsyncDisposable
             }
             linked?.Dispose();
             _exportGate.Release();
+            ExportingChanged?.Invoke(this, false);
         }
     }
 

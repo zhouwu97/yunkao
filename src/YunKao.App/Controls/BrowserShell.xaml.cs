@@ -30,6 +30,17 @@ public sealed partial class BrowserShell : UserControl, IBrowserActions
     {
         InitializeComponent();
         _service.NavigationChanged += OnNavigationChanged;
+        _service.LoadingChanged += (_, loading) =>
+        {
+            LoadingProgress.IsIndeterminate = loading;
+            LoadingProgress.Visibility = loading ? Visibility.Visible : Visibility.Collapsed;
+            if (loading)
+            {
+                ++_navigationRevision;
+                _fitWidthResizeCts?.Cancel();
+                NavigationErrorOverlay.Visibility = Visibility.Collapsed;
+            }
+        };
         _service.StatusChanged += OnStatusChanged;
         _service.ProcessFailed += OnProcessFailed;
         _service.BridgeMessageReceived += (_, args) => BridgeMessageReceived?.Invoke(this, args);
@@ -60,7 +71,7 @@ public sealed partial class BrowserShell : UserControl, IBrowserActions
             Workspace.WebViewInitialized = true;
             Workspace.BrowserVersion = _service.BrowserVersion;
             SetStatus("WebView2 已就绪");
-            _service.Navigate(new Uri("https://www.cctrcloud.net/"));
+            _service.GoHome();
             // 启动后把焦点交给网页，避免侧边栏第一个按钮出现键盘焦点框。
             WebView.Focus(FocusState.Programmatic);
         }
@@ -158,6 +169,11 @@ public sealed partial class BrowserShell : UserControl, IBrowserActions
         Workspace.CurrentUrl = args.Uri;
         Workspace.BridgeInstalled = _service.IsBridgeInstalled;
         Workspace.BrowserVersion = _service.BrowserVersion;
+        if (!args.Success)
+        {
+            NavigationErrorText.Text = args.Message;
+            NavigationErrorOverlay.Visibility = Visibility.Visible;
+        }
         if (args.Message == "导航完成")
         {
             Workspace.PageScrollWidth = 0;
@@ -195,6 +211,8 @@ public sealed partial class BrowserShell : UserControl, IBrowserActions
         => Process.Start(new ProcessStartInfo("https://go.microsoft.com/fwlink/p/?LinkId=2124703") { UseShellExecute = true });
 
     private async void OnRetryWebView2Click(object sender, RoutedEventArgs args) => await InitializeBrowserAsync();
+    private void OnReloadClick(object sender, RoutedEventArgs args) => Refresh();
+    private void OnHomeClick(object sender, RoutedEventArgs args) => Home();
 
     // ---------------- 页面宽度适配 ----------------
 

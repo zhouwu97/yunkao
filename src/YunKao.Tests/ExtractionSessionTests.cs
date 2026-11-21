@@ -6,6 +6,58 @@ namespace YunKao.Tests;
 public sealed class ExtractionSessionTests
 {
     [Fact]
+    public void ContinueStopped_preserves_questions_progress_and_deduplication()
+    {
+        var session = new ExtractionSession();
+        Guid id = session.Start(total: 3, sourceUrl: "https://www.cctrcloud.net/practice/1");
+        var first = new Question { QuestionId = "saved", Title = "已保存题目" };
+        Assert.True(session.TryAddQuestion(id, first));
+        session.SetProgress(1, 3);
+        session.Stop();
+
+        Assert.True(session.ContinueStopped());
+
+        Assert.Equal(id, session.SessionId);
+        Assert.Null(session.EndedAt);
+        Assert.Equal(1, session.Current);
+        Assert.Equal(3, session.Total);
+        Assert.Equal("https://www.cctrcloud.net/practice/1", session.SourceUrl);
+        Assert.False(session.TryAddQuestion(id, first));
+        Assert.True(session.TryAddQuestion(id, new Question { QuestionId = "next", Title = "下一题" }));
+        Assert.Equal(2, session.SavedCount);
+        Assert.Equal(1, session.DuplicateCount);
+    }
+
+    [Fact]
+    public void ContinueStopped_cannot_revive_a_cleared_or_empty_session()
+    {
+        var session = new ExtractionSession();
+        Assert.False(session.ContinueStopped());
+        Guid id = session.Start();
+        session.TryAddQuestion(id, new Question { Title = "旧题目" });
+        session.Clear();
+        Assert.False(session.ContinueStopped());
+        Assert.False(session.TryAddQuestion(id, new Question { Title = "旧回调" }));
+    }
+
+    [Theory]
+    [InlineData(ExtractionStatus.Running)]
+    [InlineData(ExtractionStatus.Paused)]
+    [InlineData(ExtractionStatus.Completed)]
+    [InlineData(ExtractionStatus.Error)]
+    public void ContinueStopped_does_not_replace_another_lifecycle(ExtractionStatus status)
+    {
+        var session = new ExtractionSession();
+        Guid id = session.Start();
+        session.TryAddQuestion(id, new Question { Title = "保留题目" });
+        if (status == ExtractionStatus.Paused) session.Pause();
+        if (status == ExtractionStatus.Completed) session.Complete();
+        if (status == ExtractionStatus.Error) session.Fail();
+        Assert.False(session.ContinueStopped());
+        Assert.Equal(status, session.Status);
+        Assert.Single(session.Questions);
+    }
+    [Fact]
     public void A_new_question_is_saved_once_and_old_session_is_rejected()
     {
         var session = new ExtractionSession();

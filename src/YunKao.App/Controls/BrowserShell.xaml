@@ -8,6 +8,22 @@
     Loaded="OnLoaded">
   <Grid Background="{ThemeResource WebViewSurfaceBrush}">
     <wv2:WebView2 x:Name="WebView" SizeChanged="OnWebViewSurfaceSizeChanged" />
+    <ProgressBar x:Name="LoadingProgress" IsIndeterminate="False" Visibility="Collapsed"
+                 Height="3" MinHeight="3" VerticalAlignment="Top" IsHitTestVisible="False"
+                 AutomationProperties.Name="正在加载网页" />
+
+    <Grid x:Name="NavigationErrorOverlay" Background="{ThemeResource SurfaceBrush}" Visibility="Collapsed">
+      <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="14" MaxWidth="440" Margin="32">
+        <FontIcon Glyph="&#xE774;" FontSize="32" Foreground="{ThemeResource TextSecondaryBrush}" />
+        <TextBlock Text="网页暂时无法打开" Style="{StaticResource SectionTitleStyle}" HorizontalAlignment="Center" />
+        <TextBlock x:Name="NavigationErrorText" TextWrapping="Wrap" TextAlignment="Center" Style="{StaticResource SecondaryTextStyle}" />
+        <TextBlock Text="请检查网络后重试。已保存的题目仍可在左侧导出。" TextWrapping="Wrap" TextAlignment="Center" Style="{StaticResource CaptionTextStyle}" />
+        <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
+          <Button Content="重新加载" Click="OnReloadClick" Style="{StaticResource PrimaryButtonStyle}" />
+          <Button Content="返回云考首页" Click="OnHomeClick" Style="{StaticResource SecondaryButtonStyle}" />
+        </StackPanel>
+      </StackPanel>
+    </Grid>
 
     <Grid x:Name="WebViewErrorOverlay" Background="{ThemeResource SurfaceBrush}" Visibility="Collapsed">
       <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="14" MaxWidth="440" Margin="32">

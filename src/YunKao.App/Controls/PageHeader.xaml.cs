@@ -17,6 +17,16 @@ public sealed partial class PageHeader : UserControl
 
     public PageHeader() => InitializeComponent();
 
+    private void OnHeaderSizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        bool narrow = args.NewSize.Width < 640;
+        Grid.SetRow(HeaderActions, narrow ? 1 : 0);
+        Grid.SetColumn(HeaderActions, narrow ? 0 : 1);
+        Grid.SetColumnSpan(HeaderActions, narrow ? 2 : 1);
+        Grid.SetColumnSpan(HeaderText, narrow ? 2 : 1);
+        HeaderActions.Margin = narrow ? new Thickness(0, 12, 0, 0) : new Thickness(0, 4, 0, 0);
+    }
+
     public string Title { get => (string)GetValue(TitleProperty); set => SetValue(TitleProperty, value); }
     public string Description { get => (string)GetValue(DescriptionProperty); set => SetValue(DescriptionProperty, value); }
     public string Status { get => (string)GetValue(StatusProperty); set => SetValue(StatusProperty, value); }

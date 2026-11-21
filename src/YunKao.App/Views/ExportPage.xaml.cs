@@ -11,6 +11,7 @@ namespace YunKao.Views;
 
 public sealed partial class ExportPage : Page
 {
+    private bool _reExporting;
     public ExportPage()
     {
         InitializeComponent();
@@ -32,8 +33,8 @@ public sealed partial class ExportPage : Page
             ViewModel.StatusText = "导出文件已不存在：" + record.FilePath;
             return;
         }
-        Process.Start(new ProcessStartInfo(record.FilePath) { UseShellExecute = true });
-        ViewModel.StatusText = "已打开文件";
+        ViewModel.StatusText = FileActions.TryOpen(record.FilePath, out string error)
+            ? "已打开文件" : "文件已保存，但无法打开：" + error;
     }
 
     private void OnOpenFolderClick(object sender, RoutedEventArgs args)
@@ -45,8 +46,8 @@ public sealed partial class ExportPage : Page
             ViewModel.StatusText = "导出目录已不存在：" + (directory ?? record.FilePath);
             return;
         }
-        Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true });
-        ViewModel.StatusText = "已打开所在文件夹";
+        ViewModel.StatusText = FileActions.TryOpen(directory, out string error)
+            ? "已打开所在文件夹" : "无法打开文件夹：" + error;
     }
 
     private void OnCopyPathClick(object sender, RoutedEventArgs args)
@@ -61,6 +62,12 @@ public sealed partial class ExportPage : Page
     private async void OnReExportClick(object sender, RoutedEventArgs args)
     {
         if (!TryGetRecord(sender, out ExportRecord record)) return;
+        if (_reExporting || App.Services.Exports.IsExporting)
+        {
+            ViewModel.StatusText = "已有文件正在导出，请等待完成。";
+            return;
+        }
+        _reExporting = true;
         try
         {
             ExtractionSessionSnapshot? snapshot = await App.Services.History.GetSessionSnapshotAsync(record.SessionId);
@@ -93,17 +100,22 @@ public sealed partial class ExportPage : Page
                 "completed",
                 snapshot.SessionId,
                 record.IncludeAnswers));
-            if (settings.AutoOpenAfterExport)
-            {
-                Process.Start(new ProcessStartInfo(result.FilePath) { UseShellExecute = true });
-            }
             await LoadAsync(reset: true);
-            ViewModel.StatusText = "重新导出完成";
+            ViewModel.StatusText = "重新导出完成：" + result.FilePath;
+            App.Services.Notifications.Show(new WorkspaceBannerInfo(
+                $"重新导出完成 · {result.QuestionCount} 题", result.FilePath,
+                InfoBarSeverity.Success, "打开文件夹", () => FileActions.OpenExportFolder(result.FilePath), ReturnToWorkspace: false));
+            if (settings.AutoOpenAfterExport && !FileActions.TryOpen(result.FilePath, out string error))
+                ViewModel.StatusText = "文件已生成，未能自动打开：" + error + "。路径：" + result.FilePath;
         }
         catch (Exception exception)
         {
             ViewModel.StatusText = "重新导出失败：" + exception.Message;
             App.Services.Diagnostics.Error("历史导出重新生成失败", exception);
+        }
+        finally
+        {
+            _reExporting = false;
         }
     }
 
@@ -120,9 +132,16 @@ public sealed partial class ExportPage : Page
             DefaultButton = ContentDialogButton.Close,
         };
         if (await confirmation.ShowAsync() != ContentDialogResult.Primary) return;
-        await App.Services.History.DeleteExportAsync(record.Id);
-        await LoadAsync(reset: true);
-        ViewModel.StatusText = "导出记录已删除，文件未受影响";
+        try
+        {
+            await App.Services.History.DeleteExportAsync(record.Id);
+            await LoadAsync(reset: true);
+            ViewModel.StatusText = "导出记录已删除，文件未受影响";
+        }
+        catch (Exception exception)
+        {
+            ViewModel.StatusText = "删除记录失败，请重试：" + exception.Message;
+        }
     }
 
     private static bool TryGetRecord(object sender, out ExportRecord record)

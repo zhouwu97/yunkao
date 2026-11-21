@@ -3,6 +3,7 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage.Pickers;
 using YunKao.Core.Models;
@@ -17,11 +18,13 @@ namespace YunKao.Views;
 /// </summary>
 public sealed partial class SettingsPage : Page
 {
-    private readonly DispatcherQueueTimer _saveTimer;
     private const string SavedCredentialMask = "●●●●●●●●";
+    private readonly DispatcherQueueTimer _saveTimer;
     private bool _loading;
     private bool _savePending;
     private string _previousProvider = "custom";
+    private readonly List<(Grid Grid, GridLength First, GridLength Second,
+        FrameworkElement Control, HorizontalAlignment Alignment)> _responsiveRows = [];
 
     public SettingsPage()
     {
@@ -30,12 +33,50 @@ public sealed partial class SettingsPage : Page
         _saveTimer.Interval = TimeSpan.FromMilliseconds(600);
         _saveTimer.IsRepeating = false;
         _saveTimer.Tick += (_, _) => SaveNow();
-        Loaded += (_, _) => LoadSettings();
+        Loaded += (_, _) =>
+        {
+            LoadSettings();
+            InitializeResponsiveRows(SettingsBody);
+            UpdateResponsiveRows();
+        };
         Unloaded += (_, _) =>
         {
             _saveTimer.Stop();
             if (_savePending) SaveNow();
         };
+    }
+
+    private void InitializeResponsiveRows(DependencyObject parent)
+    {
+        if (_responsiveRows.Count > 0 && ReferenceEquals(parent, SettingsBody)) return;
+        if (parent is Grid grid && ReferenceEquals(grid.Style, Resources["RowGridStyle"])
+            && grid.ColumnDefinitions.Count == 2
+            && grid.Children.OfType<FrameworkElement>().FirstOrDefault(child => Grid.GetColumn(child) == 1) is { } control)
+        {
+            _responsiveRows.Add((grid, grid.ColumnDefinitions[0].Width, grid.ColumnDefinitions[1].Width,
+                control, control.HorizontalAlignment));
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        }
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+            InitializeResponsiveRows(VisualTreeHelper.GetChild(parent, i));
+    }
+
+    private void OnSettingsSizeChanged(object sender, SizeChangedEventArgs args) => UpdateResponsiveRows();
+
+    private void UpdateResponsiveRows()
+    {
+        bool narrow = SettingsBody.ActualWidth < 720;
+        foreach (var row in _responsiveRows)
+        {
+            row.Grid.ColumnDefinitions[0].Width = narrow ? new GridLength(1, GridUnitType.Star) : row.First;
+            row.Grid.ColumnDefinitions[1].Width = narrow ? new GridLength(0) : row.Second;
+            row.Grid.RowSpacing = narrow ? 8 : 0;
+            row.Grid.ColumnSpacing = narrow ? 0 : 24;
+            Grid.SetRow(row.Control, narrow ? 1 : 0);
+            Grid.SetColumn(row.Control, narrow ? 0 : 1);
+            row.Control.HorizontalAlignment = narrow ? HorizontalAlignment.Left : row.Alignment;
+        }
     }
 
     private void LoadSettings()
@@ -131,14 +172,23 @@ public sealed partial class SettingsPage : Page
             App.Services.Task.SetPracticeMode(settings.ExportWithoutAnswers);
             UpdateCredentialIndicators(settings);
             SetStatus($"已自动保存 · {DateTime.Now:HH:mm:ss}");
+            RetrySaveButton.Visibility = Visibility.Collapsed;
             return true;
         }
         catch (Exception exception)
         {
+            _savePending = true;
+            RetrySaveButton.Visibility = Visibility.Visible;
             SetStatus("保存失败：" + exception.Message);
             App.Services.Diagnostics.Error("设置保存失败", exception);
             return false;
         }
+    }
+
+    private void OnRetrySaveClick(object sender, RoutedEventArgs args)
+    {
+        _saveTimer.Stop();
+        SaveNow();
     }
 
     private void OnSavePasswordClick(object sender, RoutedEventArgs args)
@@ -397,22 +447,32 @@ public sealed partial class SettingsPage : Page
         string dir = string.IsNullOrWhiteSpace(ExportDirectoryBox.Text)
             ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
             : ExportDirectoryBox.Text.Trim();
-        Directory.CreateDirectory(dir);
-        Process.Start(new ProcessStartInfo(dir) { UseShellExecute = true });
+        OpenDirectory(dir);
     }
 
     private void OnOpenDataFolderClick(object sender, RoutedEventArgs args)
     {
         string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "YunKaoDesktop");
-        Directory.CreateDirectory(dir);
-        Process.Start(new ProcessStartInfo(dir) { UseShellExecute = true });
+        OpenDirectory(dir);
     }
 
     private void OnOpenLogFolderClick(object sender, RoutedEventArgs args)
     {
         string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "YunKaoDesktop", "Logs");
-        Directory.CreateDirectory(dir);
-        Process.Start(new ProcessStartInfo(dir) { UseShellExecute = true });
+        OpenDirectory(dir);
+    }
+
+    private void OpenDirectory(string directory)
+    {
+        try
+        {
+            Directory.CreateDirectory(directory);
+            SetStatus(FileActions.TryOpen(directory, out string error) ? "已打开目录" : "打开目录失败：" + error);
+        }
+        catch (Exception exception)
+        {
+            SetStatus("打开目录失败：" + exception.Message);
+        }
     }
 
     private void OnCopyDiagnosticsClick(object sender, RoutedEventArgs args)

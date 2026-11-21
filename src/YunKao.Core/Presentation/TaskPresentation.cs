@@ -74,7 +74,8 @@ public static class TaskPresentation
     {
         int saved = Math.Max(0, snapshot.SavedCount);
         bool canClear = saved > 0;
-        bool canRestart = saved > 0 || snapshot.Status == ExtractionStatus.Error;
+        bool canRestart = snapshot.IsPracticeReady && !snapshot.IsBrowserRecovering
+            && (saved > 0 || snapshot.Status == ExtractionStatus.Error);
 
         if (snapshot.IsBrowserRecovering)
         {
@@ -82,7 +83,7 @@ public static class TaskPresentation
                 "", "页面恢复中", "正在恢复",
                 "正在重建页面组件，恢复完成前暂不能提取",
                 "正在恢复…", TaskPrimaryAction.None, TaskActionTone.Neutral,
-                ShowStop: false, canClear, canRestart,
+                ShowStop: false, canClear, CanRestart: false,
                 TaskStatusKind.Recovering, "页面恢复中");
         }
 
@@ -95,6 +96,16 @@ public static class TaskPresentation
                 ShowStop: true, canClear, canRestart,
                 TaskStatusKind.Running, $"正在提取 · {saved} 题"),
 
+            ExtractionStatus.Paused when !snapshot.IsPracticeReady => new(
+                "", $"已暂停 · 已存 {saved} 题", "下一步：确认练习页面",
+                snapshot.IsLoginPage
+                    ? "登录已失效，请重新登录并打开原练习页；已保存题目仍可导出"
+                    : "打开原练习页后可继续提取，也可以先导出已保存题目",
+                saved > 0 ? "导出题库" : "等待练习页",
+                saved > 0 ? TaskPrimaryAction.Export : TaskPrimaryAction.None, TaskActionTone.Accent,
+                ShowStop: true, canClear, canRestart,
+                TaskStatusKind.Paused, $"已暂停 · {saved} 题"),
+
             ExtractionStatus.Paused => new(
                 "", $"已暂停 · 已存 {saved} 题", "任务暂停中",
                 "当前不会自动跳转下一题，点击可随时继续",
@@ -106,7 +117,7 @@ public static class TaskPresentation
                 "", "等待 AI 补全", "题目已提取完毕",
                 "正在等待后台 AI 补全解析，请稍候…",
                 "AI 处理中…", TaskPrimaryAction.None, TaskActionTone.Neutral,
-                ShowStop: false, canClear, canRestart,
+                ShowStop: true, canClear, canRestart,
                 TaskStatusKind.Completing, "等待 AI 完成"),
 
             ExtractionStatus.Completed => new(
@@ -115,6 +126,14 @@ public static class TaskPresentation
                 "导出题库", TaskPrimaryAction.Export, TaskActionTone.Accent,
                 ShowStop: false, canClear, canRestart,
                 TaskStatusKind.Completed, $"已完成 · {saved} 题"),
+
+            ExtractionStatus.Error when !snapshot.IsPracticeReady => new(
+                "", "提取异常 · 题目已保留", "下一步：检查练习页面",
+                "请重新打开练习页后再试；已保存题目仍可导出",
+                saved > 0 ? "导出题库" : "等待练习页",
+                saved > 0 ? TaskPrimaryAction.Export : TaskPrimaryAction.None, TaskActionTone.Neutral,
+                ShowStop: false, canClear, canRestart,
+                TaskStatusKind.Error, "任务异常"),
 
             ExtractionStatus.Error => new(
                 "", "提取异常 · 可重试", "遇到异常",
@@ -135,7 +154,7 @@ public static class TaskPresentation
                 ? new(
                     "", $"已就绪 · 本地 {saved} 题", "可以继续提取",
                     "当前页面为练习页，可继续提取新题",
-                    "开始提取", TaskPrimaryAction.Start, TaskActionTone.Accent,
+                    "继续提取", TaskPrimaryAction.Start, TaskActionTone.Accent,
                     ShowStop: false, canClear, canRestart,
                     TaskStatusKind.Ready, $"本地 {saved} 题")
                 : new(

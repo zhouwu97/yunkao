@@ -44,10 +44,15 @@
 
     <controls:PageHeader x:Name="Header"
                          Title="设置"
-                         Description="修改会自动保存；密码与 API Key 需要单独点击保存。" />
+                         Description="修改会自动保存；密码与 API Key 需要单独点击保存。">
+      <controls:PageHeader.Actions>
+        <Button x:Name="RetrySaveButton" Content="重试保存" Click="OnRetrySaveClick" Visibility="Collapsed"
+                Style="{StaticResource SecondaryButtonStyle}" />
+      </controls:PageHeader.Actions>
+    </controls:PageHeader>
 
     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled">
-      <Grid Padding="32,0,32,32">
+      <Grid x:Name="SettingsBody" Padding="32,0,32,32" SizeChanged="OnSettingsSizeChanged">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="*" MaxWidth="820" />
           <ColumnDefinition Width="Auto" />

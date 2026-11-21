@@ -53,6 +53,7 @@ public sealed class WebViewService : IAsyncDisposable
     private RecoveryWaiters? _recoveryWaiters;
 
     public bool IsInitialized => _core is not null;
+    public bool IsLoading { get; private set; }
     public bool IsBridgeInstalled { get; private set; }
     public bool IsRecovering => _recoveryState.IsRecovering;
     public Uri? CurrentUri { get; private set; }
@@ -60,6 +61,7 @@ public sealed class WebViewService : IAsyncDisposable
     public string BrowserVersion => _core?.Environment.BrowserVersionString ?? "未初始化";
 
     public event EventHandler<BrowserNavigationEventArgs>? NavigationChanged;
+    public event EventHandler<bool>? LoadingChanged;
     public event EventHandler? AddressRequested;
     public event EventHandler<BridgeMessageEventArgs>? BridgeMessageReceived;
     public event EventHandler<string>? StatusChanged;
@@ -83,6 +85,7 @@ public sealed class WebViewService : IAsyncDisposable
             CoreWebView2Environment environment = await CoreWebView2Environment.CreateAsync().AsTask(cancellationToken);
             await view.EnsureCoreWebView2Async(environment).AsTask(cancellationToken);
             _core = view.CoreWebView2;
+            _core.NavigationStarting += OnNavigationStarting;
             _core.NavigationCompleted += OnNavigationCompleted;
             _core.SourceChanged += OnSourceChanged;
             _core.WebMessageReceived += OnWebMessageReceived;
@@ -129,7 +132,7 @@ public sealed class WebViewService : IAsyncDisposable
 
     public void GoHome()
     {
-        Navigate(new Uri("https://www.cctrcloud.net/"));
+        Navigate(CloudResourceClassifier.StudentLoginUri);
     }
 
     public void Refresh() => _core?.Reload();
@@ -155,7 +158,7 @@ public sealed class WebViewService : IAsyncDisposable
 
     public async Task<BrowserPageState> GetPageStateAsync(CancellationToken cancellationToken = default)
     {
-        if (_core is null)
+        if (_core is null || IsLoading)
         {
             return new(false, false, CurrentUri?.AbsoluteUri ?? "", "");
         }
@@ -252,7 +255,7 @@ public sealed class WebViewService : IAsyncDisposable
             }
 
             if (!_recoveryState.Begin()) return false;
-            Uri targetUri = CurrentUri ?? new Uri("https://www.cctrcloud.net/");
+            Uri targetUri = CurrentUri ?? CloudResourceClassifier.StudentLoginUri;
             DetachCoreEvents();
             _core = null;
             IsBridgeInstalled = false;
@@ -313,6 +316,7 @@ public sealed class WebViewService : IAsyncDisposable
     {
         if (_core is not null)
         {
+            _core.NavigationStarting -= OnNavigationStarting;
             _core.NavigationCompleted -= OnNavigationCompleted;
             _core.SourceChanged -= OnSourceChanged;
             _core.WebMessageReceived -= OnWebMessageReceived;
@@ -325,8 +329,19 @@ public sealed class WebViewService : IAsyncDisposable
         await Task.CompletedTask;
     }
 
+    private void OnNavigationStarting(CoreWebView2 sender, CoreWebView2NavigationStartingEventArgs args)
+    {
+        IsLoading = true;
+        IsBridgeInstalled = false;
+        PageState = new(false, false, args.Uri, "");
+        LoadingChanged?.Invoke(this, true);
+        StatusChanged?.Invoke(this, "正在加载网页…");
+    }
+
     private async void OnNavigationCompleted(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
     {
+        IsLoading = false;
+        LoadingChanged?.Invoke(this, false);
         Uri? uri = TryGetUri(sender.Source);
         CurrentUri = uri;
         IsBridgeInstalled = false;
@@ -589,6 +604,7 @@ public sealed class WebViewService : IAsyncDisposable
     private void DetachCoreEvents()
     {
         if (_core is null) return;
+        _core.NavigationStarting -= OnNavigationStarting;
         _core.NavigationCompleted -= OnNavigationCompleted;
         _core.SourceChanged -= OnSourceChanged;
         _core.WebMessageReceived -= OnWebMessageReceived;

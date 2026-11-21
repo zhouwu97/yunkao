@@ -92,6 +92,21 @@ public sealed class ExtractionSession
         return true;
     }
 
+    /// <summary>继续已停止的任务，保留题目、去重集合与历史关联。</summary>
+    public bool ContinueStopped()
+    {
+        lock (_gate)
+        {
+            if (Status != ExtractionStatus.Idle || SessionId == Guid.Empty || _questions.Count == 0) return false;
+            _callbackSessionId = SessionId;
+            EndedAt = null;
+            Status = ExtractionStatus.Running;
+        }
+
+        RaiseChanged();
+        return true;
+    }
+
     public bool Stop()
     {
         lock (_gate)

@@ -29,7 +29,7 @@ public sealed class TaskPresentationTests
     [Theory]
     [InlineData(ExtractionStatus.Running, TaskPrimaryAction.Pause, true, TaskStatusKind.Running)]
     [InlineData(ExtractionStatus.Paused, TaskPrimaryAction.Resume, true, TaskStatusKind.Paused)]
-    [InlineData(ExtractionStatus.Completing, TaskPrimaryAction.None, false, TaskStatusKind.Completing)]
+    [InlineData(ExtractionStatus.Completing, TaskPrimaryAction.None, true, TaskStatusKind.Completing)]
     [InlineData(ExtractionStatus.Completed, TaskPrimaryAction.Export, false, TaskStatusKind.Completed)]
     [InlineData(ExtractionStatus.Error, TaskPrimaryAction.Restart, false, TaskStatusKind.Error)]
     public void ActiveStatusesMapToSinglePrimaryAction(
@@ -47,7 +47,7 @@ public sealed class TaskPresentationTests
     [Fact]
     public void ErrorUsesDangerToneAndAllowsRestartWithoutQuestions()
     {
-        TaskPresentationState state = Map(ExtractionStatus.Error);
+        TaskPresentationState state = Map(ExtractionStatus.Error, practice: true);
         Assert.Equal(TaskActionTone.Danger, state.Tone);
         Assert.True(state.CanRestart);
         Assert.False(state.CanClear);
@@ -60,6 +60,30 @@ public sealed class TaskPresentationTests
         Assert.Equal(TaskPrimaryAction.Start, state.PrimaryAction);
         Assert.Contains("4", state.StateText);
         Assert.True(state.CanClear);
+        Assert.Equal("继续提取", state.ActionLabel);
+    }
+
+    [Theory]
+    [InlineData(ExtractionStatus.Paused, true)]
+    [InlineData(ExtractionStatus.Paused, false)]
+    [InlineData(ExtractionStatus.Error, true)]
+    [InlineData(ExtractionStatus.Error, false)]
+    public void UnavailablePracticePageOffersExistingQuestionsForExport(ExtractionStatus status, bool login)
+    {
+        TaskPresentationState state = Map(status, saved: 4, login: login);
+        Assert.Equal(TaskPrimaryAction.Export, state.PrimaryAction);
+        Assert.False(state.CanRestart);
+        Assert.Contains("练习页", state.HintText);
+    }
+
+    [Theory]
+    [InlineData(ExtractionStatus.Paused)]
+    [InlineData(ExtractionStatus.Error)]
+    public void UnavailablePageDoesNotOfferAnImpossibleRetryWithNoQuestions(ExtractionStatus status)
+    {
+        TaskPresentationState state = Map(status, login: true);
+        Assert.Equal(TaskPrimaryAction.None, state.PrimaryAction);
+        Assert.False(state.CanRestart);
     }
 
     [Fact]

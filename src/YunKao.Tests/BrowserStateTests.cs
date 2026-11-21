@@ -4,6 +4,14 @@ namespace YunKao.Tests;
 
 public sealed class BrowserStateTests
 {
+    [Fact]
+    public void Student_login_entry_accepts_bridge_messages()
+    {
+        Uri login = CloudResourceClassifier.StudentLoginUri;
+        Assert.Equal("https://www.cctrcloud.net/practice/login.html", login.AbsoluteUri);
+        Assert.True(CloudResourceClassifier.IsTrustedBridgeMessage(login, login));
+    }
+
     [Theory]
     [InlineData("https://www.cctrcloud.net/admin/index.php?act=login&op=login", true)]
     [InlineData("https://www.cctrcloud.net/admin/", true)]

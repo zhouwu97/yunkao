@@ -38,6 +38,7 @@ public sealed partial class MainWindow : Window
     private readonly UISettings _uiSettings = new();
     private AppWindow? _appWindow;
     private Action? _bannerAction;
+    private bool _bannerReturnToWorkspace;
     private NavigationTarget _current = NavigationTarget.Workspace;
     private bool? _userCompact;
     private bool _compact;
@@ -62,6 +63,7 @@ public sealed partial class MainWindow : Window
         NavigationRail.NavigationRequested += (_, args) => ShowPage(args.Target);
         BrowserBar.Navigated += (_, _) => ShowPage(NavigationTarget.Workspace);
         App.Services.Browser.AddressEditRequested += (_, _) => BeginAddressEdit();
+        App.Services.Browser.WorkspaceRequested += (_, _) => ShowPage(NavigationTarget.Workspace);
         RootFrame.Navigated += OnRootFrameNavigated;
         RootSurface.SizeChanged += OnRootSizeChanged;
         RootSurface.ActualThemeChanged += (_, _) => UpdateCaptionButtons();
@@ -231,6 +233,7 @@ public sealed partial class MainWindow : Window
             ShellBanner.Message = info.Message;
             ShellBanner.Severity = info.Severity;
             _bannerAction = info.ActionCallback;
+            _bannerReturnToWorkspace = info.ReturnToWorkspace;
             ShellBannerAction.Content = info.ActionLabel ?? "";
             ShellBannerAction.Visibility = string.IsNullOrWhiteSpace(info.ActionLabel) || info.ActionCallback is null
                 ? Visibility.Collapsed
@@ -247,7 +250,7 @@ public sealed partial class MainWindow : Window
         ShellBanner.IsOpen = false;
         Action? action = _bannerAction;
         _bannerAction = null;
-        ShowPage(NavigationTarget.Workspace);
+        if (_bannerReturnToWorkspace) ShowPage(NavigationTarget.Workspace);
         action?.Invoke();
     }
 

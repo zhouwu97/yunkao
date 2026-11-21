@@ -45,15 +45,18 @@
           </Grid.ColumnDefinitions>
           <FontIcon Glyph="&#xE72E;" FontSize="12" Foreground="{StaticResource StatusSuccessBrush}" VerticalAlignment="Center" />
           <Grid Grid.Column="1" VerticalAlignment="Center">
-            <Grid x:Name="AddressDisplay"
+            <Button x:Name="AddressDisplay"
                   Background="Transparent"
-                  Tapped="OnAddressTapped"
+                  Click="OnAddressClick" Padding="0" MinWidth="0" BorderThickness="0"
+                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                  AutomationProperties.Name="编辑网址 (Ctrl+L)"
+                  Style="{StaticResource SubtleButtonStyle}"
                   ToolTipService.ToolTip="{x:Bind ViewModel.FullAddress, Mode=OneWay}">
               <TextBlock TextTrimming="CharacterEllipsis" FontSize="13" VerticalAlignment="Center">
                 <Run Text="{x:Bind ViewModel.Host, Mode=OneWay}" FontWeight="SemiBold" Foreground="{ThemeResource SidebarTextBrush}" />
                 <Run Text="{x:Bind ViewModel.Path, Mode=OneWay}" Foreground="{ThemeResource SidebarTextTertiaryBrush}" />
               </TextBlock>
-            </Grid>
+            </Button>
             <TextBox x:Name="AddressBox"
                      AutomationProperties.Name="地址栏"
                      Visibility="Collapsed"
@@ -64,6 +67,9 @@
           </Grid>
         </Grid>
       </controls:GlassPanel>
+
+      <TextBlock x:Name="AddressError" Visibility="Collapsed" TextWrapping="Wrap" FontSize="12"
+                 Foreground="{ThemeResource DangerTextBrush}" AutomationProperties.LiveSetting="Polite" />
 
       <TextBlock x:Name="StatusLine"
                  Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
@@ -94,6 +100,18 @@
       </Button>
       <Button Command="{x:Bind ViewModel.RefreshCommand}" AutomationProperties.Name="刷新页面" ToolTipService.ToolTip="刷新" Style="{StaticResource SidebarIconButtonStyle}" Width="40" Height="36">
         <FontIcon Glyph="&#xE72C;" FontSize="14" />
+      </Button>
+      <Button AutomationProperties.Name="更多浏览器操作" ToolTipService.ToolTip="前进、首页、缩放与外部浏览器"
+              Style="{StaticResource SidebarIconButtonStyle}" Width="40" Height="36">
+        <FontIcon Glyph="&#xE712;" FontSize="14" />
+        <Button.Flyout>
+          <MenuFlyout Placement="RightEdgeAlignedTop">
+            <MenuFlyoutItem Text="前进" Command="{x:Bind ViewModel.ForwardCommand}" />
+            <MenuFlyoutItem Text="云考首页" Command="{x:Bind ViewModel.HomeCommand}" />
+            <MenuFlyoutItem Text="切换适应宽度 / 原始大小" Command="{x:Bind ViewModel.FitWidthCommand}" />
+            <MenuFlyoutItem Text="在系统浏览器中打开" Command="{x:Bind ViewModel.ExternalCommand}" />
+          </MenuFlyout>
+        </Button.Flyout>
       </Button>
     </StackPanel>
   </Grid>

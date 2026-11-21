@@ -20,5 +20,6 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <Compile Include="..\YunKao.App\ViewModels\BrowserViewModel.cs" Link="BrowserViewModel.cs" />
   </ItemGroup>
 </Project>

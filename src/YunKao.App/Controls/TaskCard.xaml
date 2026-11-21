@@ -36,10 +36,10 @@
                 <MenuFlyoutItem Text="停止任务" Command="{x:Bind ViewModel.StopCommand}" Visibility="{x:Bind ViewModel.ShowStop, Mode=OneWay}">
                   <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE71A;" /></MenuFlyoutItem.Icon>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="重新开始" Command="{x:Bind ViewModel.RestartCommand}">
+                <MenuFlyoutItem Text="新建提取任务（保留历史）" Command="{x:Bind ViewModel.RestartCommand}">
                   <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE72C;" /></MenuFlyoutItem.Icon>
                 </MenuFlyoutItem>
-                <MenuFlyoutItem Text="清空本次题目" Command="{x:Bind ViewModel.ClearCommand}">
+                <MenuFlyoutItem Text="移出工作台（保留历史）" Command="{x:Bind ViewModel.ClearCommand}">
                   <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE74D;" /></MenuFlyoutItem.Icon>
                 </MenuFlyoutItem>
                 <MenuFlyoutSeparator Visibility="{x:Bind ViewModel.HasInterrupted, Mode=OneWay}" />
@@ -57,12 +57,12 @@
           <StackPanel Orientation="Horizontal" Spacing="6">
             <TextBlock Text="{x:Bind ViewModel.SavedCount, Mode=OneWay}" Style="{StaticResource DisplayNumberStyle}" LineHeight="36" />
             <TextBlock Text="题已保存" VerticalAlignment="Bottom" Margin="0,0,0,6" FontSize="12" Foreground="{ThemeResource SidebarTextSecondaryBrush}" />
-            <TextBlock VerticalAlignment="Bottom" Margin="0,0,0,6" FontSize="12"
+          </StackPanel>
+            <TextBlock FontSize="12"
                        Foreground="{ThemeResource SidebarTextTertiaryBrush}"
                        Visibility="{x:Bind ViewModel.HasProgress, Mode=OneWay}">
               <Run Text="· 第 " /><Run Text="{x:Bind ViewModel.Current, Mode=OneWay}" /><Run Text=" / " /><Run Text="{x:Bind ViewModel.Total, Mode=OneWay}" /><Run Text=" 题" />
             </TextBlock>
-          </StackPanel>
           <ProgressBar Value="{x:Bind ViewModel.ProgressPercent, Mode=OneWay}"
                        Visibility="{x:Bind ViewModel.HasProgress, Mode=OneWay}"
                        Minimum="0" Maximum="100" Height="3" MinHeight="3" CornerRadius="2" />
@@ -82,6 +82,14 @@
                 Style="{x:Bind helpers:Ui.ToneStyle(ViewModel.Tone), Mode=OneWay}"
                 HorizontalAlignment="Stretch"
                 MinHeight="36" />
+
+        <Button Content="停止任务，保留题目" Command="{x:Bind ViewModel.StopCommand}"
+                Visibility="{x:Bind ViewModel.ShowStop, Mode=OneWay}"
+                Style="{StaticResource SidebarButtonStyle}" HorizontalAlignment="Stretch" />
+
+        <Button Content="{x:Bind ViewModel.RestoreLabel, Mode=OneWay}" Command="{x:Bind ViewModel.RestoreCommand}"
+                Visibility="{x:Bind ViewModel.HasInterrupted, Mode=OneWay}"
+                Style="{StaticResource SidebarButtonStyle}" HorizontalAlignment="Stretch" />
 
         <StackPanel Spacing="8" Visibility="{x:Bind ViewModel.HasQuestions, Mode=OneWay}">
           <Rectangle Height="1" Fill="{ThemeResource SidebarDividerBrush}" Margin="0,2,0,0" />
@@ -109,6 +117,9 @@
               </Button.Flyout>
             </Button>
           </Grid>
+          <CheckBox Content="练习版（隐藏答案）" IsChecked="{x:Bind ViewModel.PracticeMode, Mode=TwoWay}"
+                    FontSize="12" MinWidth="0" Padding="0"
+                    ToolTipService.ToolTip="{x:Bind ViewModel.ExportVersionText, Mode=OneWay}" />
         </StackPanel>
       </StackPanel>
     </controls:GlassPanel>

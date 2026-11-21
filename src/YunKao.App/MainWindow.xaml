@@ -40,7 +40,10 @@
     </Grid>
 
     <!-- 侧边栏 -->
-    <Grid x:Name="Sidebar" Grid.Row="1" Padding="14,6,10,14">
+    <ScrollViewer x:Name="SidebarScroller" Grid.Row="1" HorizontalScrollMode="Disabled"
+                  HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+    <Grid x:Name="Sidebar" Padding="14,6,10,14"
+          MinHeight="{Binding ViewportHeight, ElementName=SidebarScroller}">
       <Grid.RowDefinitions>
         <RowDefinition Height="Auto" />
         <RowDefinition Height="Auto" />
@@ -52,7 +55,7 @@
       <controls:BrowserBar x:Name="BrowserBar" />
       <controls:TaskCard x:Name="TaskCard" Grid.Row="1" Margin="0,14,0,0" />
       <TextBlock x:Name="PagesLabel" Grid.Row="2" Text="页面" Margin="12,20,0,6" Style="{StaticResource SidebarLabelStyle}" />
-      <controls:NavigationRail x:Name="NavigationRail" Grid.Row="3" />
+      <controls:NavigationRail x:Name="NavigationRail" Grid.Row="3" MinHeight="220" />
       <Button x:Name="CollapseButton"
               Grid.Row="4"
               Margin="0,6,0,0"
@@ -64,6 +67,7 @@
         <FontIcon x:Name="CollapseGlyph" Glyph="&#xE76B;" FontSize="12" />
       </Button>
     </Grid>
+    </ScrollViewer>
 
     <!-- 内容卡片 -->
     <Grid Grid.Row="1" Grid.Column="1" Margin="0,0,12,12">

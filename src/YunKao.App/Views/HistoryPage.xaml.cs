@@ -66,6 +66,7 @@ public sealed partial class HistoryPage : Page
             ViewModel.StatusText = restored
                 ? $"已恢复任务（{snapshot.Questions.Count} 题），处于暂停状态，可回到工作台确认页面后继续。"
                 : "恢复失败，请重试。";
+            if (restored) App.MainWindow?.ShowPage(YunKao.Controls.NavigationTarget.Workspace);
         }
         catch (Exception exception)
         {
