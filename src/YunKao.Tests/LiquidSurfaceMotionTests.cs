@@ -1,93 +1,99 @@
+using System.Numerics;
+using System.Text.Json;
 using YunKao.Core.Presentation;
 
 namespace YunKao.Tests;
 
 public sealed class LiquidSurfaceMotionTests
 {
-    [Theory]
-    [InlineData(5, 100, 0, .5)]
-    [InlineData(395, 100, 1, .5)]
-    [InlineData(200, 5, .5, 0)]
-    [InlineData(200, 195, .5, 1)]
-    public void PullInfluenceStartsOnTheNearestEdge(double x, double y, double expectedX, double expectedY)
+    [Fact]
+    public void TrajectoryMatchesThePinnedUpstreamController()
     {
+        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures/reference-tether.json")));
+        Assert.Equal("7a424c93b9be13cf835b91ea67495fec2ec0584e", document.RootElement.GetProperty("revision").GetString());
         var motion = new LiquidSurfaceMotion();
-        motion.Press(x, y, 400, 200);
-        Assert.Equal(expectedX, motion.GrabX);
-        Assert.Equal(expectedY, motion.GrabY);
-        motion.Pull(x + 100, y - 50);
-        Settle(motion);
-        Assert.Equal(expectedX, motion.GrabX);
-        Assert.Equal(expectedY, motion.GrabY);
+        foreach (var frame in document.RootElement.GetProperty("frames").EnumerateArray())
+        {
+            double Value(string name) => frame.GetProperty(name).GetDouble();
+            switch (frame.GetProperty("action").GetString())
+            {
+                case "press": motion.Press(Value("x"), Value("y"), 400, 200); break;
+                case "pull": motion.Pull(Value("x"), Value("y")); break;
+                case "release": motion.Release(); break;
+            }
+            motion.Advance(1d / 60);
+            Assert.Equal(Value("positionX"), motion.PositionX, 8);
+            Assert.Equal(Value("positionY"), motion.PositionY, 8);
+            Assert.Equal(Value("pressure"), motion.Pressure, 8);
+            Assert.Equal(Value("stretch"), motion.Stretch, 8);
+            Assert.Equal(Value("angle"), motion.Angle, 8);
+            Assert.Equal(Value("bendX"), motion.BendX, 8);
+            Assert.Equal(Value("bendY"), motion.BendY, 8);
+            Assert.Equal(Value("energy"), motion.Energy, 8);
+        }
+        Assert.False(motion.Moving);
     }
 
     private static void Settle(LiquidSurfaceMotion motion)
     {
-        for (int i = 0; i < 900 && motion.Moving; i++) motion.Advance(1d / 120);
+        for (int i = 0; i < 1200 && motion.Moving; i++) motion.Advance(1d / 120);
         Assert.False(motion.Moving);
     }
 
-    [Fact]
-    public void HoldingAPullKeepsTheShapeDeformedAtRest()
+    [Theory]
+    [InlineData(75)]
+    [InlineData(18)]
+    public void TetherUsesTheComponentTravelLimitAndReleasesToItsOrigin(double travel)
     {
-        var motion = new LiquidSurfaceMotion();
-        motion.Press(120, 80, 400, 200);
-        motion.Pull(230, 130);
-        Settle(motion);
-        Assert.True(motion.Held);
-        Assert.InRange(motion.PullX, 5, 19);
-        Assert.True(motion.PullX > 3);
-        Assert.True(motion.PullY > 1);
-        Assert.Equal(1, motion.Pressure);
+        var motion = new LiquidSurfaceMotion(travel);
+        motion.Press(0, 0, 400, 200);
+        motion.Pull(2000, -2000); Settle(motion);
+        Assert.Equal(travel, motion.PositionX);
+        Assert.Equal(-travel, motion.PositionY);
+        Assert.Equal(1.0245, motion.Lift, 8);
+        Assert.Equal(0, motion.Stretch);
+        Assert.Equal(0, motion.BendX);
+        var center = Vector2.Transform(new Vector2(200, 100), motion.CreatePose(400, 200));
+        Assert.Equal(200 + travel, center.X, 3);
+        Assert.Equal(100 - travel, center.Y, 3);
+        motion.Release(); Settle(motion);
+        Assert.Equal(Matrix3x2.Identity, motion.CreatePose(400, 200));
     }
 
     [Fact]
-    public void ReleasePreservesTheCurrentShapeThenReturnsToRest()
+    public void HostTuningLimitsTravelWithoutChangingTheReferenceSpring()
     {
-        var motion = new LiquidSurfaceMotion();
-        motion.Press(0, 0, 200, 100);
-        motion.Pull(80, 35);
-        motion.Advance(.08);
-        var before = (motion.PullX, motion.PullY, motion.GrabX, motion.GrabY, motion.Pressure);
-        motion.Release();
-        Assert.Equal(before, (motion.PullX, motion.PullY, motion.GrabX, motion.GrabY, motion.Pressure));
-        Settle(motion);
-        Assert.False(motion.Held);
-        Assert.Equal(0, motion.Energy);
-        Assert.Equal(0, motion.PullX);
-        Assert.Equal(0, motion.PullY);
-        Assert.Equal(0, motion.Pressure);
+        var panel = new LiquidSurfaceMotion(12, dragGain: .18);
+        panel.Press(0, 0, 400, 200); panel.Pull(50, -25); Settle(panel);
+        Assert.Equal(9, panel.PositionX); Assert.Equal(-4.5, panel.PositionY);
+        panel.Pull(2000, -2000); Settle(panel);
+        Assert.Equal(12, panel.PositionX); Assert.Equal(-12, panel.PositionY);
+        panel.Release(); Settle(panel);
+        Assert.Equal(Matrix3x2.Identity, panel.CreatePose(400, 200));
     }
 
     [Fact]
-    public void RegrabDoesNotRestartTheSprings()
+    public void BoundsKeepTheTetherInsideTheViewport()
     {
         var motion = new LiquidSurfaceMotion();
-        motion.Press(0, 0, 200, 100);
-        motion.Pull(80, 0);
-        motion.Advance(.08);
-        motion.Release();
-        motion.Advance(.02);
-        var before = (motion.PullX, motion.PullY, motion.GrabX, motion.GrabY, motion.Pressure);
-        motion.Press(35, 12, 200, 100);
-        Assert.Equal(before, (motion.PullX, motion.PullY, motion.GrabX, motion.GrabY, motion.Pressure));
+        motion.SetBounds(-12, 9, -6, 30);
+        motion.Press(0, 0, 400, 200); motion.Pull(-200, 200); Settle(motion);
+        Assert.Equal(-12, motion.PositionX); Assert.Equal(30, motion.PositionY);
+        motion.Pull(200, -200); Settle(motion);
+        Assert.Equal(9, motion.PositionX); Assert.Equal(-6, motion.PositionY);
     }
 
     [Fact]
-    public void ReversingThePullChangesBendContinuously()
+    public void ReleaseReversalAndRegrabPreserveTheCurrentPose()
     {
         var motion = new LiquidSurfaceMotion();
-        motion.Press(0, 0, 200, 100);
-        motion.Pull(80, 0);
-        Settle(motion);
-        double bend = motion.PullX;
-        double offset = -5; // Pressing the left edge adds a small outward bulge.
-        motion.Pull(-80, 0);
-        Assert.Equal(bend, motion.PullX);
-        motion.Advance(1d / 120);
-        Assert.True(motion.PullX > 0);
-        Settle(motion);
-        Assert.InRange(motion.PullX, -bend + 2 * offset - .001, -bend + 2 * offset + .001);
+        motion.Press(0, 0, 400, 200); motion.Pull(70, 20); motion.Advance(.05);
+        var before = motion.CreatePose(400, 200);
+        motion.Pull(-70, -20); Assert.Equal(before, motion.CreatePose(400, 200));
+        motion.Release(); Assert.Equal(before, motion.CreatePose(400, 200));
+        motion.Press(100, 50, 400, 200); Assert.Equal(before, motion.CreatePose(400, 200));
+        motion.Release(); Settle(motion);
+        Assert.Equal(Matrix3x2.Identity, motion.CreatePose(400, 200));
     }
 
     [Theory]
@@ -95,85 +101,41 @@ public sealed class LiquidSurfaceMotionTests
     [InlineData(60)]
     [InlineData(120)]
     [InlineData(144)]
-    public void DifferentFrameRatesStayStable(int fps)
+    public void FrameRatesRemainStableAndReleaseHasVisibleRecoil(int fps)
     {
         var motion = new LiquidSurfaceMotion();
-        motion.Press(0, 0, 400, 240);
-        for (int i = 0; i < fps; i++)
+        motion.Press(0, 0, 400, 200); motion.Pull(75, 0); Settle(motion);
+        motion.Release(); double opposite = 0;
+        for (int i = 0; i < fps * 4; i++)
         {
-            motion.Pull(i * 180d / fps, i * 65d / fps);
             motion.Advance(1d / fps);
-            Assert.InRange(motion.Energy, 0, .376);
-            Assert.InRange(motion.PullX, -25, 25);
+            opposite = Math.Min(opposite, motion.PositionX);
+            Assert.InRange(motion.PositionX, -25, 80);
+            Assert.InRange(motion.Stretch, -.2, .34);
         }
-        motion.Release();
-        for (int i = 0; i < fps * 4; i++) motion.Advance(1d / fps);
-        Assert.False(motion.Moving);
-        Assert.Equal(0, motion.Energy);
+        Assert.True(opposite < -5, $"Recoil was only {opposite:F2} DIP at {fps} FPS");
+        Assert.False(motion.Moving); Assert.Equal(0, motion.Energy);
     }
 
     [Fact]
-    public void VeryWidePanelsKeepDeformationWithinTheCapturePadding()
+    public void TransformOriginDoesNotChangeTheVisiblePose()
     {
         var motion = new LiquidSurfaceMotion();
-        motion.Press(0, 0, 2000, 40);
-        motion.Pull(10000, 0);
-        for (int i = 0; i < 120; i++)
-        {
-            motion.Advance(1d / 120);
-            Assert.True(Math.Sqrt(motion.PullX * motion.PullX + motion.PullY * motion.PullY) <= 25.001);
-        }
+        motion.Press(0, 0, 400, 200); motion.Pull(75, 40); motion.Advance(.05);
+        var point = new Vector2(31, 53); var center = new Vector2(200, 100);
+        Assert.True(Vector2.Distance(Vector2.Transform(point, motion.CreatePose(400, 200)),
+            Vector2.Transform(point - center, motion.CreatePose(400, 200, .5, .5)) + center) < .001);
     }
 
     [Fact]
-    public void ResetCancelsAnActivePullImmediately()
+    public void ResetAndInvalidSamplesDoNotLeaveAnActiveAnimation()
     {
         var motion = new LiquidSurfaceMotion();
-        motion.Press(0, 0, 200, 100);
-        motion.Pull(80, 0);
-        motion.Advance(.08);
-        motion.Reset();
-        Assert.False(motion.Moving);
-        Assert.False(motion.Held);
-        Assert.Equal(0, motion.Energy);
-        Assert.Equal(0, motion.Pressure);
-    }
-
-    [Fact]
-    public void InvalidSamplesDoNotPoisonTheMotion()
-    {
-        var motion = new LiquidSurfaceMotion();
-        motion.Press(double.NaN, 0, 200, 100);
-        Assert.False(motion.Held);
-        motion.Press(0, 0, 200, 100);
-        motion.Pull(double.PositiveInfinity, 5);
-        motion.Advance(double.NaN);
-        motion.Advance(-1);
-        Assert.Equal(0, motion.Energy);
-        motion.Release();
-        Settle(motion);
-    }
-
-    [Fact]
-    public void APressBulgesLocallyAndReleaseHasVisibleRecoil()
-    {
-        var motion = new LiquidSurfaceMotion();
-        motion.Press(200, 4, 400, 240);
-        Settle(motion);
-        Assert.Equal(-5, motion.PullY, 3);
-        motion.Pull(200, -95);
-        Settle(motion);
-        double held = motion.PullY;
-        Assert.True(held < -18);
-        motion.Release();
-        double oppositePeak = 0;
-        for (int frame = 0; frame < 90; frame++)
-        {
-            motion.Advance(1d / 120);
-            oppositePeak = Math.Max(oppositePeak, motion.PullY);
-        }
-        Assert.True(oppositePeak > 4, $"Recoil was only {oppositePeak:F2} DIP.");
-        Settle(motion);
-        Assert.Equal(0, motion.Energy);
+        motion.Press(double.NaN, 0, 400, 200); Assert.False(motion.Held);
+        motion.Press(0, 0, 400, 200); motion.Pull(double.PositiveInfinity, 5);
+        motion.Advance(double.NaN); motion.Advance(-1); Assert.Equal(0, motion.Energy);
+        motion.Pull(75, 40); motion.Advance(.05); motion.Reset();
+        Assert.False(motion.Held); Assert.False(motion.Moving);
+        Assert.Equal(Matrix3x2.Identity, motion.CreatePose(400, 200));
     }
 }

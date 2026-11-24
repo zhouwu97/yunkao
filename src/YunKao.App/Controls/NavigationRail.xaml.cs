@@ -109,9 +109,13 @@ public sealed partial class NavigationRail : UserControl
         }
         try
         {
-            _lens ??= new LiquidGlassRenderer(LensHost, _scene, 32, LensFallback, _labels);
-            _lens.SetMaterial(new(new GlassCorners(_compact ? 25 : 22), .8f, 14, 1.04f,
-                Windows.UI.Color.FromArgb(255, 232, 223, 252), (float)(GlassSettings.TintOpacity * .5), true, 24, .5f));
+            _lens ??= new LiquidGlassRenderer(LensHost, _scene, 32, LensFallback, _labels,
+                materialReady: ready => Canvas.SetZIndex(SelectionBlob, ready ? 1 : 0));
+            // Preserve a clear center on the dark rail. Keep rim refraction, but remove
+            // blur, tint and the pressed interior glint/shadow that reads as an oval wash.
+            _lens.SetMaterial(new(new GlassCorners(_compact ? 25 : 22), 0,
+                LiquidLensPreset.Refraction, LiquidLensPreset.Saturation,
+                Windows.UI.Color.FromArgb(255, 255, 255, 255), 0, true, 24, LiquidLensPreset.Dispersion, InteriorEffects: 0));
             _lens.Invalidate();
         }
         catch (Exception ex)
@@ -350,7 +354,6 @@ public sealed partial class NavigationRail : UserControl
         SelectionTransform.TranslateX = _motion.Cross;
         SelectionTransform.ScaleX = SelectionTransform.ScaleY = 1;
         SelectionTransform.SkewX = 0;
-        Canvas.SetZIndex(SelectionBlob, press > .04 && _lens?.HasLabels == true ? 1 : 0);
         _lens?.SetInteraction(press, _lightX, _lightY);
         _lens?.SetDeformation(_motion.Stretch, _motion.Angle, _motion.CrossBend,
             _motion.Bend - press * _compression * 4, _motion.Energy);

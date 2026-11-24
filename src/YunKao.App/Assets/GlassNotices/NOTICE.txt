@@ -1,4 +1,4 @@
-YunKao desktop liquid glass
+LiquidGlass desktop liquid glass
 Native Win2D adaptation of the circle-profile refraction and directional rim lighting studied in
 zhouwu97/FlutterLiquidglass, revision 2c281279bdde506d65a035442638a90c031bd593:
 https://github.com/zhouwu97/FlutterLiquidglass/blob/2c281279bdde506d65a035442638a90c031bd593/shaders/liquid_glass.frag
@@ -13,3 +13,8 @@ reconstruction and directional surface lighting into a ComputeSharp Direct2D pix
 It samples separate artwork and tab-label textures and preserves continuous spring state.
 ComputeSharp 3.2.0 is Copyright (c) Sergio Pedri and contributors, MIT licensed.
 Applicable notices are included alongside this file.
+
+The tethered component spring solver and affine pose also adapt JellyController and jelly-physics
+from ruiqichenbiec/design-systems, revision 7a424c93b9be13cf835b91ea67495fec2ec0584e (MIT):
+https://github.com/ruiqichenbiec/design-systems/tree/7a424c93b9be13cf835b91ea67495fec2ec0584e/lens/lab/design-system/internal
+Host-specific travel gain/limits and clear-material geometry are documented in the example README.

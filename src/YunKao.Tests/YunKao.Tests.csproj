@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <None Update="Fixtures/*.json" CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="..\YunKao.App\ViewModels\BrowserViewModel.cs" Link="BrowserViewModel.cs" />
   </ItemGroup>
 </Project>

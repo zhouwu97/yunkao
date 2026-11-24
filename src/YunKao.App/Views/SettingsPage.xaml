@@ -28,9 +28,7 @@
       <Setter Property="AutomationProperties.HeadingLevel" Value="Level2" />
       <Setter Property="Margin" Value="4,0,0,10" />
     </Style>
-    <Style x:Key="RowToggleStyle" TargetType="ToggleSwitch" BasedOn="{StaticResource DefaultToggleSwitchStyle}">
-      <Setter Property="OnContent" Value="" />
-      <Setter Property="OffContent" Value="" />
+    <Style x:Key="RowToggleStyle" TargetType="controls:LiquidGlassToggleSwitch" BasedOn="{StaticResource LiquidGlassToggleStyle}">
       <Setter Property="MinWidth" Value="0" />
       <Setter Property="HorizontalAlignment" Value="Right" />
       <Setter Property="Margin" Value="0,0,-12,0" />
@@ -132,7 +130,7 @@
                     <TextBlock Text="减少动画" Style="{StaticResource RowTitleStyle}" />
                     <TextBlock Text="关闭导航滑动、指针光效与按钮回弹；系统关闭动画时自动生效" Style="{StaticResource RowDescriptionStyle}" />
                   </StackPanel>
-                  <ToggleSwitch x:Name="ReduceMotionToggle" AutomationProperties.Name="减少动画" Grid.Column="1" Toggled="OnReduceMotionToggled" Style="{StaticResource RowToggleStyle}" />
+                  <controls:LiquidGlassToggleSwitch x:Name="ReduceMotionToggle" AutomationProperties.Name="减少动画" Grid.Column="1" Toggled="OnReduceMotionToggled" Style="{StaticResource RowToggleStyle}" />
                 </Grid>
               </StackPanel>
             </controls:GlassPanel>
@@ -171,7 +169,7 @@
                     <TextBlock Text="记住密码" Style="{StaticResource RowTitleStyle}" />
                     <TextBlock Text="在云考登录页自动填写；关闭后会清除已保存的密码" Style="{StaticResource RowDescriptionStyle}" />
                   </StackPanel>
-                  <ToggleSwitch x:Name="RememberPasswordToggle" AutomationProperties.Name="记住密码" Grid.Column="1" Toggled="OnSettingChanged" Style="{StaticResource RowToggleStyle}" />
+                  <controls:LiquidGlassToggleSwitch x:Name="RememberPasswordToggle" AutomationProperties.Name="记住密码" Grid.Column="1" Toggled="OnSettingChanged" Style="{StaticResource RowToggleStyle}" />
                 </Grid>
               </StackPanel>
             </controls:GlassPanel>
@@ -225,7 +223,7 @@
                 <Grid Style="{StaticResource RowGridStyle}">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                   <TextBlock Text="导出后自动打开文件" VerticalAlignment="Center" Style="{StaticResource RowTitleStyle}" />
-                  <ToggleSwitch x:Name="AutoOpenToggle" AutomationProperties.Name="导出后自动打开文件" Grid.Column="1" Toggled="OnSettingChanged" Style="{StaticResource RowToggleStyle}" />
+                  <controls:LiquidGlassToggleSwitch x:Name="AutoOpenToggle" AutomationProperties.Name="导出后自动打开文件" Grid.Column="1" Toggled="OnSettingChanged" Style="{StaticResource RowToggleStyle}" />
                 </Grid>
                 <Rectangle Style="{StaticResource RowDividerStyle}" />
                 <Grid Style="{StaticResource RowGridStyle}">
@@ -234,7 +232,7 @@
                     <TextBlock Text="练习版" Style="{StaticResource RowTitleStyle}" />
                     <TextBlock Text="导出时隐藏答案和解析" Style="{StaticResource RowDescriptionStyle}" />
                   </StackPanel>
-                  <ToggleSwitch x:Name="ExportWithoutAnswersToggle" AutomationProperties.Name="练习版，隐藏答案和解析" Grid.Column="1" Toggled="OnSettingChanged" Style="{StaticResource RowToggleStyle}" />
+                  <controls:LiquidGlassToggleSwitch x:Name="ExportWithoutAnswersToggle" AutomationProperties.Name="练习版，隐藏答案和解析" Grid.Column="1" Toggled="OnSettingChanged" Style="{StaticResource RowToggleStyle}" />
                 </Grid>
               </StackPanel>
             </controls:GlassPanel>
@@ -256,7 +254,7 @@
                     <TextBlock Text="自动补全缺失答案" Style="{StaticResource RowTitleStyle}" />
                     <TextBlock Text="缺少答案的题目会发送给所选服务商；结果需自行核对，导出时标明 AI 来源与置信度" Style="{StaticResource RowDescriptionStyle}" />
                   </StackPanel>
-                  <ToggleSwitch x:Name="AiEnabledToggle" AutomationProperties.Name="自动补全缺失答案" Grid.Column="1" Toggled="OnSettingChanged" Style="{StaticResource RowToggleStyle}" />
+                  <controls:LiquidGlassToggleSwitch x:Name="AiEnabledToggle" AutomationProperties.Name="自动补全缺失答案" Grid.Column="1" Toggled="OnSettingChanged" Style="{StaticResource RowToggleStyle}" />
                 </Grid>
                 <Rectangle Style="{StaticResource RowDividerStyle}" />
                 <Grid Style="{StaticResource RowGridStyle}">
@@ -302,7 +300,7 @@
                     <TextBlock Text="允许发送题目图片" Style="{StaticResource RowTitleStyle}" />
                     <TextBlock Text="仅对支持视觉的模型生效" Style="{StaticResource RowDescriptionStyle}" />
                   </StackPanel>
-                  <ToggleSwitch x:Name="AiSupportsImagesToggle" AutomationProperties.Name="允许发送题目图片" Grid.Column="1" Toggled="OnSettingChanged" Style="{StaticResource RowToggleStyle}" />
+                  <controls:LiquidGlassToggleSwitch x:Name="AiSupportsImagesToggle" AutomationProperties.Name="允许发送题目图片" Grid.Column="1" Toggled="OnSettingChanged" Style="{StaticResource RowToggleStyle}" />
                 </Grid>
                 <Rectangle Style="{StaticResource RowDividerStyle}" />
                 <StackPanel Padding="20,14" Spacing="10">

@@ -15,13 +15,14 @@ namespace YunKao.Controls;
 internal readonly partial struct LiquidGlassShader(
     Float2 size, Float2 center, Float4 corners, Float2 pointer, Float4 inverse,
     Float2 bend, Float4 tint, float pressure, float refraction, float dispersion,
-    float energy, float dpiScale, float sheen, float foreground, float compare, float anchored = 0, Float2 grab = default) : ID2D1PixelShader
+    float energy, float dpiScale, float sheen, float foreground, float compare, float anchored = 0, Float2 grab = default,
+    float interiorEffects = 1) : ID2D1PixelShader
 {
     private float Distance(Float2 point)
     {
         Float2 p = point - center;
         Float2 half = size * .5f;
-        if (anchored > .5f)
+        if (anchored > .5f && anchored < 1.5f)
         {
             // Compact support around the grabbed edge. No whole-panel affine transform:
             // distant corners, opposite edges, the body and its texture stay in place.
@@ -35,7 +36,8 @@ internal readonly partial struct LiquidGlassShader(
         }
         else
         {
-            p = new Float2(inverse.X * p.X + inverse.Y * p.Y, inverse.Z * p.X + inverse.W * p.Y);
+            if (anchored < 1.5f)
+                p = new Float2(inverse.X * p.X + inverse.Y * p.Y, inverse.Z * p.X + inverse.W * p.Y);
             Float2 uv = Hlsl.Clamp(p / Hlsl.Max(half, new Float2(1, 1)), new Float2(-1.3f, -1.3f), new Float2(1.3f, 1.3f));
             p -= bend * new Float2(1 - uv.Y * uv.Y, 1 - uv.X * uv.X) * .7f;
         }
@@ -79,7 +81,7 @@ internal readonly partial struct LiquidGlassShader(
         float outline = Hlsl.Exp(-Hlsl.Pow((d + .7f) / .65f, 2));
         float bloom = Hlsl.Exp(-Hlsl.Pow((d + 1.4f) / 2, 2));
         float caustic = Hlsl.Exp(-Hlsl.Pow((d + 3) / 1.65f, 2));
-        return (outline * (.04f + a * .62f + b * .32f) + bloom * (a + b) * .12f
+        return (outline * (.14f + a * .62f + b * .32f) + bloom * (.025f + a + b) * .12f
             + caustic * b * .07f + fresnel * .045f) * sheen * (1 - compare);
     }
 
@@ -87,17 +89,28 @@ internal readonly partial struct LiquidGlassShader(
     {
         Float2 p = D2D.GetScenePosition().XY / dpiScale;
         float d = Distance(p);
+        Float2 n = Normal(p);
+        if (anchored > 1.5f)
+        {
+            Float2 worldNormal = new(inverse.X * n.X + inverse.Z * n.Y, inverse.Y * n.X + inverse.W * n.Y);
+            float magnitude = Hlsl.Max(Hlsl.Length(worldNormal), .0001f);
+            n = worldNormal / magnitude;
+            d /= magnitude;
+        }
         float mask = 1 - Hlsl.SmoothStep(-.65f / dpiScale, .65f / dpiScale, d);
         if (mask < .0001f) return new Float4(0, 0, 0, 0);
-        Float2 n = Normal(p);
         Float2 q = p - center;
         Float2 radial = q / Hlsl.Max(Hlsl.Length(q), .0001f);
         Float2 opticalNormal = n + radial * foreground;
         opticalNormal /= Hlsl.Max(Hlsl.Length(opticalNormal), .0001f);
-        float height = Hlsl.Min(16, Hlsl.Min(size.X, size.Y) * .30f);
+        // Keep the lens' curved optical footprint visible on large cards as well as capsules.
+        float height = anchored > 1.5f ? Hlsl.Clamp(Hlsl.Min(size.X, size.Y) * .22f, 12, 40)
+            : Hlsl.Min(16, Hlsl.Min(size.X, size.Y) * .30f);
         float band = Hlsl.Saturate(1 + d / Hlsl.Max(height, .001f));
         float circle = 1 - Hlsl.Sqrt(Hlsl.Max(0, 1 - band * band));
         Float2 offset = -opticalNormal * circle * refraction * (1 + energy * .12f) * (1 - compare);
+        if (anchored > 1.5f)
+            offset = new Float2(inverse.X * offset.X + inverse.Y * offset.Y, inverse.Z * offset.X + inverse.W * offset.Y);
         Float2 at = p + offset;
         float spread = dispersion * q.X * q.Y / Hlsl.Max(size.X * size.Y * .25f, 1);
         Float2 split = offset * spread;
@@ -112,10 +125,9 @@ internal readonly partial struct LiquidGlassShader(
         Float3 v = Sample(at - split);
         Float3 color = new((r.R + o.R + y.R) / 3.5f + v.R / 7,
             o.G / 7 + (y.G + g.G + cyan.G) / 3.5f, (cyan.B + b.B + v.B) / 3);
-        color -= Hlsl.Exp(-Hlsl.Pow((d + 3) / 5, 2)) * .065f * pressure * (1 - compare);
         color += Light(d, n);
         float glint = Hlsl.Exp(-Hlsl.Length((p - pointer) / new Float2(90, 70)) * 2);
-        color += glint * .035f * pressure * (1 - compare);
+        color += glint * .035f * pressure * interiorEffects * (1 - compare);
         return new Float4(Hlsl.Saturate(color) * mask, mask);
     }
 }

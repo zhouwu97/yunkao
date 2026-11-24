@@ -17,7 +17,7 @@ namespace YunKao.Controls;
 
 internal readonly record struct LiquidGlassMaterial(
     GlassCorners Corners, float Blur, float Refraction, float Saturation, Color Tint, float TintOpacity,
-    bool ShowSheen, float Padding = 0, float Dispersion = .35f);
+    bool ShowSheen, float Padding = 0, float Dispersion = .35f, float InteriorEffects = 1);
 
 /// <summary>GPU surface optics, ported from FlutterLiquidglass. No CPU normal maps or geometry-only deformation.</summary>
 internal sealed class LiquidGlassRenderer : IDisposable
@@ -40,7 +40,8 @@ internal sealed class LiquidGlassRenderer : IDisposable
     private (int Width, int Height, float Scale) _targetSize;
     private int _version = -1, _labelVersion = -1;
     private LiquidGlassMaterial _material;
-    private float _pressure, _stretch, _angle, _energy;
+    private float _pressure, _stretch, _angle, _energy, _lift = 1;
+    private bool _externalPose;
     private Vector2 _bend;
     private Vector2 _grab = new(.5f, .5f);
     private Vector2 _light = new(.22f, .05f);
@@ -125,6 +126,15 @@ internal sealed class LiquidGlassRenderer : IDisposable
         Invalidate();
     }
 
+    // The native visual carries the affine pose, including crisp foreground content.
+    // Supply its inverse to the optics so normals/refraction remain in scene coordinates.
+    public void SetJellyPose(double stretch, double angle, double lift, double bendX, double bendY, double energy)
+    {
+        _externalPose = true;
+        _lift = (float)lift;
+        SetDeformation(stretch, angle, bendX, bendY, energy);
+    }
+
     private void OnDraw(CanvasControl canvas, CanvasDrawEventArgs args)
     {
         if (_disposed || _failed || _scene.IsDisposed || _scene.Pixels is null) return;
@@ -169,18 +179,22 @@ internal sealed class LiquidGlassRenderer : IDisposable
             float along = 1 + _stretch, across = 1 / along;
             float c = MathF.Cos(_angle), s = MathF.Sin(_angle);
             // Invert the volume-preserving stretch along the actual velocity vector.
-            var inverse = new Float4(across * c * c + along * s * s, (across - along) * c * s,
-                (across - along) * c * s, across * s * s + along * c * c);
+            float lift = _externalPose ? _lift : 1;
+            // ComputeSharp vector operators are shader intrinsics, not CPU arithmetic.
+            // Do scalar arithmetic before constructing the uniform (vector division returns default on the CPU).
+            var inverse = new Float4((across * c * c + along * s * s) / lift, (across - along) * c * s / lift,
+                (across - along) * c * s / lift, (across * s * s + along * c * c) / lift);
             Color tint = _material.Tint;
-            float opacity = _material.TintOpacity * tint.A / 255f * (lens ? 1 - .78f * activation : 1 - .12f * activation);
+            float opacity = _material.TintOpacity * tint.A / 255f * (lens ? 1 : 1 - .12f * activation);
             _shader.ConstantBuffer = new LiquidGlassShader(
                 new Float2(size.X, size.Y), new Float2(w / 2, h / 2),
                 new Float4(corners.TopLeft, corners.TopRight, corners.BottomRight, corners.BottomLeft),
                 pointer, inverse, new Float2(_bend.X, _bend.Y),
                 new Float4(tint.R / 255f, tint.G / 255f, tint.B / 255f, opacity),
-                activation, _material.Refraction * (lens ? .2f + .8f * activation : 1 + .25f * activation),
-                _material.Dispersion, _energy, scale, _material.ShowSheen ? (lens ? .75f : .55f) : 0,
-                lens && _labelBitmap is not null && activation > .015f ? 1 : 0, 0, lens ? 0 : 1, new Float2(_grab.X, _grab.Y));
+                activation, _material.Refraction * (lens ? 1 : 1 + .25f * activation),
+                _material.Dispersion, _energy, scale, _material.ShowSheen ? .85f : 0,
+                lens && _labelBitmap is not null ? 1 : 0, 0, lens ? 0 : _externalPose ? 2 : 1,
+                new Float2(_grab.X, _grab.Y), _material.InteriorEffects);
             // Complex samplers stay in one physical-pixel space. Final presentation alone uses the XAML DPI.
             using (var draw = _target!.CreateDrawingSession())
             {

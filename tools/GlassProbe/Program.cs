@@ -20,6 +20,15 @@ using (var draw = scene.CreateDrawingSession())
     draw.DrawText("GLASS / 0123", 102, 65, Color.FromArgb(255, 26, 32, 45));
 }
 using var ink = new CanvasRenderTarget(device, 320, 180, 96);
+using var darkScene = new CanvasRenderTarget(device, 320, 180, 96);
+using var lightScene = new CanvasRenderTarget(device,320,180,96);
+using(var draw=lightScene.CreateDrawingSession()) draw.Clear(Color.FromArgb(255,224,224,230));
+using (var draw = darkScene.CreateDrawingSession())
+{
+    draw.Clear(Color.FromArgb(255, 44, 42, 76));
+    for (int x = 0; x < 320; x += 11) draw.FillRectangle(x, 0, 1, 180, Color.FromArgb(255, 105, 102, 138));
+    draw.DrawText("CLEAR / 0123", 100, 77, Color.FromArgb(255, 230, 234, 245));
+}
 using (var draw = ink.CreateDrawingSession())
 {
     draw.Clear(Color.FromArgb(0, 0, 0, 0));
@@ -34,7 +43,7 @@ void Check(string name, bool passed, double measured)
     Console.WriteLine($"{(passed ? "PASS" : "FAIL")} {name}: {measured:F3}");
 }
 CanvasRenderTarget Render(float compare = 0, float bend = 0, float dpi = 96, float foreground = 1, float sheen = 0,
-    bool translated = false, bool anchored = false, float stretch = 0, float pullY = 0)
+    bool translated = false, bool anchored = false, float stretch = 0, float pullY = 0, bool external = false, bool clearLens = false, bool flatColor = false)
 {
     float scale = dpi / 96;
     // Keep the effect graph in physical pixels at 96 DPI. Win2D then presents this texture
@@ -46,7 +55,7 @@ CanvasRenderTarget Render(float compare = 0, float bend = 0, float dpi = 96, flo
         draw.Clear(Color.FromArgb(255, 218, 230, 241));
         draw.DrawImage(scene, 400, 200);
     }
-    using var backdrop = new Transform2DEffect { Source = translated ? atlas : scene,
+    using var backdrop = new Transform2DEffect { Source = translated ? atlas : flatColor ? lightScene : clearLens ? darkScene : scene,
         BorderMode = EffectBorderMode.Hard,
         TransformMatrix = (translated ? Matrix3x2.CreateTranslation(-400, -200) : Matrix3x2.Identity) * Matrix3x2.CreateScale(scale) };
     using var blur = new GaussianBlurEffect { Source = backdrop, BlurAmount = 0, BorderMode = EffectBorderMode.Hard };
@@ -54,9 +63,10 @@ CanvasRenderTarget Render(float compare = 0, float bend = 0, float dpi = 96, flo
     using var lettering = new Transform2DEffect { Source = ink, TransformMatrix = Matrix3x2.CreateScale(scale) };
     using var effect = new PixelShaderEffect<LiquidGlassShader>
     {
-        ConstantBuffer = new(new Float2(200, 80), new Float2(160, 90), new Float4(40, 40, 40, 40),
-            new Float2(90, 20), new Float4(1 / (1 + stretch), 0, 0, 1 + stretch), new Float2(bend, pullY), new Float4(1, 1, 1, .06f),
-            1, 22, .5f, .2f, dpi / 96, sheen, foreground, compare, anchored ? 1 : 0, new Float2(.5f, 0)),
+        ConstantBuffer = new(new Float2(200, clearLens ? 44 : 80), new Float2(160, 90), new Float4(40, 40, 40, 40),
+            new Float2(90, 20), new Float4(1 / (1 + stretch), 0, 0, 1 + stretch), new Float2(bend, pullY), new Float4(1, 1, 1, clearLens || flatColor ? 0 : .06f),
+            1, clearLens ? 14 : 22, .5f, .2f, dpi / 96, sheen, foreground, compare, external ? 2 : anchored ? 1 : 0,
+            new Float2(.5f, 0), clearLens ? 0 : 1),
         TransformMapper = D2D1DrawTransformMapper<LiquidGlassShader>.Inflate(96),
     };
     effect.Sources[0] = saturation;
@@ -126,6 +136,34 @@ double bodyError = Difference(a, ap, 140, 80, 180, 100);
 Check("local pull preserves the body texture", bodyError < .01, bodyError);
 double anchoredChange = Difference(a, ap, 120, 25, 200, 70, 3);
 Check("grabbed edge bulges locally", anchoredChange > 3, anchoredChange);
+using var externalRest = Render(external: true, foreground: 0);
+using var externalStrain = Render(external: true, foreground: 0, stretch: .15f);
+using var externalBend = Render(external: true, foreground: 0, bend: 4);
+byte[] er = externalRest.GetPixelBytes(), es = externalStrain.GetPixelBytes(), eb = externalBend.GetPixelBytes();
+double repeatedStrain = Difference(er, es, 35, 35, 285, 145, 3);
+Check("native affine strain is applied only once", repeatedStrain < .5, repeatedStrain);
+double transformedOptics = Difference(er, es, 65, 65, 85, 115);
+Check("external pose transforms optical sampling", transformedOptics > .2, transformedOptics);
+double lagSilhouette = Difference(er, eb, 35, 35, 285, 145, 3);
+Check("reference lag bend deforms the native surface", lagSilhouette > .5, lagSilhouette);
+using var clearLens = Render(clearLens: true, foreground: 0);
+using var clearControl = Render(clearLens: true, foreground: 0, compare: 1);
+double darkCenter = Difference(clearLens.GetPixelBytes(), clearControl.GetPixelBytes(), 105, 85, 215, 95);
+Check("clear navigation preserves dark center without an oval wash", darkCenter < .1, darkCenter);
+double clearRim = Difference(clearLens.GetPixelBytes(), clearControl.GetPixelBytes(), 65, 85, 85, 95);
+Check("clear navigation retains curved edge refraction", clearRim > 1, clearRim);
+using var brightPressed=Render(flatColor:true,foreground:0,sheen:.85f);
+byte[] bright=brightPressed.GetPixelBytes();
+double darkest=0;
+for(int y=53;y<127;y++)for(int x=65;x<255;x++)
+    if(bright[(y*320+x)*4+3]==255)darkest=Math.Min(darkest,bright[(y*320+x)*4+2]-224);
+Check("press does not paint a dark inner ring on pale glass",darkest>=-1,darkest);
+double weakestRim=new[]{(160,50),(160,129),(60,90),(259,90)}
+    .Select(p=>(double)bright[(p.Item2*320+p.Item1)*4+2]-224).Min();
+Check("all four sides retain a bright rounded rim",weakestRim>4,weakestRim);
+await brightPressed.SaveAsync(Path.Combine(output,"bright-pressed-rim.png"),CanvasBitmapFileFormat.Png);
+await clearLens.SaveAsync(Path.Combine(output, "clear-navigation.png"), CanvasBitmapFileFormat.Png);
+await externalBend.SaveAsync(Path.Combine(output, "tether-bend.png"), CanvasBitmapFileFormat.Png);
 await scene.SaveAsync(Path.Combine(output, "scene.png"), CanvasBitmapFileFormat.Png);
 await glass.SaveAsync(Path.Combine(output, "refracted.png"), CanvasBitmapFileFormat.Png);
 await control.SaveAsync(Path.Combine(output, "blur-only.png"), CanvasBitmapFileFormat.Png);

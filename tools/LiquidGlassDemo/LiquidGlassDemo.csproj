@@ -29,8 +29,10 @@
     <Compile Include="../../src/YunKao.App/Controls/LiquidGlassRenderer.cs" Link="Controls/LiquidGlassRenderer.cs" />
     <Compile Include="../../src/YunKao.App/Controls/LiquidGlassScene.cs" Link="Controls/LiquidGlassScene.cs" />
     <Compile Include="../../src/YunKao.App/Controls/LiquidGlassScope.cs" Link="Controls/LiquidGlassScope.cs" />
+    <Compile Include="../../src/YunKao.App/Controls/LiquidGlassToggleSwitch.cs" Link="Controls/LiquidGlassToggleSwitch.cs" />
     <Compile Include="../../src/YunKao.App/Controls/GlassPanel.cs" Link="Controls/GlassPanel.cs" />
     <Compile Include="../../src/YunKao.App/Services/GlassSettings.cs" Link="Services/GlassSettings.cs" />
+    <Compile Include="../../src/YunKao.App/Services/ButtonMotion.cs" Link="Services/ButtonMotion.cs" />
     <Compile Include="../../src/YunKao.App/Services/MotionService.cs" Link="Services/MotionService.cs" />
     <Compile Include="../../src/YunKao.App/Services/CompositionBackdropService.cs" Link="Services/CompositionBackdropService.cs" />
     <Page Include="../../src/YunKao.App/Themes/Tokens.xaml" Link="Themes/Tokens.xaml" />

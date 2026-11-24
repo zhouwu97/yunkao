@@ -14,8 +14,8 @@
     <Setter Property="Padding" Value="14" />
     <Setter Property="Blur" Value="True" />
     <Setter Property="ShowSheen" Value="True" />
-    <Setter Property="BlurAmount" Value="1.5" />
-    <Setter Property="TintScale" Value="1.1" />
+    <Setter Property="BlurAmount" Value="0.25" />
+    <Setter Property="TintScale" Value="0.65" />
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
     <Setter Property="VerticalContentAlignment" Value="Stretch" />
     <Setter Property="IsTabStop" Value="False" />
@@ -55,8 +55,29 @@
 
   <Style x:Key="GlassGroupStyle" TargetType="controls:GlassPanel" BasedOn="{StaticResource GlassPanelBaseStyle}">
     <Setter Property="Padding" Value="0" />
-    <Setter Property="CornerRadius" Value="12" />
-    <Setter Property="TintScale" Value="1.25" />
-    <Setter Property="RefractionAmount" Value="18" />
+    <Setter Property="CornerRadius" Value="28" />
+    <Setter Property="TintScale" Value="0.65" />
+    <Setter Property="RefractionAmount" Value="28" />
   </Style>
+  <Style x:Key="LiquidGlassToggleStyle" TargetType="controls:LiquidGlassToggleSwitch">
+    <Setter Property="MinWidth" Value="0" />
+    <Setter Property="MinHeight" Value="32" />
+    <Setter Property="UseSystemFocusVisuals" Value="True" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="controls:LiquidGlassToggleSwitch">
+          <Grid x:Name="PART_Track" Width="48" Height="32" Background="Transparent">
+            <Border x:Name="PART_Fill" Height="26" CornerRadius="13" Background="#CFCBD3" />
+            <Border Height="26" CornerRadius="13" BorderThickness="1" BorderBrush="#30807887" IsHitTestVisible="False" />
+            <Grid x:Name="PART_Thumb" Width="20" Height="20" HorizontalAlignment="Left" Margin="3,0,0,0"
+                  RenderTransformOrigin="0.5,0.5" IsHitTestVisible="False">
+              <Border x:Name="PART_Solid" CornerRadius="10" Background="White" />
+              <Grid x:Name="PART_Glass" Margin="-8" Opacity="0" />
+            </Grid>
+          </Grid>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <Style TargetType="controls:LiquidGlassToggleSwitch" BasedOn="{StaticResource LiquidGlassToggleStyle}" />
 </ResourceDictionary>

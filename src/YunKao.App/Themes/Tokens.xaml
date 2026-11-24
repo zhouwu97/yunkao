@@ -24,7 +24,7 @@
   <SolidColorBrush x:Key="ScrimBrush" Color="#292638" />
 
   <CornerRadius x:Key="ContentCornerRadius">14</CornerRadius>
-  <CornerRadius x:Key="GlassCornerRadius">16</CornerRadius>
+  <CornerRadius x:Key="GlassCornerRadius">28</CornerRadius>
   <CornerRadius x:Key="ControlCornerRadiusLarge">7</CornerRadius>
 
   <ResourceDictionary.ThemeDictionaries>

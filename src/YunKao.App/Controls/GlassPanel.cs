@@ -13,8 +13,8 @@ public sealed partial class GlassPanel : ContentControl
     public static readonly DependencyProperty SolidBackgroundProperty = Register(nameof(SolidBackground), typeof(Brush), null);
     public static readonly DependencyProperty BackdropSourceProperty = Register(nameof(BackdropSource), typeof(FrameworkElement), null);
     public static readonly DependencyProperty BlurProperty = Register(nameof(Blur), typeof(bool), true);
-    public static readonly DependencyProperty BlurAmountProperty = Register(nameof(BlurAmount), typeof(double), 1.5d);
-    public static readonly DependencyProperty RefractionAmountProperty = Register(nameof(RefractionAmount), typeof(double), 24d);
+    public static readonly DependencyProperty BlurAmountProperty = Register(nameof(BlurAmount), typeof(double), .25d);
+    public static readonly DependencyProperty RefractionAmountProperty = Register(nameof(RefractionAmount), typeof(double), 28d);
     public static readonly DependencyProperty SaturationProperty = Register(nameof(Saturation), typeof(double), 1.12d);
     public static readonly DependencyProperty DispersionProperty = Register(nameof(Dispersion), typeof(double), .35d);
     public static readonly DependencyProperty ShowSheenProperty = Register(nameof(ShowSheen), typeof(bool), true);

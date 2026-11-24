@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
+using ComputeSharp.D2D1.WinUI;
 using Microsoft.Graphics.Canvas;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -17,6 +18,7 @@ internal static class NativeCapture
     internal static async Task RunAsync(FrameworkElement root, string directory)
     {
         var nodes = Descendants(root).ToArray();
+        root.IsHitTestVisible = false;
         var heading = nodes.OfType<FrameworkElement>().Single(e => AutomationProperties.GetAutomationId(e) == "AnchoredHeading");
         var surfaces = nodes.OfType<LiquidGlassSurface>().OrderByDescending(s => s.ActualHeight).ToArray();
         var trace = new List<object>();
@@ -27,20 +29,30 @@ internal static class NativeCapture
             var motion = Read<LiquidSurfaceMotion>(controller, "_motion");
             if (renderer.HasFailed || surface.FallbackOpacity != 0) throw new InvalidOperationException("Native glass is using a fallback.");
             string prefix = index == 0 ? "native-card" : "native-button";
-            Point initial = heading.TransformToVisual(root).TransformPoint(new Point());
+            controller.Reset();
+            Point initial = controller.Input.TransformToVisual(root).TransformPoint(new Point());
 
             async Task Frame(string phase)
             {
-                renderer.SetInteraction(motion.Pressure, .7, .3);
-                renderer.SetPull(motion.PullX, motion.PullY, motion.GrabX, motion.GrabY, motion.Energy);
+                controller.Paint();
                 await Task.Delay(120);
                 var target = Read<CanvasRenderTarget>(renderer, "_target");
                 await target.SaveAsync(Path.Combine(directory, $"{prefix}-{phase}.png"), CanvasBitmapFileFormat.Png);
-                Point current = heading.TransformToVisual(root).TransformPoint(new Point());
-                if (current != initial) throw new InvalidOperationException("Surface deformation moved the content.");
-                trace.Add(new { surface = prefix, phase, motion.Held, motion.PullX, motion.PullY, motion.GrabX, motion.GrabY,
-                    motion.Moving, centerX = surface.ActualWidth / 2, centerY = surface.ActualHeight / 2,
-                    headingX = current.X, headingY = current.Y, surface.FallbackOpacity });
+                if (phase == "rest")
+                {
+                    object constants = Read<PixelShaderEffect<LiquidGlassShader>>(renderer, "_shader").ConstantBuffer;
+                    var values = constants.GetType().GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)
+                        .ToDictionary(f => f.Name, f => f.GetValue(constants)?.ToString());
+                    await File.WriteAllTextAsync(Path.Combine(directory, prefix+"-constants.json"), JsonSerializer.Serialize(values));
+                    var inverse = (ComputeSharp.Float4)constants.GetType().GetField("<inverse>P", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(constants)!;
+                    if (inverse.X <= 0 || inverse.W <= 0) throw new InvalidOperationException("Native renderer lost its optical normal transform.");
+                }
+                Point current = controller.Input.TransformToVisual(root).TransformPoint(new Point());
+                if (phase is "settled" or "reduced" && Math.Abs(current.X-initial.X)+Math.Abs(current.Y-initial.Y) > .01)
+                    throw new InvalidOperationException("Tether did not return to its original position.");
+                trace.Add(new { surface = prefix, phase, motion.Held, motion.PositionX, motion.PositionY,
+                    motion.Stretch, motion.BendX, motion.BendY, motion.Lift, motion.Moving,
+                    inputX = current.X, inputY = current.Y, surface.FallbackOpacity });
             }
             void Settle() { for (int f = 0; f < 720; f++) motion.Advance(1.0 / 120); }
 
@@ -61,6 +73,7 @@ internal static class NativeCapture
             YunKao.Services.MotionService.SetReduceMotion(false);
         }
         await File.WriteAllTextAsync(Path.Combine(directory, "native-motion.json"), JsonSerializer.Serialize(trace));
+        root.IsHitTestVisible = true;
     }
 
     private static T Read<T>(object owner, string field) where T : class

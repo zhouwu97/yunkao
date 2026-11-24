@@ -120,7 +120,7 @@
       <controls:LiquidGlassSurface x:Name="GlassSurface" Tint="{TemplateBinding Background}"
                     SolidBackground="{ThemeResource ControlFillBrush}"
                     SurfaceCorners="{TemplateBinding CornerRadius}"
-                    BlurAmount="2" RefractionAmount="12" TintScale="1.2" />
+                    BlurAmount="0.25" RefractionAmount="20" TintScale="0.65" />
       <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}"
               Opacity="{Binding FallbackOpacity, ElementName=GlassSurface}" IsHitTestVisible="False" />
       <ContentPresenter x:Name="ContentPresenter"
@@ -342,7 +342,7 @@
             <Grid x:Name="Thumb" Opacity="0" IsHitTestVisible="False">
               <controls:LiquidGlassSurface Tint="{ThemeResource SegmentThumbBrush}"
                     SolidBackground="{ThemeResource SegmentThumbBrush}"
-                    SurfaceCorners="{TemplateBinding CornerRadius}" BlurAmount="2" RefractionAmount="12" TintScale="1.2" />
+                    SurfaceCorners="{TemplateBinding CornerRadius}" BlurAmount="0.25" RefractionAmount="20" TintScale="0.65" />
               <Border BorderBrush="{ThemeResource SegmentThumbStrokeBrush}" BorderThickness="1"
                       CornerRadius="{TemplateBinding CornerRadius}" />
             </Grid>

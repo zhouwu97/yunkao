@@ -32,8 +32,8 @@ public sealed partial class LiquidGlassSurface : Grid
     public static readonly DependencyProperty SolidBackgroundProperty = Register(nameof(SolidBackground), typeof(Brush), null);
     public static readonly DependencyProperty BackdropSourceProperty = Register(nameof(BackdropSource), typeof(FrameworkElement), null);
     public static readonly DependencyProperty BlurProperty = Register(nameof(Blur), typeof(bool), true);
-    public static readonly DependencyProperty BlurAmountProperty = Register(nameof(BlurAmount), typeof(double), 1.5d);
-    public static readonly DependencyProperty RefractionAmountProperty = Register(nameof(RefractionAmount), typeof(double), 24d);
+    public static readonly DependencyProperty BlurAmountProperty = Register(nameof(BlurAmount), typeof(double), .25d);
+    public static readonly DependencyProperty RefractionAmountProperty = Register(nameof(RefractionAmount), typeof(double), 28d);
     public static readonly DependencyProperty SaturationProperty = Register(nameof(Saturation), typeof(double), 1.12d);
     public static readonly DependencyProperty DispersionProperty = Register(nameof(Dispersion), typeof(double), .35d);
     public static readonly DependencyProperty TintScaleProperty = Register(nameof(TintScale), typeof(double), 1d);
@@ -137,7 +137,7 @@ public sealed partial class LiquidGlassSurface : Grid
     private void PaintInteraction(LiquidSurfaceMotion motion, double x, double y)
     {
         _renderer?.SetInteraction(motion.Pressure, x, y);
-        _renderer?.SetPull(motion.PullX, motion.PullY, motion.GrabX, motion.GrabY, motion.Energy);
+        _renderer?.SetJellyPose(motion.Stretch, motion.Angle, motion.Lift, motion.BendX, motion.BendY, motion.Energy);
     }
 
     private void OnMaterialChanged(object? sender, EventArgs args)
@@ -210,6 +210,7 @@ public sealed partial class LiquidGlassSurface : Grid
                 Clamp(RefractionAmount, 0, 80, 24), Clamp(Saturation, 0, 2, 1.12f), tint,
                 Clamp(GlassSettings.TintOpacity * TintScale, 0, 1, .6f), ShowSheen,
                 Padding: DeformationPadding, Dispersion: Clamp(Dispersion, 0, 1, .35f)));
+            _interaction?.Paint();
         }
         catch (Exception ex)
         {
