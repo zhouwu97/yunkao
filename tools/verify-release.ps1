@@ -15,6 +15,11 @@ $required = @(
     "YunKao.App.exe",
     "worker\YunKao.Worker.exe",
     "Scripts\yunkao-bridge.js",
+    "ComputeSharp.D2D1.WinUI.dll",
+    "Microsoft.Graphics.Canvas.dll",
+    "Assets\Luna.png",
+    "Assets\GlassNotices\NOTICE.txt",
+    "Assets\GlassNotices\ComputeSharp-MIT.txt",
     "README.txt",
     "VERSION",
     "release-manifest.json"
@@ -29,6 +34,11 @@ foreach ($relativePath in $required) {
 $version = (Get-Content -Raw -LiteralPath (Join-Path $artifact "VERSION")).Trim()
 if ($version -ne $ExpectedVersion) {
     throw "Release version mismatch: expected $ExpectedVersion, got $version"
+}
+
+$fileVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $artifact "YunKao.App.exe")).FileVersion
+if ($fileVersion -ne "$ExpectedVersion.0") {
+    throw "Executable version mismatch: expected $ExpectedVersion.0, got $fileVersion"
 }
 
 $manifest = Get-Content -Raw -LiteralPath (Join-Path $artifact "release-manifest.json") | ConvertFrom-Json

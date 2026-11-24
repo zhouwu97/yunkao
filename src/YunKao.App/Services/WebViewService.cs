@@ -46,6 +46,7 @@ public sealed class WebViewService : IAsyncDisposable
         """;
     private WebView2? _view;
     private CoreWebView2? _core;
+    private ulong _navigationId;
     private string? _bridgeScript;
     private int _blankProbeAttempts;
     private readonly SemaphoreSlim _recoveryGate = new(1, 1);
@@ -92,6 +93,7 @@ public sealed class WebViewService : IAsyncDisposable
             _core.ProcessFailed += OnProcessFailed;
             _core.WebResourceResponseReceived += OnWebResourceResponseReceived;
             _core.Settings.IsStatusBarEnabled = false;
+            _core.Settings.IsBuiltInErrorPageEnabled = false;
 #if !DEBUG
             _core.Settings.AreDevToolsEnabled = false;
 #endif
@@ -331,6 +333,7 @@ public sealed class WebViewService : IAsyncDisposable
 
     private void OnNavigationStarting(CoreWebView2 sender, CoreWebView2NavigationStartingEventArgs args)
     {
+        _navigationId = args.NavigationId;
         IsLoading = true;
         IsBridgeInstalled = false;
         PageState = new(false, false, args.Uri, "");
@@ -340,6 +343,7 @@ public sealed class WebViewService : IAsyncDisposable
 
     private async void OnNavigationCompleted(CoreWebView2 sender, CoreWebView2NavigationCompletedEventArgs args)
     {
+        if (args.NavigationId != _navigationId) return;
         IsLoading = false;
         LoadingChanged?.Invoke(this, false);
         Uri? uri = TryGetUri(sender.Source);
@@ -371,6 +375,7 @@ public sealed class WebViewService : IAsyncDisposable
             StatusChanged?.Invoke(this, "浏览器模式：当前页面不注入 Bridge");
         }
 
+        if (args.NavigationId != _navigationId) return;
         if (_recoveryState.IsRecovering)
         {
             _recoveryState.MarkNavigationCompleted(args.IsSuccess);
@@ -382,9 +387,28 @@ public sealed class WebViewService : IAsyncDisposable
             new BrowserNavigationEventArgs(
                 uri,
                 args.IsSuccess,
-                args.IsSuccess ? "导航完成" : $"导航失败：{args.WebErrorStatus}"));
+                args.IsSuccess ? "导航完成" : DescribeFailure(args.WebErrorStatus, args.HttpStatusCode)));
 
         if (args.IsSuccess) _ = ProbeBlankPageAsync(sender, uri);
+    }
+
+    private static string DescribeFailure(CoreWebView2WebErrorStatus error, int httpStatus)
+    {
+        if (httpStatus >= 400) return $"服务器返回 HTTP {httpStatus}。";
+        return error switch
+        {
+            CoreWebView2WebErrorStatus.HostNameNotResolved => "无法解析网站域名，请检查 DNS 或代理设置。",
+            CoreWebView2WebErrorStatus.Timeout => "网站响应超时，请稍后重试。",
+            CoreWebView2WebErrorStatus.Disconnected => "当前网络已断开。",
+            CoreWebView2WebErrorStatus.ConnectionAborted or CoreWebView2WebErrorStatus.ConnectionReset => "与网站的连接在加载过程中中断。",
+            CoreWebView2WebErrorStatus.CannotConnect or CoreWebView2WebErrorStatus.ServerUnreachable => "暂时无法连接网站服务器。",
+            CoreWebView2WebErrorStatus.ValidProxyAuthenticationRequired => "当前网络代理需要身份验证。",
+            CoreWebView2WebErrorStatus.CertificateIsInvalid or CoreWebView2WebErrorStatus.CertificateExpired
+                or CoreWebView2WebErrorStatus.CertificateRevoked or CoreWebView2WebErrorStatus.CertificateCommonNameIsIncorrect
+                => "网站证书未通过验证，浏览器已停止加载。",
+            CoreWebView2WebErrorStatus.OperationCanceled => "本次页面加载已取消。",
+            _ => "页面加载失败，浏览器未提供具体原因。",
+        };
     }
 
     private void OnSourceChanged(CoreWebView2 sender, CoreWebView2SourceChangedEventArgs args)

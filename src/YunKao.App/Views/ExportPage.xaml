@@ -7,36 +7,53 @@
     xmlns:helpers="using:YunKao.Helpers"
     xmlns:vm="using:YunKao.ViewModels"
     Background="Transparent">
+  <Page.KeyboardAccelerators>
+    <KeyboardAccelerator Key="F" Modifiers="Control" Invoked="OnFindInvoked" />
+  </Page.KeyboardAccelerators>
   <Grid>
     <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
 
     <controls:PageHeader Title="导出记录"
-                         Description="最近生成的 PDF、DOCX、Markdown 和 TXT 文件。"
+                         Description="打开已生成的文件，或从题库快照重新导出。"
                          Status="{x:Bind ViewModel.StatusText, Mode=OneWay}">
       <controls:PageHeader.Actions>
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <Button Content="加载更多" Click="OnMoreClick" Visibility="{x:Bind ViewModel.CanLoadMore, Mode=OneWay}" Style="{StaticResource SubtleButtonStyle}" />
-          <Button Click="OnRefreshClick" IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}" Style="{StaticResource SecondaryButtonStyle}">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <FontIcon Glyph="&#xE72C;" FontSize="12" />
-              <TextBlock Text="刷新" />
-            </StackPanel>
-          </Button>
-        </StackPanel>
+        <Button AutomationProperties.Name="刷新记录" Click="OnRefreshClick" IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}" Style="{StaticResource SecondaryButtonStyle}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <FontIcon Glyph="&#xE72C;" FontSize="12" />
+            <TextBlock Text="刷新" />
+          </StackPanel>
+        </Button>
       </controls:PageHeader.Actions>
     </controls:PageHeader>
 
-    <Grid Grid.Row="1" Margin="32,0,32,28">
-      <Border Style="{StaticResource GroupStyle}"
-              VerticalAlignment="Top"
-              Visibility="{x:Bind helpers:Ui.Collapsed(ViewModel.IsEmpty), Mode=OneWay}">
+    <Grid Grid.Row="1" Margin="32,0,32,14" ColumnSpacing="12">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*" MaxWidth="480" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+      <Grid>
+        <TextBox x:Name="SearchBox" TextChanged="OnSearchChanged" Padding="36,7,10,7" CornerRadius="8"
+                 PlaceholderText="搜索文件名、路径或格式" AutomationProperties.Name="搜索文件名、路径或格式"
+                 ToolTipService.ToolTip="搜索文件名、路径或格式 (Ctrl+F)" />
+        <FontIcon Glyph="&#xE721;" FontSize="14" IsHitTestVisible="False" HorizontalAlignment="Left"
+                  Margin="12,0,0,0" Foreground="{ThemeResource TextSecondaryBrush}" />
+      </Grid>
+      <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.ResultLabel, Mode=OneWay}"
+                 VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite" Style="{StaticResource CaptionTextStyle}" />
+    </Grid>
+
+    <Grid Grid.Row="2" Margin="32,0,32,28">
+      <controls:GlassPanel Style="{StaticResource GlassGroupStyle}" VerticalAlignment="Top" Visibility="{x:Bind helpers:Ui.Collapsed(ViewModel.IsEmpty), Mode=OneWay}">
         <ListView ItemsSource="{x:Bind ViewModel.Items}"
                   SelectionMode="None"
                   Padding="0,4"
                   ItemContainerStyle="{StaticResource RowItemStyle}">
+          <ListView.Footer>
+            <Button Content="加载更多记录" Click="OnMoreClick" HorizontalAlignment="Center" Margin="0,8"
+                    Visibility="{x:Bind ViewModel.CanLoadMore, Mode=OneWay}" IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}"
+                    Style="{StaticResource SecondaryButtonStyle}" />
+          </ListView.Footer>
           <ListView.ItemTemplate>
             <DataTemplate x:DataType="vm:ExportRow">
               <Grid ColumnSpacing="14">
@@ -45,12 +62,12 @@
                   <ColumnDefinition Width="*" />
                   <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <Border Width="38" Height="38" CornerRadius="11" Background="{ThemeResource SurfaceSubtleBrush}" BorderBrush="{ThemeResource SurfaceStrokeBrush}" BorderThickness="1" VerticalAlignment="Center">
+                <Border Width="38" Height="38" CornerRadius="11" Background="{ThemeResource AccentSoftBrush}" VerticalAlignment="Center">
                   <TextBlock Text="{x:Bind Format}"
                              FontSize="10"
                              FontWeight="Bold"
                              FontFamily="{StaticResource NumberFontFamily}"
-                             Foreground="{ThemeResource TextSecondaryBrush}"
+                             Foreground="{ThemeResource TextAccentBrush}"
                              HorizontalAlignment="Center"
                              VerticalAlignment="Center" />
                 </Border>
@@ -59,10 +76,12 @@
                              TextTrimming="CharacterEllipsis"
                              ToolTipService.ToolTip="{x:Bind FilePath}"
                              Style="{StaticResource CardTitleStyle}" />
-                  <TextBlock Text="{x:Bind Meta}" TextTrimming="CharacterEllipsis" Style="{StaticResource CaptionTextStyle}" />
+                  <TextBlock Text="{x:Bind Meta}" ToolTipService.ToolTip="{x:Bind Meta}" TextTrimming="CharacterEllipsis" Style="{StaticResource CaptionTextStyle}" />
                 </StackPanel>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                  <Button Content="打开" Tag="{x:Bind}" IsEnabled="{x:Bind FileExists}" Click="OnOpenClick" MinHeight="30" Padding="14,4" Style="{StaticResource SecondaryButtonStyle}" />
+                  <Button Content="打开" Tag="{x:Bind}" Visibility="{x:Bind helpers:Ui.Collapsed(ShowReExport)}" IsEnabled="{x:Bind FileExists}" Click="OnOpenClick" MinHeight="30" Padding="14,4" Style="{StaticResource SecondaryButtonStyle}" />
+                  <Button Content="重新导出" Tag="{x:Bind}" Visibility="{x:Bind ShowReExport}" Click="OnReExportClick"
+                          ToolTipService.ToolTip="文件已移动或删除，可尝试从题库快照重新生成" MinHeight="30" Padding="12,4" Style="{StaticResource SecondaryButtonStyle}" />
                   <Button Tag="{x:Bind}" Click="OnOpenFolderClick" AutomationProperties.Name="打开所在文件夹" ToolTipService.ToolTip="打开所在文件夹" Style="{StaticResource IconButtonStyle}">
                     <FontIcon Glyph="&#xE838;" FontSize="14" />
                   </Button>
@@ -87,15 +106,17 @@
             </DataTemplate>
           </ListView.ItemTemplate>
         </ListView>
-      </Border>
+      </controls:GlassPanel>
 
       <controls:EmptyState Glyph="&#xE8B7;"
                            Title="{x:Bind ViewModel.EmptyTitle, Mode=OneWay}"
                            Text="{x:Bind ViewModel.EmptyText, Mode=OneWay}"
-                           ActionLabel="前往工作台"
-                           ActionClick="OnGoToWorkspaceClick"
-                           Margin="0,0,0,60"
+                           ActionLabel="{x:Bind ViewModel.EmptyAction, Mode=OneWay}"
+                           ActionClick="OnEmptyActionClick"
                            Visibility="{x:Bind ViewModel.IsEmpty, Mode=OneWay}" />
+      <ProgressBar IsIndeterminate="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                   Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay}" VerticalAlignment="Top" Margin="8,1"
+                   AutomationProperties.Name="正在读取记录" />
     </Grid>
   </Grid>
 </Page>

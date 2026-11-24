@@ -24,7 +24,8 @@
       <Setter Property="Fill" Value="{ThemeResource DividerBrush}" />
       <Setter Property="Margin" Value="20,0" />
     </Style>
-    <Style x:Key="GroupTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource CardTitleStyle}">
+    <Style x:Key="GroupTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource SectionTitleStyle}">
+      <Setter Property="AutomationProperties.HeadingLevel" Value="Level2" />
       <Setter Property="Margin" Value="4,0,0,10" />
     </Style>
     <Style x:Key="RowToggleStyle" TargetType="ToggleSwitch" BasedOn="{StaticResource DefaultToggleSwitchStyle}">
@@ -44,10 +45,27 @@
 
     <controls:PageHeader x:Name="Header"
                          Title="设置"
-                         Description="修改会自动保存；密码与 API Key 需要单独点击保存。">
+                         Description="常规设置自动保存。修改密码或 API Key 后，请点击对应的保存按钮。">
       <controls:PageHeader.Actions>
-        <Button x:Name="RetrySaveButton" Content="重试保存" Click="OnRetrySaveClick" Visibility="Collapsed"
-                Style="{StaticResource SecondaryButtonStyle}" />
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button x:Name="RetrySaveButton" Content="重试保存" Click="OnRetrySaveClick" Visibility="Collapsed" Style="{StaticResource SecondaryButtonStyle}" />
+          <Button AutomationProperties.Name="跳转到设置分组" Style="{StaticResource SecondaryButtonStyle}">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <FontIcon Glyph="&#xE8FD;" FontSize="14" />
+              <TextBlock Text="跳转到" />
+              <FontIcon Glyph="&#xE70D;" FontSize="10" />
+            </StackPanel>
+            <Button.Flyout>
+              <MenuFlyout Placement="BottomEdgeAlignedRight">
+                  <MenuFlyoutItem Text="外观" Tag="Appearance" Click="OnJumpToGroup"><MenuFlyoutItem.Icon><FontIcon Glyph="&#xE790;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                  <MenuFlyoutItem Text="云考账号" Tag="Account" Click="OnJumpToGroup"><MenuFlyoutItem.Icon><FontIcon Glyph="&#xE77B;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                  <MenuFlyoutItem Text="导出" Tag="Export" Click="OnJumpToGroup"><MenuFlyoutItem.Icon><FontIcon Glyph="&#xE896;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                  <MenuFlyoutItem Text="AI 辅助" Tag="Ai" Click="OnJumpToGroup"><MenuFlyoutItem.Icon><FontIcon Glyph="&#xE945;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+                  <MenuFlyoutItem Text="数据与诊断" Tag="Data" Click="OnJumpToGroup"><MenuFlyoutItem.Icon><FontIcon Glyph="&#xE9D9;" /></MenuFlyoutItem.Icon></MenuFlyoutItem>
+              </MenuFlyout>
+            </Button.Flyout>
+          </Button>
+        </StackPanel>
       </controls:PageHeader.Actions>
     </controls:PageHeader>
 
@@ -60,9 +78,9 @@
         <StackPanel Spacing="28">
 
           <!-- 外观 -->
-          <StackPanel>
+          <StackPanel x:Name="AppearanceGroup">
             <TextBlock Text="外观" Style="{StaticResource GroupTitleStyle}" />
-            <Border Style="{StaticResource GroupStyle}">
+            <controls:GlassPanel Style="{StaticResource GlassGroupStyle}">
               <StackPanel>
                 <Grid Style="{StaticResource RowGridStyle}">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
@@ -82,7 +100,7 @@
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                   <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="窗口材质" Style="{StaticResource RowTitleStyle}" />
-                    <TextBlock Text="亚克力会透出模糊的桌面，云母更安静" Style="{StaticResource RowDescriptionStyle}" />
+                    <TextBlock Text="亚克力与云母支持液态玻璃，纯色使用实体面板。" Style="{StaticResource RowDescriptionStyle}" />
                   </StackPanel>
                   <Border Grid.Column="1" Style="{StaticResource SegmentTrackStyle}">
                     <StackPanel Orientation="Horizontal">
@@ -96,8 +114,8 @@
                 <Grid Style="{StaticResource RowGridStyle}">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                   <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="外框透明度" Style="{StaticResource RowTitleStyle}" />
-                    <TextBlock Text="网页与内容区始终保持实体底色" Style="{StaticResource RowDescriptionStyle}" />
+                    <TextBlock Text="玻璃透明度" Style="{StaticResource RowTitleStyle}" />
+                    <TextBlock Text="调整导航、工具栏与玻璃面板的着色强度。" Style="{StaticResource RowDescriptionStyle}" />
                   </StackPanel>
                   <Border Grid.Column="1" Style="{StaticResource SegmentTrackStyle}">
                     <StackPanel Orientation="Horizontal">
@@ -112,18 +130,18 @@
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                   <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="减少动画" Style="{StaticResource RowTitleStyle}" />
-                    <TextBlock Text="关闭导航滑动与页面淡入；系统关闭动画时自动生效" Style="{StaticResource RowDescriptionStyle}" />
+                    <TextBlock Text="关闭导航滑动、指针光效与按钮回弹；系统关闭动画时自动生效" Style="{StaticResource RowDescriptionStyle}" />
                   </StackPanel>
-                  <ToggleSwitch x:Name="ReduceMotionToggle" Grid.Column="1" Toggled="OnReduceMotionToggled" Style="{StaticResource RowToggleStyle}" />
+                  <ToggleSwitch x:Name="ReduceMotionToggle" AutomationProperties.Name="减少动画" Grid.Column="1" Toggled="OnReduceMotionToggled" Style="{StaticResource RowToggleStyle}" />
                 </Grid>
               </StackPanel>
-            </Border>
+            </controls:GlassPanel>
           </StackPanel>
 
           <!-- 云考账号 -->
-          <StackPanel>
+          <StackPanel x:Name="AccountGroup">
             <TextBlock Text="云考账号" Style="{StaticResource GroupTitleStyle}" />
-            <Border Style="{StaticResource GroupStyle}">
+            <controls:GlassPanel Style="{StaticResource GlassGroupStyle}">
               <StackPanel>
                 <Grid Style="{StaticResource RowGridStyle}">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
@@ -131,7 +149,7 @@
                     <TextBlock Text="学号 / 用户名" Style="{StaticResource RowTitleStyle}" />
                     <TextBlock Text="学校代码固定为 u101441" Style="{StaticResource RowDescriptionStyle}" />
                   </StackPanel>
-                  <TextBox x:Name="YunKaoUserBox" Grid.Column="1" Width="280" VerticalAlignment="Center" PlaceholderText="例如 20260001" TextChanged="OnTextSettingChanged" />
+                  <TextBox x:Name="YunKaoUserBox" AutomationProperties.Name="学号或用户名" Grid.Column="1" Width="280" VerticalAlignment="Center" PlaceholderText="例如 20260001" TextChanged="OnTextSettingChanged" />
                 </Grid>
                 <Rectangle Style="{StaticResource RowDividerStyle}" />
                 <Grid Style="{StaticResource RowGridStyle}">
@@ -143,7 +161,7 @@
                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <PasswordBox x:Name="YunKaoPasswordBox" Width="200" PasswordRevealMode="Hidden"
                                  PlaceholderText="输入密码" AutomationProperties.Name="密码" />
-                    <Button Content="保存" Click="OnSavePasswordClick" Style="{StaticResource SecondaryButtonStyle}" />
+                    <Button Content="保存" AutomationProperties.Name="保存密码" Click="OnSavePasswordClick" Style="{StaticResource SecondaryButtonStyle}" />
                   </StackPanel>
                 </Grid>
                 <Rectangle Style="{StaticResource RowDividerStyle}" />
@@ -153,16 +171,16 @@
                     <TextBlock Text="记住密码" Style="{StaticResource RowTitleStyle}" />
                     <TextBlock Text="在云考登录页自动填写；关闭后会清除已保存的密码" Style="{StaticResource RowDescriptionStyle}" />
                   </StackPanel>
-                  <ToggleSwitch x:Name="RememberPasswordToggle" Grid.Column="1" Toggled="OnSettingChanged" Style="{StaticResource RowToggleStyle}" />
+                  <ToggleSwitch x:Name="RememberPasswordToggle" AutomationProperties.Name="记住密码" Grid.Column="1" Toggled="OnSettingChanged" Style="{StaticResource RowToggleStyle}" />
                 </Grid>
               </StackPanel>
-            </Border>
+            </controls:GlassPanel>
           </StackPanel>
 
           <!-- 导出 -->
-          <StackPanel>
+          <StackPanel x:Name="ExportGroup">
             <TextBlock Text="导出" Style="{StaticResource GroupTitleStyle}" />
-            <Border Style="{StaticResource GroupStyle}">
+            <controls:GlassPanel Style="{StaticResource GlassGroupStyle}">
               <StackPanel>
                 <Grid Style="{StaticResource RowGridStyle}">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
@@ -176,7 +194,7 @@
                       <ColumnDefinition Width="Auto" />
                       <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <TextBox x:Name="ExportDirectoryBox" MinWidth="220" PlaceholderText="文档" TextChanged="OnTextSettingChanged" />
+                    <TextBox x:Name="ExportDirectoryBox" AutomationProperties.Name="默认导出目录" MinWidth="220" PlaceholderText="文档" TextChanged="OnTextSettingChanged" />
                     <Button Grid.Column="1" Content="浏览" Click="OnBrowseExportFolderClick" Style="{StaticResource SecondaryButtonStyle}" />
                     <Button Grid.Column="2" Click="OnOpenExportFolderClick" AutomationProperties.Name="打开导出目录" ToolTipService.ToolTip="打开导出目录" Style="{StaticResource IconButtonStyle}">
                       <FontIcon Glyph="&#xE838;" FontSize="14" />
@@ -187,7 +205,7 @@
                 <Grid Style="{StaticResource RowGridStyle}">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                   <TextBlock Text="文件名前缀" VerticalAlignment="Center" Style="{StaticResource RowTitleStyle}" />
-                  <TextBox x:Name="ExportPrefixBox" Grid.Column="1" Width="240" VerticalAlignment="Center" TextChanged="OnTextSettingChanged" />
+                  <TextBox x:Name="ExportPrefixBox" AutomationProperties.Name="文件名前缀" Grid.Column="1" Width="240" VerticalAlignment="Center" TextChanged="OnTextSettingChanged" />
                 </Grid>
                 <Rectangle Style="{StaticResource RowDividerStyle}" />
                 <Grid Style="{StaticResource RowGridStyle}">
@@ -196,7 +214,7 @@
                     <TextBlock Text="默认格式" Style="{StaticResource RowTitleStyle}" />
                     <TextBlock Text="任务卡「导出题库」使用此格式；PDF 需要本机安装 Word 或 WPS" Style="{StaticResource RowDescriptionStyle}" />
                   </StackPanel>
-                  <ComboBox x:Name="ExportFormatCombo" Grid.Column="1" MinWidth="150" VerticalAlignment="Center" SelectionChanged="OnSelectionSettingChanged">
+                  <ComboBox x:Name="ExportFormatCombo" AutomationProperties.Name="默认导出格式" Grid.Column="1" MinWidth="150" VerticalAlignment="Center" SelectionChanged="OnSelectionSettingChanged">
                     <ComboBoxItem Tag="PDF" Content="PDF" />
                     <ComboBoxItem Tag="DOCX" Content="DOCX" />
                     <ComboBoxItem Tag="MD" Content="Markdown" />
@@ -207,7 +225,7 @@
                 <Grid Style="{StaticResource RowGridStyle}">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                   <TextBlock Text="导出后自动打开文件" VerticalAlignment="Center" Style="{StaticResource RowTitleStyle}" />
-                  <ToggleSwitch x:Name="AutoOpenToggle" Grid.Column="1" Toggled="OnSettingChanged" Style="{StaticResource RowToggleStyle}" />
+                  <ToggleSwitch x:Name="AutoOpenToggle" AutomationProperties.Name="导出后自动打开文件" Grid.Column="1" Toggled="OnSettingChanged" Style="{StaticResource RowToggleStyle}" />
                 </Grid>
                 <Rectangle Style="{StaticResource RowDividerStyle}" />
                 <Grid Style="{StaticResource RowGridStyle}">
@@ -216,21 +234,21 @@
                     <TextBlock Text="练习版" Style="{StaticResource RowTitleStyle}" />
                     <TextBlock Text="导出时隐藏答案和解析" Style="{StaticResource RowDescriptionStyle}" />
                   </StackPanel>
-                  <ToggleSwitch x:Name="ExportWithoutAnswersToggle" Grid.Column="1" Toggled="OnSettingChanged" Style="{StaticResource RowToggleStyle}" />
+                  <ToggleSwitch x:Name="ExportWithoutAnswersToggle" AutomationProperties.Name="练习版，隐藏答案和解析" Grid.Column="1" Toggled="OnSettingChanged" Style="{StaticResource RowToggleStyle}" />
                 </Grid>
               </StackPanel>
-            </Border>
+            </controls:GlassPanel>
           </StackPanel>
 
           <!-- AI 辅助 -->
-          <StackPanel>
+          <StackPanel x:Name="AiGroup">
             <Grid Margin="0,0,0,10">
-              <TextBlock Text="AI 辅助" Style="{StaticResource CardTitleStyle}" Margin="4,0,0,0" VerticalAlignment="Center" />
+              <TextBlock Text="AI 辅助" AutomationProperties.HeadingLevel="Level2" Style="{StaticResource SectionTitleStyle}" Margin="4,0,0,0" VerticalAlignment="Center" />
               <Border HorizontalAlignment="Right" CornerRadius="10" Padding="10,3" Background="{ThemeResource AccentSoftBrush}">
                 <TextBlock x:Name="AiKeyStatusText" Text="未保存 Key" FontSize="12" Foreground="{ThemeResource TextAccentBrush}" />
               </Border>
             </Grid>
-            <Border Style="{StaticResource GroupStyle}">
+            <controls:GlassPanel Style="{StaticResource GlassGroupStyle}">
               <StackPanel>
                 <Grid Style="{StaticResource RowGridStyle}">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
@@ -238,13 +256,13 @@
                     <TextBlock Text="自动补全缺失答案" Style="{StaticResource RowTitleStyle}" />
                     <TextBlock Text="缺少答案的题目会发送给所选服务商；结果需自行核对，导出时标明 AI 来源与置信度" Style="{StaticResource RowDescriptionStyle}" />
                   </StackPanel>
-                  <ToggleSwitch x:Name="AiEnabledToggle" Grid.Column="1" Toggled="OnSettingChanged" Style="{StaticResource RowToggleStyle}" />
+                  <ToggleSwitch x:Name="AiEnabledToggle" AutomationProperties.Name="自动补全缺失答案" Grid.Column="1" Toggled="OnSettingChanged" Style="{StaticResource RowToggleStyle}" />
                 </Grid>
                 <Rectangle Style="{StaticResource RowDividerStyle}" />
                 <Grid Style="{StaticResource RowGridStyle}">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                   <TextBlock Text="服务商" VerticalAlignment="Center" Style="{StaticResource RowTitleStyle}" />
-                  <ComboBox x:Name="ProviderCombo" Grid.Column="1" MinWidth="220" VerticalAlignment="Center" SelectionChanged="OnProviderChanged">
+                  <ComboBox x:Name="ProviderCombo" AutomationProperties.Name="AI 服务商" Grid.Column="1" MinWidth="220" VerticalAlignment="Center" SelectionChanged="OnProviderChanged">
                     <ComboBoxItem Tag="openai" Content="OpenAI / GPT" />
                     <ComboBoxItem Tag="deepseek" Content="DeepSeek" />
                     <ComboBoxItem Tag="kimi" Content="Kimi / Moonshot" />
@@ -258,13 +276,13 @@
                 <Grid Style="{StaticResource RowGridStyle}">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                   <TextBlock Text="接口地址" VerticalAlignment="Center" Style="{StaticResource RowTitleStyle}" />
-                  <TextBox x:Name="AiBaseUrlBox" Grid.Column="1" Width="320" VerticalAlignment="Center" PlaceholderText="https://.../v1" TextChanged="OnTextSettingChanged" />
+                  <TextBox x:Name="AiBaseUrlBox" AutomationProperties.Name="AI 接口地址" Grid.Column="1" Width="320" VerticalAlignment="Center" PlaceholderText="https://.../v1" TextChanged="OnTextSettingChanged" />
                 </Grid>
                 <Rectangle Style="{StaticResource RowDividerStyle}" />
                 <Grid Style="{StaticResource RowGridStyle}">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                   <TextBlock Text="模型名称" VerticalAlignment="Center" Style="{StaticResource RowTitleStyle}" />
-                  <TextBox x:Name="AiModelBox" Grid.Column="1" Width="320" VerticalAlignment="Center" PlaceholderText="模型名称" TextChanged="OnTextSettingChanged" />
+                  <TextBox x:Name="AiModelBox" AutomationProperties.Name="模型名称" Grid.Column="1" Width="320" VerticalAlignment="Center" PlaceholderText="模型名称" TextChanged="OnTextSettingChanged" />
                 </Grid>
                 <Rectangle Style="{StaticResource RowDividerStyle}" />
                 <Grid Style="{StaticResource RowGridStyle}">
@@ -273,7 +291,7 @@
                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <PasswordBox x:Name="AiKeyBox" Width="200" PasswordRevealMode="Hidden"
                                  PlaceholderText="输入 API Key" AutomationProperties.Name="API Key" />
-                    <Button Content="保存" Click="OnSaveAiKeyClick" Style="{StaticResource SecondaryButtonStyle}" />
+                    <Button Content="保存" AutomationProperties.Name="保存 API Key" Click="OnSaveAiKeyClick" Style="{StaticResource SecondaryButtonStyle}" />
                     <Button Content="清除" Click="OnClearAiKeyClick" Style="{StaticResource SubtleButtonStyle}" />
                   </StackPanel>
                 </Grid>
@@ -284,7 +302,7 @@
                     <TextBlock Text="允许发送题目图片" Style="{StaticResource RowTitleStyle}" />
                     <TextBlock Text="仅对支持视觉的模型生效" Style="{StaticResource RowDescriptionStyle}" />
                   </StackPanel>
-                  <ToggleSwitch x:Name="AiSupportsImagesToggle" Grid.Column="1" Toggled="OnSettingChanged" Style="{StaticResource RowToggleStyle}" />
+                  <ToggleSwitch x:Name="AiSupportsImagesToggle" AutomationProperties.Name="允许发送题目图片" Grid.Column="1" Toggled="OnSettingChanged" Style="{StaticResource RowToggleStyle}" />
                 </Grid>
                 <Rectangle Style="{StaticResource RowDividerStyle}" />
                 <StackPanel Padding="20,14" Spacing="10">
@@ -296,13 +314,13 @@
                   <TextBlock x:Name="AiTestResultText" Visibility="Collapsed" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" Style="{StaticResource SecondaryTextStyle}" FontSize="13" />
                 </StackPanel>
               </StackPanel>
-            </Border>
+            </controls:GlassPanel>
           </StackPanel>
 
           <!-- 数据与诊断 -->
-          <StackPanel>
+          <StackPanel x:Name="DataGroup">
             <TextBlock Text="数据与诊断" Style="{StaticResource GroupTitleStyle}" />
-            <Border Style="{StaticResource GroupStyle}">
+            <controls:GlassPanel Style="{StaticResource GlassGroupStyle}">
               <Grid Style="{StaticResource RowGridStyle}">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                 <StackPanel VerticalAlignment="Center">
@@ -315,7 +333,7 @@
                   <Button Content="复制诊断" Click="OnCopyDiagnosticsClick" Style="{StaticResource SubtleButtonStyle}" />
                 </StackPanel>
               </Grid>
-            </Border>
+            </controls:GlassPanel>
           </StackPanel>
         </StackPanel>
       </Grid>

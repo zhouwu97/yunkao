@@ -34,6 +34,7 @@ public sealed class TaskViewModel : ObservableObject
     private int _current;
     private int _total;
     private int _aiPending;
+    private bool _isStarting;
     private bool _isExporting;
     private string _exportStateText = "待机";
     private bool _practiceMode;
@@ -43,12 +44,12 @@ public sealed class TaskViewModel : ObservableObject
 
     public TaskViewModel()
     {
-        PrimaryCommand = new RelayCommand(ExecutePrimary, () => _presentation.IsActionEnabled && _actions is not null
+        PrimaryCommand = new RelayCommand(ExecutePrimary, () => !_isStarting && _presentation.IsActionEnabled && _actions is not null
             && !(_isExporting && _presentation.PrimaryAction == TaskPrimaryAction.Export));
         StopCommand = new RelayCommand(() => _actions?.Stop(), () => _presentation.ShowStop);
-        ClearCommand = new RelayCommand(() => _actions?.Clear(), () => _presentation.CanClear);
-        RestartCommand = new RelayCommand(() => _actions?.Restart(), () => _presentation.CanRestart);
-        RestoreCommand = new RelayCommand(() => _actions?.RestoreInterrupted(), () => _interruptedCount is > 0);
+        ClearCommand = new RelayCommand(() => _actions?.Clear(), () => !_isStarting && _presentation.CanClear);
+        RestartCommand = new RelayCommand(() => _actions?.Restart(), () => !_isStarting && _presentation.CanRestart);
+        RestoreCommand = new RelayCommand(() => _actions?.RestoreInterrupted(), () => !_isStarting && _interruptedCount is > 0);
         ExportCommand = new RelayCommand(
             parameter => _actions?.Export(parameter?.ToString() ?? "pdf"),
             _ => HasQuestions && !_isExporting);
@@ -70,9 +71,16 @@ public sealed class TaskViewModel : ObservableObject
     public string StateText => _presentation.StateText;
     public string StepText => _presentation.StepText;
     public string HintText => _presentation.HintText;
-    public string ActionLabel => _isExporting && _presentation.PrimaryAction == TaskPrimaryAction.Export
-        ? "正在导出…" : _presentation.ActionLabel;
-    public bool IsActionEnabled => _presentation.IsActionEnabled;
+    public string ActionLabel
+    {
+        get
+        {
+            if (_isStarting) return "正在准备提取…";
+            if (_isExporting && _presentation.PrimaryAction == TaskPrimaryAction.Export) return "正在导出…";
+            return _presentation.ActionLabel;
+        }
+    }
+    public bool ShowPrimaryAction => _isStarting || _presentation.IsActionEnabled;
     public TaskActionTone Tone => _presentation.Tone;
     public bool ShowStop => _presentation.ShowStop;
     public bool CanClear => _presentation.CanClear;
@@ -139,7 +147,7 @@ public sealed class TaskViewModel : ObservableObject
         OnPropertyChanged(nameof(StepText));
         OnPropertyChanged(nameof(HintText));
         OnPropertyChanged(nameof(ActionLabel));
-        OnPropertyChanged(nameof(IsActionEnabled));
+        OnPropertyChanged(nameof(ShowPrimaryAction));
         OnPropertyChanged(nameof(Tone));
         OnPropertyChanged(nameof(ShowStop));
         OnPropertyChanged(nameof(CanClear));
@@ -154,6 +162,15 @@ public sealed class TaskViewModel : ObservableObject
             OnPropertyChanged(nameof(ProgressText));
             if (!_isExporting) SetExportState(HasQuestions ? "就绪" : "待机");
         }
+        RefreshCommands();
+    });
+
+    public void SetStarting(bool starting) => Post(() =>
+    {
+        if (_isStarting == starting) return;
+        _isStarting = starting;
+        OnPropertyChanged(nameof(ActionLabel));
+        OnPropertyChanged(nameof(ShowPrimaryAction));
         RefreshCommands();
     });
 

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   任务卡：侧边栏中常驻的提取控制中心。
-  展开：状态 → 大号计数与进度 → 提示 → 唯一主操作 → 快捷导出。
+  展开时显示当前状态、进度、下一步操作和导出选项。
   紧凑：一颗玻璃按钮（状态点 + 已保存数），点击弹出完整任务卡。
 -->
 <UserControl
@@ -13,72 +13,51 @@
   <Grid>
     <controls:GlassPanel x:Name="ExpandedRoot" Padding="16,13,16,16">
       <StackPanel Spacing="10">
-        <Grid>
+        <Grid ColumnSpacing="8">
+          <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
           <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-            <Grid Width="8" Height="8" VerticalAlignment="Center">
-              <Ellipse Fill="{x:Bind helpers:Ui.StatusBrush(ViewModel.StatusKind), Mode=OneWay}" Opacity="0.3" Margin="-3" />
-              <Ellipse Fill="{x:Bind helpers:Ui.StatusBrush(ViewModel.StatusKind), Mode=OneWay}" />
-            </Grid>
-            <TextBlock Text="{x:Bind ViewModel.StatusLabel, Mode=OneWay}"
-                       FontSize="12"
-                       FontWeight="SemiBold"
-                       Foreground="{ThemeResource SidebarTextSecondaryBrush}"
-                       AutomationProperties.LiveSetting="Polite" />
+            <FontIcon Glyph="&#xE9F9;" FontSize="15" Foreground="{ThemeResource TextAccentBrush}" />
+            <TextBlock Text="提取任务" FontSize="16" FontWeight="SemiBold" Foreground="{ThemeResource TextPrimaryBrush}" />
           </StackPanel>
-          <Button HorizontalAlignment="Right"
-                  Margin="0,-6,-8,-6"
+          <Button Grid.Column="1" Margin="0,-4,-5,-4"
                   AutomationProperties.Name="更多任务操作"
                   ToolTipService.ToolTip="更多操作"
-                  Style="{StaticResource SidebarIconButtonStyle}">
+                  Style="{StaticResource SidebarGlassIconButtonStyle}">
             <FontIcon Glyph="&#xE712;" FontSize="13" />
             <Button.Flyout>
               <MenuFlyout Placement="RightEdgeAlignedTop">
-                <MenuFlyoutItem Text="停止任务" Command="{x:Bind ViewModel.StopCommand}" Visibility="{x:Bind ViewModel.ShowStop, Mode=OneWay}">
-                  <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE71A;" /></MenuFlyoutItem.Icon>
-                </MenuFlyoutItem>
                 <MenuFlyoutItem Text="新建提取任务（保留历史）" Command="{x:Bind ViewModel.RestartCommand}">
                   <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE72C;" /></MenuFlyoutItem.Icon>
                 </MenuFlyoutItem>
                 <MenuFlyoutItem Text="移出工作台（保留历史）" Command="{x:Bind ViewModel.ClearCommand}">
                   <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE74D;" /></MenuFlyoutItem.Icon>
                 </MenuFlyoutItem>
-                <MenuFlyoutSeparator Visibility="{x:Bind ViewModel.HasInterrupted, Mode=OneWay}" />
-                <MenuFlyoutItem Text="{x:Bind ViewModel.RestoreLabel, Mode=OneWay}"
-                                Command="{x:Bind ViewModel.RestoreCommand}"
-                                Visibility="{x:Bind ViewModel.HasInterrupted, Mode=OneWay}">
-                  <MenuFlyoutItem.Icon><FontIcon Glyph="&#xE777;" /></MenuFlyoutItem.Icon>
-                </MenuFlyoutItem>
               </MenuFlyout>
             </Button.Flyout>
           </Button>
         </Grid>
 
-        <StackPanel Spacing="6">
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <TextBlock Text="{x:Bind ViewModel.SavedCount, Mode=OneWay}" Style="{StaticResource DisplayNumberStyle}" LineHeight="36" />
-            <TextBlock Text="题已保存" VerticalAlignment="Bottom" Margin="0,0,0,6" FontSize="12" Foreground="{ThemeResource SidebarTextSecondaryBrush}" />
-          </StackPanel>
-            <TextBlock FontSize="12"
-                       Foreground="{ThemeResource SidebarTextTertiaryBrush}"
+        <Border BorderBrush="{ThemeResource GlassRimBrush}" BorderThickness="0,1,0,0" Padding="0,10,0,1">
+          <StackPanel Spacing="6">
+            <StackPanel Orientation="Horizontal" Spacing="7">
+              <Ellipse Width="7" Height="7" Fill="{x:Bind helpers:Ui.StatusBrush(ViewModel.StatusKind), Mode=OneWay}" />
+              <TextBlock Text="{x:Bind ViewModel.StatusLabel, Mode=OneWay}" Foreground="{ThemeResource TextPrimaryBrush}"
+                         FontWeight="SemiBold" FontSize="13" AutomationProperties.LiveSetting="Polite" />
+            </StackPanel>
+            <TextBlock Text="{x:Bind ViewModel.HintText, Mode=OneWay}" TextWrapping="Wrap" FontSize="12"
+                       LineHeight="18" Foreground="{ThemeResource TextSecondaryBrush}" />
+            <TextBlock FontSize="12" Foreground="{ThemeResource TextSecondaryBrush}"
                        Visibility="{x:Bind ViewModel.HasProgress, Mode=OneWay}">
-              <Run Text="· 第 " /><Run Text="{x:Bind ViewModel.Current, Mode=OneWay}" /><Run Text=" / " /><Run Text="{x:Bind ViewModel.Total, Mode=OneWay}" /><Run Text=" 题" />
+              <Run Text="进度" /> <Run Text="{x:Bind ViewModel.Current, Mode=OneWay}" /><Run Text=" / " /><Run Text="{x:Bind ViewModel.Total, Mode=OneWay}" />
             </TextBlock>
-          <ProgressBar Value="{x:Bind ViewModel.ProgressPercent, Mode=OneWay}"
-                       Visibility="{x:Bind ViewModel.HasProgress, Mode=OneWay}"
-                       Minimum="0" Maximum="100" Height="3" MinHeight="3" CornerRadius="2" />
-        </StackPanel>
-
-        <TextBlock Text="{x:Bind ViewModel.HintText, Mode=OneWay}"
-                   TextWrapping="Wrap"
-                   MaxLines="3"
-                   TextTrimming="CharacterEllipsis"
-                   FontSize="12"
-                   LineHeight="18"
-                   Foreground="{ThemeResource SidebarTextSecondaryBrush}" />
+            <ProgressBar Value="{x:Bind ViewModel.ProgressPercent, Mode=OneWay}" AutomationProperties.Name="提取进度"
+                         Visibility="{x:Bind ViewModel.HasProgress, Mode=OneWay}" Minimum="0" Maximum="100" Height="4" />
+          </StackPanel>
+        </Border>
 
         <Button Content="{x:Bind ViewModel.ActionLabel, Mode=OneWay}"
                 Command="{x:Bind ViewModel.PrimaryCommand}"
-                Visibility="{x:Bind ViewModel.IsActionEnabled, Mode=OneWay}"
+                Visibility="{x:Bind ViewModel.ShowPrimaryAction, Mode=OneWay}"
                 Style="{x:Bind helpers:Ui.ToneStyle(ViewModel.Tone), Mode=OneWay}"
                 HorizontalAlignment="Stretch"
                 MinHeight="36" />
@@ -94,8 +73,10 @@
         <StackPanel Spacing="8" Visibility="{x:Bind ViewModel.HasQuestions, Mode=OneWay}">
           <Rectangle Height="1" Fill="{ThemeResource SidebarDividerBrush}" Margin="0,2,0,0" />
           <Grid>
-            <TextBlock Text="快捷导出" Style="{StaticResource SidebarLabelStyle}" VerticalAlignment="Center" />
-            <TextBlock Text="{x:Bind ViewModel.ExportStateText, Mode=OneWay}" HorizontalAlignment="Right" FontSize="11" Foreground="{ThemeResource SidebarTextTertiaryBrush}" />
+            <TextBlock Style="{StaticResource SmallLabelStyle}" VerticalAlignment="Center">
+              <Run Text="导出已存" /> <Run Text="{x:Bind ViewModel.SavedCount, Mode=OneWay}" /> <Run Text="题" />
+            </TextBlock>
+            <TextBlock Text="{x:Bind ViewModel.ExportStateText, Mode=OneWay}" HorizontalAlignment="Right" FontSize="12" Visibility="{x:Bind ViewModel.IsExporting, Mode=OneWay}" Foreground="{ThemeResource TextAccentBrush}" />
           </Grid>
           <Grid ColumnSpacing="6">
             <Grid.ColumnDefinitions>
@@ -105,20 +86,18 @@
             </Grid.ColumnDefinitions>
             <Button Content="PDF" Command="{x:Bind ViewModel.ExportCommand}" CommandParameter="pdf" HorizontalAlignment="Stretch" Style="{StaticResource SidebarButtonStyle}" />
             <Button Grid.Column="1" Content="DOCX" Command="{x:Bind ViewModel.ExportCommand}" CommandParameter="docx" HorizontalAlignment="Stretch" Style="{StaticResource SidebarButtonStyle}" />
-            <Button Grid.Column="2" AutomationProperties.Name="更多导出选项" ToolTipService.ToolTip="更多格式与练习版" Style="{StaticResource SidebarButtonStyle}" Padding="8,4">
+            <Button Grid.Column="2" AutomationProperties.Name="更多导出格式" ToolTipService.ToolTip="更多导出格式" Style="{StaticResource SidebarButtonStyle}" Padding="8,4">
               <FontIcon Glyph="&#xE712;" FontSize="12" />
               <Button.Flyout>
                 <MenuFlyout Placement="RightEdgeAlignedBottom">
-                  <ToggleMenuFlyoutItem Text="练习版（隐藏答案和解析）" IsChecked="{x:Bind ViewModel.PracticeMode, Mode=TwoWay}" />
-                  <MenuFlyoutSeparator />
                   <MenuFlyoutItem Text="导出 Markdown (.md)" Command="{x:Bind ViewModel.ExportCommand}" CommandParameter="md" />
                   <MenuFlyoutItem Text="导出纯文本 (.txt)" Command="{x:Bind ViewModel.ExportCommand}" CommandParameter="txt" />
                 </MenuFlyout>
               </Button.Flyout>
             </Button>
           </Grid>
-          <CheckBox Content="练习版（隐藏答案）" IsChecked="{x:Bind ViewModel.PracticeMode, Mode=TwoWay}"
-                    FontSize="12" MinWidth="0" Padding="0"
+          <CheckBox Content="练习版（隐藏答案与解析）" IsChecked="{x:Bind ViewModel.PracticeMode, Mode=TwoWay}"
+                    HorizontalAlignment="Stretch" MinHeight="36" FontSize="12" MinWidth="0" Padding="0"
                     ToolTipService.ToolTip="{x:Bind ViewModel.ExportVersionText, Mode=OneWay}" />
         </StackPanel>
       </StackPanel>
@@ -131,24 +110,33 @@
             Height="52"
             Padding="0"
             HorizontalAlignment="Center"
-            Click="OnCompactClick"
             AutomationProperties.Name="任务面板"
+            AutomationProperties.ItemStatus="{x:Bind ViewModel.StatusLabel, Mode=OneWay}"
             ToolTipService.ToolTip="{x:Bind ViewModel.StatusLabel, Mode=OneWay}"
             Style="{StaticResource SidebarIconButtonStyle}">
       <Grid Width="52" Height="52">
-        <controls:GlassPanel Padding="0" CornerRadius="16" Blur="False" />
-        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="2">
-          <Ellipse Width="7" Height="7" Fill="{x:Bind helpers:Ui.StatusBrush(ViewModel.StatusKind), Mode=OneWay}" HorizontalAlignment="Center" />
-          <TextBlock Text="{x:Bind ViewModel.SavedCount, Mode=OneWay}"
-                     FontFamily="{StaticResource NumberFontFamily}"
-                     FontSize="15"
-                     FontWeight="SemiBold"
-                     HorizontalAlignment="Center"
-                     Foreground="{ThemeResource SidebarTextBrush}" />
+        <controls:GlassPanel x:Name="CompactGlass" Padding="0" CornerRadius="16" />
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="1">
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="4">
+            <Ellipse Width="6" Height="6" Fill="{x:Bind helpers:Ui.StatusBrush(ViewModel.StatusKind), Mode=OneWay}" />
+            <TextBlock Text="{x:Bind ViewModel.SavedCount, Mode=OneWay}"
+                       FontFamily="{StaticResource NumberFontFamily}" FontSize="15" FontWeight="SemiBold"
+                       Foreground="{ThemeResource SidebarTextBrush}" />
+          </StackPanel>
+          <TextBlock Text="任务" HorizontalAlignment="Center" FontSize="11" Foreground="{ThemeResource SidebarTextSecondaryBrush}" />
         </StackPanel>
       </Grid>
       <Button.Flyout>
-        <Flyout x:Name="CompactFlyout" Placement="RightEdgeAlignedTop" Opening="OnCompactFlyoutOpening" />
+        <Flyout x:Name="CompactFlyout" Placement="RightEdgeAlignedTop" Opening="OnCompactFlyoutOpening">
+          <Flyout.FlyoutPresenterStyle>
+            <Style TargetType="FlyoutPresenter">
+              <Setter Property="Background" Value="Transparent" />
+              <Setter Property="BorderThickness" Value="0" />
+              <Setter Property="Padding" Value="0" />
+              <Setter Property="CornerRadius" Value="16" />
+            </Style>
+          </Flyout.FlyoutPresenterStyle>
+        </Flyout>
       </Button.Flyout>
     </Button>
   </Grid>

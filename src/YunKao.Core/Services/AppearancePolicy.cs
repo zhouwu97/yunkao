@@ -76,9 +76,9 @@ public static class AppearancePolicy
         if (ResolveMaterial(material) == AppearanceMaterial.Solid) return 1.0;
         return ResolveClarity(clarity) switch
         {
-            AppearanceClarity.Clear => 0.82,
-            AppearanceClarity.Transparent => 0.40,
-            _ => 0.60,
+            AppearanceClarity.Clear => 0.10,
+            AppearanceClarity.Transparent => 0.02,
+            _ => 0.06,
         };
     }
 

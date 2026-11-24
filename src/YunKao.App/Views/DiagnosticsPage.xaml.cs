@@ -132,6 +132,7 @@ public sealed partial class DiagnosticsPage : Page
         report.AppendLine($"WebChannel：{(App.Services.Workspace.BridgeInstalled ? "已连接" : "未连接")}");
         report.AppendLine($"浏览器状态：{App.Services.Workspace.BrowserStatus}");
         report.AppendLine($"窗口材质：Requested {FormatMaterial(workspace.RequestedAppearanceMaterial)} / Applied {FormatMaterial(workspace.AppliedAppearanceMaterial)}");
+        report.AppendLine($"导航材质：{workspace.NavigationMaterial}");
         report.AppendLine($"透明强度：{FormatClarity(workspace.AppearanceClarity)}");
         report.AppendLine($"WebView ActualWidth：{FormatMetric(workspace.WebViewActualWidth)} DIP");
         report.AppendLine($"缩放模式：{workspace.WebViewZoomMode}");

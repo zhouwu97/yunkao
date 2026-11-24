@@ -1,8 +1,13 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Media.Animation;
+using System.Diagnostics;
+using Microsoft.UI.Xaml.Media;
 using YunKao.Services;
 using Windows.Foundation;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Input;
+using Windows.System;
+using YunKao.Core.Presentation;
 
 namespace YunKao.Controls;
 
@@ -21,44 +26,125 @@ public sealed class NavigationRequestEventArgs(NavigationTarget target) : EventA
 }
 
 /// <summary>
-/// 侧边导航。选中指示是一块玻璃：移动时纵向拉伸、横向收窄，再弹回原形。
+/// 侧边导航。选中项的标记跟随当前页面，紧凑时保留短标签。
 /// </summary>
 public sealed partial class NavigationRail : UserControl
 {
     private NavigationTarget _activeTarget = NavigationTarget.Workspace;
     private bool _isLoaded;
     private bool _compact;
-    private Storyboard? _moveStoryboard;
+    private LiquidGlassScene? _scene;
+    private LiquidGlassScene? _labels;
+    private LiquidGlassRenderer? _lens;
+    private readonly LiquidRailMotion _motion = new();
+    private long _lastTick;
+    private uint? _pointer;
+    private double _lastY, _speed, _grabX, _grabOffsetY, _lightX = .22, _lightY = .1, _compression;
+    private ulong _lastSample;
+    private bool _animating;
+    private bool _keyboardSelection;
 
     public NavigationRail()
     {
         InitializeComponent();
+        GestureSurface.AddHandler(PointerPressedEvent, new PointerEventHandler(OnGlassPressed), true);
+        GestureSurface.AddHandler(PointerMovedEvent, new PointerEventHandler(OnGlassMoved), true);
+        GestureSurface.AddHandler(PointerReleasedEvent, new PointerEventHandler(OnGlassReleased), true);
+        GestureSurface.AddHandler(PointerCaptureLostEvent, new PointerEventHandler(OnGlassCancelled), true);
+        GestureSurface.AddHandler(PointerCanceledEvent, new PointerEventHandler(OnGlassCancelled), true);
         Loaded += (_, _) =>
         {
             _isLoaded = true;
+            _labels = new LiquidGlassScene(NavigationItems);
             ApplyStyles();
+            GlassSettings.Changed += OnGlassChanged;
+            MotionService.Changed += OnMotionChanged;
+            RefreshLens();
             MoveSelection(animate: false);
         };
+        Unloaded += (_, _) =>
+        {
+            _isLoaded = false;
+            GlassSettings.Changed -= OnGlassChanged;
+            MotionService.Changed -= OnMotionChanged;
+            _pointer = null;
+            GestureSurface.ReleasePointerCaptures();
+            StopMotion();
+            _lens?.Dispose();
+            _lens = null;
+            _labels?.Dispose();
+            _labels = null;
+        };
         SizeChanged += OnLayoutChanged;
+        KeyDown += OnRailKeyDown;
     }
 
     public event EventHandler<NavigationRequestEventArgs>? NavigationRequested;
 
-    public void SetActive(NavigationTarget target)
+    internal void SetScene(LiquidGlassScene scene) => _scene = scene;
+
+    private void OnGlassChanged(object? sender, EventArgs args)
     {
-        bool changed = _activeTarget != target;
-        _activeTarget = target;
-        ApplyStyles();
-        if (_isLoaded) MoveSelection(changed);
+        if (_lens?.HasFailed == true) { _lens.Dispose(); _lens = null; }
+        RefreshLens();
     }
 
-    /// <summary>紧凑模式只显示图标，按钮与选中块收为方形。</summary>
+    private void OnMotionChanged(object? sender, EventArgs args)
+    {
+        if (!MotionService.ReduceMotion) return;
+        StopMotion();
+        _motion.Snap((int)_activeTarget * Step);
+        PaintMotion();
+    }
+
+    public void RefreshLens()
+    {
+        if (!_isLoaded || _scene is null) return;
+        if (GlassSettings.IsSolid || !OperatingSystem.IsWindowsVersionAtLeast(10, 0, 19041))
+        {
+            _lens?.Dispose();
+            _lens = null;
+            App.Services.Workspace.NavigationMaterial = "实体选中态";
+            return;
+        }
+        try
+        {
+            _lens ??= new LiquidGlassRenderer(LensHost, _scene, 32, LensFallback, _labels);
+            _lens.SetMaterial(new(new GlassCorners(_compact ? 25 : 22), .8f, 14, 1.04f,
+                Windows.UI.Color.FromArgb(255, 232, 223, 252), (float)(GlassSettings.TintOpacity * .5), true, 24, .5f));
+            _lens.Invalidate();
+        }
+        catch (Exception ex)
+        {
+            App.Services.Workspace.NavigationMaterial = "基础材质";
+            App.Services.Diagnostics.Warning("导航玻璃不可用：" + ex.Message);
+        }
+    }
+
+    public void SetActive(NavigationTarget target)
+    {
+        if (_pointer.HasValue)
+        {
+            _pointer = null;
+            GestureSurface.ReleasePointerCaptures();
+        }
+        bool changed = _activeTarget != target || _motion.Held;
+        _activeTarget = target;
+        ApplyStyles();
+        if (changed) _labels?.Invalidate();
+        if (_isLoaded) MoveSelection(changed && !_keyboardSelection);
+    }
+
+    /// <summary>紧凑模式在图标下显示页面短名。</summary>
     public void SetCompact(bool compact)
     {
         _compact = compact;
         ApplyStyles();
-        SelectionBlob.Width = compact ? 44 : double.NaN;
+        SelectionBlob.Width = compact ? 54 : double.NaN;
+        SelectionBlob.Height = compact ? 50 : 44;
         SelectionBlob.HorizontalAlignment = compact ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
+        _labels?.Invalidate();
+        RefreshLens();
         if (_isLoaded) DispatcherQueue.TryEnqueue(() => MoveSelection(animate: false));
     }
 
@@ -78,13 +164,23 @@ public sealed partial class NavigationRail : UserControl
             if (!ReferenceEquals(button.Style, style)) button.Style = style;
 
             // 样式切换会重置本地值，紧凑尺寸在样式之后应用。
-            button.Width = _compact ? 44 : double.NaN;
+            button.Width = _compact ? 54 : double.NaN;
+            button.Height = _compact ? 50 : 44;
             button.HorizontalAlignment = _compact ? HorizontalAlignment.Center : HorizontalAlignment.Stretch;
             button.HorizontalContentAlignment = _compact ? HorizontalAlignment.Center : HorizontalAlignment.Left;
             button.Padding = _compact ? new Thickness(0) : new Thickness(12, 0, 12, 0);
-            if (button.Content is StackPanel content && content.Children.Count > 1)
+            if (button.Content is StackPanel content && content.Children[1] is TextBlock label)
             {
-                content.Children[1].Visibility = _compact ? Visibility.Collapsed : Visibility.Visible;
+                content.Orientation = _compact ? Orientation.Vertical : Orientation.Horizontal;
+                content.Spacing = _compact ? 3 : 12;
+                label.FontSize = _compact ? 11 : 14;
+                label.HorizontalAlignment = HorizontalAlignment.Center;
+                label.Text = (_compact, target) switch
+                {
+                    (true, NavigationTarget.History) => "历史",
+                    (true, NavigationTarget.Export) => "导出",
+                    _ => Microsoft.UI.Xaml.Automation.AutomationProperties.GetName(button),
+                };
             }
             Microsoft.UI.Xaml.Automation.AutomationProperties.SetItemStatus(button, target == _activeTarget ? "当前页" : "");
         }
@@ -96,58 +192,176 @@ public sealed partial class NavigationRail : UserControl
         if (button.ActualHeight <= 0) return;
         double translation = button.TransformToVisual(NavigationItems).TransformPoint(new Point(0, 0)).Y;
 
-        _moveStoryboard?.Stop();
+        if (_pointer.HasValue) return;
         if (!animate || MotionService.ReduceMotion)
         {
-            SelectionTransform.TranslateY = translation;
-            SelectionTransform.ScaleX = 1;
-            SelectionTransform.ScaleY = 1;
-            return;
+            StopMotion();
+            _motion.Snap(translation);
+            PaintMotion();
         }
-
-        double distance = Math.Abs(translation - SelectionTransform.TranslateY);
-        double stretch = 1 + Math.Min(0.12, distance / 800);
-        var storyboard = new Storyboard();
-        var move = new DoubleAnimation
-        {
-            To = translation,
-            Duration = new Duration(TimeSpan.FromMilliseconds(340)),
-            EasingFunction = new ExponentialEase { EasingMode = EasingMode.EaseOut, Exponent = 5 },
-        };
-        Storyboard.SetTarget(move, SelectionTransform);
-        Storyboard.SetTargetProperty(move, "TranslateY");
-        storyboard.Children.Add(move);
-        storyboard.Children.Add(Wobble("ScaleY", stretch));
-        _moveStoryboard = storyboard;
-        storyboard.Begin();
+        else Aim(translation);
     }
 
-    /// <summary>形变关键帧：拉伸 → 轻微过冲 → 复原。</summary>
-    private DoubleAnimationUsingKeyFrames Wobble(string property, double peak)
+    private double Step => WorkspaceButton.ActualHeight + NavigationItems.Spacing;
+    private double PositionAt(double y) => (y - WorkspaceButton.ActualHeight / 2) / Math.Max(1, Step);
+
+    private void OnGlassPressed(object sender, PointerRoutedEventArgs e)
     {
-        var frames = new DoubleAnimationUsingKeyFrames();
-        frames.KeyFrames.Add(new EasingDoubleKeyFrame { KeyTime = TimeSpan.Zero, Value = 1 });
-        frames.KeyFrames.Add(new EasingDoubleKeyFrame
+        var pt = e.GetCurrentPoint(GestureSurface);
+        if (_pointer.HasValue || !pt.Properties.IsLeftButtonPressed) return;
+        // Button captures during its class handler, before this routed handler. Transfer it to the rail
+        // so a drag can cross several buttons; release still commits through their native focus/automation.
+        for (DependencyObject? node = e.OriginalSource as DependencyObject; node is not null && node != GestureSurface;
+             node = VisualTreeHelper.GetParent(node))
         {
-            KeyTime = TimeSpan.FromMilliseconds(120),
-            Value = peak,
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
-        });
-        frames.KeyFrames.Add(new EasingDoubleKeyFrame
+            if (node is not Button button) continue;
+            button.ReleasePointerCapture(e.Pointer);
+            break;
+        }
+        if (!GestureSurface.CapturePointer(e.Pointer)) return;
+        _pointer = pt.PointerId;
+        _grabX = pt.Position.X;
+        double center = pt.Position.Y - WorkspaceButton.ActualHeight / 2;
+        double grabbed = Math.Abs(center - _motion.Position) <= WorkspaceButton.ActualHeight / 2
+            ? _motion.Position : Math.Round(PositionAt(pt.Position.Y)) * Step;
+        _grabOffsetY = center - grabbed;
+        _lastY = pt.Position.Y;
+        _lastSample = pt.Timestamp;
+        _speed = 0;
+        AimAtPointer(pt);
+        e.Handled = true;
+    }
+
+    private void OnGlassMoved(object sender, PointerRoutedEventArgs e)
+    {
+        var pt = e.GetCurrentPoint(GestureSurface);
+        if (_pointer is null)
         {
-            KeyTime = TimeSpan.FromMilliseconds(260),
-            Value = 1 - (peak - 1) * 0.3,
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut },
-        });
-        frames.KeyFrames.Add(new EasingDoubleKeyFrame
+            return;
+        }
+        if (pt.PointerId != _pointer) return;
+        if (pt.Timestamp > _lastSample)
         {
-            KeyTime = TimeSpan.FromMilliseconds(400),
-            Value = 1,
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
-        });
-        Storyboard.SetTarget(frames, SelectionTransform);
-        Storyboard.SetTargetProperty(frames, property);
-        return frames;
+            double dt = (pt.Timestamp - _lastSample) / 1_000_000d;
+            _speed += (1 - Math.Exp(-dt * 30)) * ((pt.Position.Y - _lastY) / dt - _speed);
+        }
+        _lastSample = pt.Timestamp;
+        _lastY = pt.Position.Y;
+        AimAtPointer(pt);
+        e.Handled = true;
+    }
+
+    private void AimAtPointer(PointerPoint pt)
+    {
+        double raw = PositionAt(pt.Position.Y - _grabOffsetY);
+        double index = Math.Clamp(raw, 0, NavigationItems.Children.Count - 1);
+        _compression = Math.Min(1, Math.Abs(raw - index) / .72);
+        _lightX = Math.Clamp(pt.Position.X / Math.Max(1, GestureSurface.ActualWidth), 0, 1);
+        _lightY = Math.Clamp(.5 + (pt.Position.Y - index * Step - WorkspaceButton.ActualHeight / 2) / WorkspaceButton.ActualHeight, 0, 1);
+        double pressure = pt.PointerDeviceType == PointerDeviceType.Pen ? Math.Clamp(pt.Properties.Pressure, .15, 1) : 1;
+        Aim(index * Step, true, pressure, (pt.Position.X - _grabX) * .12);
+    }
+
+    private void OnGlassReleased(object sender, PointerRoutedEventArgs e)
+    {
+        var pt = e.GetCurrentPoint(GestureSurface);
+        if (pt.PointerId != _pointer) return;
+        _pointer = null;
+        GestureSurface.ReleasePointerCapture(e.Pointer);
+        _compression = 0;
+        if (pt.Position.X < -8 || pt.Position.X > GestureSurface.ActualWidth + 8 ||
+            pt.Position.Y < -32 || pt.Position.Y > GestureSurface.ActualHeight + 32)
+        {
+            Aim((int)_activeTarget * Step);
+        }
+        else
+        {
+            double speed = pt.Timestamp - _lastSample > 100_000 ? 0 : _speed;
+            int index = LiquidRailMotion.ReleaseIndex(PositionAt(pt.Position.Y - _grabOffsetY), speed, Step, NavigationItems.Children.Count);
+            Commit((NavigationTarget)index, FocusState.Pointer);
+        }
+        e.Handled = true;
+    }
+
+    private void OnGlassCancelled(object sender, PointerRoutedEventArgs e)
+    {
+        if (!ReferenceEquals(e.OriginalSource, GestureSurface)) return;
+        if (_pointer != e.Pointer.PointerId) return;
+        _pointer = null;
+        _compression = 0;
+        Aim((int)_activeTarget * Step);
+    }
+
+    private void OnRailKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        int current = e.OriginalSource is Button b && Enum.TryParse<NavigationTarget>(b.Tag?.ToString(), out var focused)
+            ? (int)focused : (int)_activeTarget;
+        int last = NavigationItems.Children.Count - 1;
+        int index = e.Key switch
+        {
+            VirtualKey.Home => 0, VirtualKey.End => last,
+            VirtualKey.Up => Math.Max(0, current - 1), VirtualKey.Down => Math.Min(last, current + 1),
+            _ => -1,
+        };
+        if (index < 0) return;
+        _keyboardSelection = true;
+        try { Commit((NavigationTarget)index, FocusState.Keyboard); }
+        finally { _keyboardSelection = false; }
+        e.Handled = true;
+    }
+
+    private void Commit(NavigationTarget target, FocusState focus)
+    {
+        GetButton(target).Focus(focus);
+        if (target != _activeTarget) NavigationRequested?.Invoke(this, new NavigationRequestEventArgs(target));
+        else MoveSelection(animate: focus != FocusState.Keyboard);
+    }
+
+    private void Aim(double y, bool held = false, double pressure = 0, double cross = 0)
+    {
+        if (MotionService.ReduceMotion)
+        {
+            StopMotion();
+            _motion.Snap(y);
+            PaintMotion();
+            return;
+        }
+        _motion.Aim(y, held, pressure, cross);
+        if (_animating) return;
+        _animating = true;
+        _lastTick = Stopwatch.GetTimestamp();
+        CompositionTarget.Rendering += OnMotionFrame;
+    }
+
+    private void OnMotionFrame(object? sender, object args)
+    {
+        long now = Stopwatch.GetTimestamp();
+        _motion.Advance(Stopwatch.GetElapsedTime(_lastTick, now).TotalSeconds);
+        _lastTick = now;
+        if (MotionService.ReduceMotion) _motion.Snap((int)_activeTarget * Step);
+        PaintMotion();
+        if (!_motion.Moving) StopMotion();
+    }
+
+    private void PaintMotion()
+    {
+        double press = _motion.Pressure;
+        SelectionTransform.TranslateY = _motion.Position;
+        SelectionTransform.TranslateX = _motion.Cross;
+        SelectionTransform.ScaleX = SelectionTransform.ScaleY = 1;
+        SelectionTransform.SkewX = 0;
+        Canvas.SetZIndex(SelectionBlob, press > .04 && _lens?.HasLabels == true ? 1 : 0);
+        _lens?.SetInteraction(press, _lightX, _lightY);
+        _lens?.SetDeformation(_motion.Stretch, _motion.Angle, _motion.CrossBend,
+            _motion.Bend - press * _compression * 4, _motion.Energy);
+        // Position changes need fresh sampling even after pressure and light have settled.
+        _lens?.Invalidate();
+    }
+
+    private void StopMotion()
+    {
+        if (_animating) CompositionTarget.Rendering -= OnMotionFrame;
+        _animating = false;
     }
 
     private Button GetButton(NavigationTarget target) => target switch

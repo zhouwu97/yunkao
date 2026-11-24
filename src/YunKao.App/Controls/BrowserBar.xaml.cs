@@ -8,7 +8,7 @@ namespace YunKao.Controls;
 
 public sealed partial class BrowserBar : UserControl
 {
-    private bool _compact;
+    internal void ConnectGlass(LiquidGlassScene scene) => ToolbarGlass.Connect(scene, ToolbarShell);
 
     public BrowserBar()
     {
@@ -20,25 +20,23 @@ public sealed partial class BrowserBar : UserControl
     /// <summary>地址栏提交后触发，外壳据此切回工作台。</summary>
     public event EventHandler? Navigated;
 
-    public void SetCompact(bool compact)
+    private void OnBarSizeChanged(object sender, SizeChangedEventArgs args)
     {
-        _compact = compact;
-        ExpandedRoot.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-        CompactRoot.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
+        bool narrow = args.NewSize.Width < 540;
+        ZoomButton.Visibility = ForwardButton.Visibility = narrow ? Visibility.Collapsed : Visibility.Visible;
+        ZoomMenu.Visibility = ForwardMenu.Visibility = narrow ? Visibility.Visible : Visibility.Collapsed;
     }
 
     public void BeginAddressEdit()
     {
-        AddressError.Visibility = Visibility.Collapsed;
-        if (_compact)
+        if (AddressBox.Visibility == Visibility.Collapsed)
         {
-            AddressFlyout.ShowAt(CompactAddressButton);
-            return;
+            AddressError.Visibility = Visibility.Collapsed;
+            AddressBox.Text = ViewModel.FullAddress;
         }
-        AddressDisplay.Visibility = Visibility.Collapsed;
         AddressBox.Visibility = Visibility.Visible;
-        AddressBox.Text = ViewModel.FullAddress;
         AddressBox.Focus(FocusState.Programmatic);
+        AddressDisplay.Visibility = Visibility.Collapsed;
         AddressBox.SelectAll();
     }
 
@@ -46,23 +44,31 @@ public sealed partial class BrowserBar : UserControl
 
     private void OnAddressKeyDown(object sender, KeyRoutedEventArgs args)
     {
+        var editor = (TextBox)sender;
         if (args.Key == VirtualKey.Escape)
         {
             args.Handled = true;
-            EndAddressEdit();
+            CloseAddressEditor();
             return;
         }
         if (args.Key != VirtualKey.Enter) return;
         args.Handled = true;
-        string? error = ViewModel.Navigate(AddressBox.Text);
+        string? error = ViewModel.Navigate(editor.Text);
         if (error is not null)
         {
             AddressError.Text = error;
             AddressError.Visibility = Visibility.Visible;
             return;
         }
-        EndAddressEdit();
+        CloseAddressEditor();
         Navigated?.Invoke(this, EventArgs.Empty);
+    }
+
+    private void CloseAddressEditor()
+    {
+        AddressDisplay.Visibility = Visibility.Visible;
+        AddressDisplay.Focus(FocusState.Programmatic);
+        EndAddressEdit();
     }
 
     private void OnAddressLostFocus(object sender, RoutedEventArgs args) => EndAddressEdit();
@@ -72,28 +78,5 @@ public sealed partial class BrowserBar : UserControl
         AddressError.Visibility = Visibility.Collapsed;
         AddressBox.Visibility = Visibility.Collapsed;
         AddressDisplay.Visibility = Visibility.Visible;
-    }
-
-    private void OnAddressFlyoutOpened(object? sender, object args)
-    {
-        CompactAddressError.Visibility = Visibility.Collapsed;
-        CompactAddressBox.Text = ViewModel.FullAddress;
-        CompactAddressBox.Focus(FocusState.Programmatic);
-        CompactAddressBox.SelectAll();
-    }
-
-    private void OnCompactAddressKeyDown(object sender, KeyRoutedEventArgs args)
-    {
-        if (args.Key != VirtualKey.Enter) return;
-        args.Handled = true;
-        string? error = ViewModel.Navigate(CompactAddressBox.Text);
-        if (error is not null)
-        {
-            CompactAddressError.Text = error;
-            CompactAddressError.Visibility = Visibility.Visible;
-            return;
-        }
-        AddressFlyout.Hide();
-        Navigated?.Invoke(this, EventArgs.Empty);
     }
 }

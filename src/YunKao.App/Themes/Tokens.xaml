@@ -1,87 +1,90 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  设计令牌（"纸感极简"方向）：
-    暖白纸面、黑色文字、细线分隔；没有渐变、阴影、模糊和高光。
-    蓝色只用于主操作、选中状态和链接。
-  键名沿用：Frame* 外框 / Sidebar* 侧边栏 / Glass* 外框上的卡片（现为实体纸卡）/ Surface* 内容区 /
-            Text* 文字 / Control* 控件 / Segment* 分段控件 / Accent* 品牌蓝 / Status* 状态点。
--->
+<!-- 樱小路露娜主题。银紫、暖象牙和墨色服饰对应纸面、强调色与侧栏。 -->
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
   <!-- 墨蓝覆盖系统强调色，原生控件（开关、进度条、复选框、焦点）自动跟随。 -->
-  <Color x:Key="SystemAccentColor">#2F5BD8</Color>
-  <Color x:Key="SystemAccentColorLight1">#4A73E2</Color>
-  <Color x:Key="SystemAccentColorLight2">#7C9BEB</Color>
-  <Color x:Key="SystemAccentColorLight3">#B3C5F4</Color>
-  <Color x:Key="SystemAccentColorDark1">#264CB8</Color>
-  <Color x:Key="SystemAccentColorDark2">#1E3D95</Color>
-  <Color x:Key="SystemAccentColorDark3">#162E70</Color>
+  <Color x:Key="SystemAccentColor">#62518B</Color>
+  <Color x:Key="SystemAccentColorLight1">#8471AD</Color>
+  <Color x:Key="SystemAccentColorLight2">#AA99C7</Color>
+  <Color x:Key="SystemAccentColorLight3">#D8CDE9</Color>
+  <Color x:Key="SystemAccentColorDark1">#504071</Color>
+  <Color x:Key="SystemAccentColorDark2">#41345D</Color>
+  <Color x:Key="SystemAccentColorDark3">#302643</Color>
 
   <SolidColorBrush x:Key="StatusReadyBrush" Color="#3E8E7E" />
-  <SolidColorBrush x:Key="StatusRunningBrush" Color="#2F5BD8" />
+  <SolidColorBrush x:Key="StatusRunningBrush" Color="#62518B" />
   <SolidColorBrush x:Key="StatusPausedBrush" Color="#C98A1B" />
   <SolidColorBrush x:Key="StatusAiBrush" Color="#7A5AC8" />
   <SolidColorBrush x:Key="StatusSuccessBrush" Color="#2E8A57" />
   <SolidColorBrush x:Key="StatusErrorBrush" Color="#C8473D" />
   <SolidColorBrush x:Key="StatusIdleBrush" Color="#A3A09A" />
-  <SolidColorBrush x:Key="OnAccentBrush" Color="#FFFFFF" />
   <SolidColorBrush x:Key="TransparentBrush" Color="Transparent" />
-  <SolidColorBrush x:Key="ScrimBrush" Color="#1F1E1B" />
+  <SolidColorBrush x:Key="ScrimBrush" Color="#292638" />
 
-  <CornerRadius x:Key="ContentCornerRadius">10</CornerRadius>
-  <CornerRadius x:Key="GlassCornerRadius">10</CornerRadius>
+  <CornerRadius x:Key="ContentCornerRadius">14</CornerRadius>
+  <CornerRadius x:Key="GlassCornerRadius">16</CornerRadius>
   <CornerRadius x:Key="ControlCornerRadiusLarge">7</CornerRadius>
 
   <ResourceDictionary.ThemeDictionaries>
-    <!-- ==================== 浅色：暖白纸面 ==================== -->
+    <!-- ==================== 浅色：暖象牙纸面 ==================== -->
     <ResourceDictionary x:Key="Light">
-      <SolidColorBrush x:Key="FrameGradientBrush" Color="#F6F5F2" />
+      <SolidColorBrush x:Key="AddressInsetBrush" Color="#80FFFFFF" />
+      <SolidColorBrush x:Key="PaperBandBrush" Color="#EDE8F2" />
+      <SolidColorBrush x:Key="PaperWarmBrush" Color="#F0E3E8" />
+      <SolidColorBrush x:Key="PaperLineBrush" Color="#D0C2D6" />
+      <SolidColorBrush x:Key="PaperSunBrush" Color="#E9D4DE" />
+      <SolidColorBrush x:Key="RailBaseBrush" Color="#292940" />
+      <SolidColorBrush x:Key="BrandMarkBrush" Color="#F4EAF8" />
+      <SolidColorBrush x:Key="BrandInkBrush" Color="#4B3C66" />
+      <SolidColorBrush x:Key="OnAccentBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="NavSelectedTextBrush" Color="#544574" />
+      <SolidColorBrush x:Key="FrameGradientBrush" Color="#F7F4F6" />
       <SolidColorBrush x:Key="FrameGlowPrimaryBrush" Color="Transparent" />
       <SolidColorBrush x:Key="FrameGlowSecondaryBrush" Color="Transparent" />
 
-      <SolidColorBrush x:Key="SidebarTextBrush" Color="#1F1E1B" />
-      <SolidColorBrush x:Key="SidebarTextSecondaryBrush" Color="#5F5D57" />
-      <SolidColorBrush x:Key="SidebarTextTertiaryBrush" Color="#8C8A83" />
-      <SolidColorBrush x:Key="SidebarItemHoverBrush" Color="#EDEBE6" />
-      <SolidColorBrush x:Key="SidebarItemPressedBrush" Color="#E5E2DB" />
-      <SolidColorBrush x:Key="SidebarItemSelectedBrush" Color="#E9E7E1" />
-      <SolidColorBrush x:Key="SidebarDividerBrush" Color="#E6E4DE" />
+      <SolidColorBrush x:Key="SidebarTextBrush" Color="#292638" />
+      <SolidColorBrush x:Key="SidebarTextSecondaryBrush" Color="#504C61" />
+      <SolidColorBrush x:Key="SidebarTextTertiaryBrush" Color="#625B70" />
+      <SolidColorBrush x:Key="SidebarItemHoverBrush" Color="#EFECF6" />
+      <SolidColorBrush x:Key="SidebarItemPressedBrush" Color="#E9E3F1" />
+      <SolidColorBrush x:Key="SidebarItemSelectedBrush" Color="#E8E0F3" />
+      <SolidColorBrush x:Key="SidebarDividerBrush" Color="#D9D2E1" />
 
       <SolidColorBrush x:Key="GlassTintBrush" Color="#FFFFFF" />
       <SolidColorBrush x:Key="GlassSolidBrush" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="GlassRimBrush" Color="#E6E4DE" />
+      <SolidColorBrush x:Key="GlassRimBrush" Color="#D9D2E1" />
       <SolidColorBrush x:Key="GlassSheenBrush" Color="Transparent" />
       <SolidColorBrush x:Key="GlassInsetBrush" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="GlassInsetStrokeBrush" Color="#E0DDD6" />
+      <SolidColorBrush x:Key="GlassInsetStrokeBrush" Color="#D2DCE9" />
 
-      <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="SurfaceSubtleBrush" Color="#F6F5F2" />
-      <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="SurfaceStrokeBrush" Color="#E6E4DE" />
-      <SolidColorBrush x:Key="DividerBrush" Color="#EFEDE8" />
-      <SolidColorBrush x:Key="RowHoverBrush" Color="#F6F5F2" />
+      <SolidColorBrush x:Key="SurfaceBrush" Color="#F8F5F8" />
+      <SolidColorBrush x:Key="SurfaceSubtleBrush" Color="#F7F4F6" />
+      <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#EEFFFFFF" />
+      <SolidColorBrush x:Key="SurfaceStrokeBrush" Color="#D9D2E1" />
+      <SolidColorBrush x:Key="DividerBrush" Color="#E9E2EC" />
+      <SolidColorBrush x:Key="RowHoverBrush" Color="#F7F4F6" />
       <SolidColorBrush x:Key="WebViewSurfaceBrush" Color="#FFFFFF" />
 
-      <SolidColorBrush x:Key="TextPrimaryBrush" Color="#1F1E1B" />
-      <SolidColorBrush x:Key="TextSecondaryBrush" Color="#5F5D57" />
-      <SolidColorBrush x:Key="TextTertiaryBrush" Color="#8C8A83" />
-      <SolidColorBrush x:Key="TextAccentBrush" Color="#2F5BD8" />
+      <SolidColorBrush x:Key="TextPrimaryBrush" Color="#292638" />
+      <SolidColorBrush x:Key="TextSecondaryBrush" Color="#504C61" />
+      <SolidColorBrush x:Key="TextTertiaryBrush" Color="#625B70" />
+      <SolidColorBrush x:Key="TextAccentBrush" Color="#62518B" />
 
       <SolidColorBrush x:Key="ControlFillBrush" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="ControlStrokeBrush" Color="#DEDBD3" />
+      <SolidColorBrush x:Key="ControlStrokeBrush" Color="#C9C0D2" />
       <SolidColorBrush x:Key="ControlHoverOverlayBrush" Color="#0A1F1E1B" />
       <SolidColorBrush x:Key="ControlPressedOverlayBrush" Color="#141F1E1B" />
       <SolidColorBrush x:Key="ControlSubtleHoverBrush" Color="#0D1F1E1B" />
       <SolidColorBrush x:Key="ControlSubtlePressedBrush" Color="#161F1E1B" />
-      <SolidColorBrush x:Key="SegmentTrackBrush" Color="#EFEDE8" />
+      <SolidColorBrush x:Key="SegmentTrackBrush" Color="#E9E2EC" />
       <SolidColorBrush x:Key="SegmentThumbBrush" Color="#FFFFFF" />
-      <SolidColorBrush x:Key="SegmentThumbStrokeBrush" Color="#DEDBD3" />
+      <SolidColorBrush x:Key="SegmentThumbStrokeBrush" Color="#C9C0D2" />
 
-      <SolidColorBrush x:Key="AccentFillBrush" Color="#2F5BD8" />
+      <SolidColorBrush x:Key="AccentFillBrush" Color="#62518B" />
       <SolidColorBrush x:Key="AccentRimBrush" Color="Transparent" />
-      <SolidColorBrush x:Key="AccentSoftBrush" Color="#ECF0FB" />
+      <SolidColorBrush x:Key="AccentSoftBrush" Color="#ECE5F6" />
 
       <SolidColorBrush x:Key="SuccessSoftBrush" Color="#E8F3EC" />
       <SolidColorBrush x:Key="WarningSoftBrush" Color="#FAF1DE" />
@@ -91,53 +94,63 @@
       <SolidColorBrush x:Key="DangerTextBrush" Color="#A93A31" />
     </ResourceDictionary>
 
-    <!-- ==================== 深色：暖炭纸面 ==================== -->
+    <!-- ==================== 深色：墨紫纸面 ==================== -->
     <ResourceDictionary x:Key="Dark">
-      <SolidColorBrush x:Key="FrameGradientBrush" Color="#191918" />
+      <SolidColorBrush x:Key="AddressInsetBrush" Color="#78353148" />
+      <SolidColorBrush x:Key="PaperBandBrush" Color="#2A2639" />
+      <SolidColorBrush x:Key="PaperWarmBrush" Color="#372E40" />
+      <SolidColorBrush x:Key="PaperLineBrush" Color="#57485F" />
+      <SolidColorBrush x:Key="PaperSunBrush" Color="#4B394D" />
+      <SolidColorBrush x:Key="RailBaseBrush" Color="#292940" />
+      <SolidColorBrush x:Key="BrandMarkBrush" Color="#F4EAF8" />
+      <SolidColorBrush x:Key="BrandInkBrush" Color="#4B3C66" />
+      <SolidColorBrush x:Key="OnAccentBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="NavSelectedTextBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="FrameGradientBrush" Color="#1E1C2A" />
       <SolidColorBrush x:Key="FrameGlowPrimaryBrush" Color="Transparent" />
       <SolidColorBrush x:Key="FrameGlowSecondaryBrush" Color="Transparent" />
 
-      <SolidColorBrush x:Key="SidebarTextBrush" Color="#ECEAE6" />
-      <SolidColorBrush x:Key="SidebarTextSecondaryBrush" Color="#A8A59F" />
-      <SolidColorBrush x:Key="SidebarTextTertiaryBrush" Color="#7E7B75" />
-      <SolidColorBrush x:Key="SidebarItemHoverBrush" Color="#242422" />
-      <SolidColorBrush x:Key="SidebarItemPressedBrush" Color="#2A2A28" />
-      <SolidColorBrush x:Key="SidebarItemSelectedBrush" Color="#2A2A28" />
-      <SolidColorBrush x:Key="SidebarDividerBrush" Color="#2E2D2B" />
+      <SolidColorBrush x:Key="SidebarTextBrush" Color="#FFFFFF" />
+      <SolidColorBrush x:Key="SidebarTextSecondaryBrush" Color="#F5F0FB" />
+      <SolidColorBrush x:Key="SidebarTextTertiaryBrush" Color="#DFD9EB" />
+      <SolidColorBrush x:Key="SidebarItemHoverBrush" Color="#1CFFFFFF" />
+      <SolidColorBrush x:Key="SidebarItemPressedBrush" Color="#30FFFFFF" />
+      <SolidColorBrush x:Key="SidebarItemSelectedBrush" Color="#505E567C" />
+      <SolidColorBrush x:Key="SidebarDividerBrush" Color="#303C4E" />
 
-      <SolidColorBrush x:Key="GlassTintBrush" Color="#212120" />
-      <SolidColorBrush x:Key="GlassSolidBrush" Color="#212120" />
-      <SolidColorBrush x:Key="GlassRimBrush" Color="#31302E" />
-      <SolidColorBrush x:Key="GlassSheenBrush" Color="Transparent" />
-      <SolidColorBrush x:Key="GlassInsetBrush" Color="#2A2A28" />
-      <SolidColorBrush x:Key="GlassInsetStrokeBrush" Color="#383734" />
+      <SolidColorBrush x:Key="GlassTintBrush" Color="#2A273D" />
+      <SolidColorBrush x:Key="GlassSolidBrush" Color="#363248" />
+      <SolidColorBrush x:Key="GlassRimBrush" Color="#749F96B7" />
+      <SolidColorBrush x:Key="GlassSheenBrush" Color="#0AFFFFFF" />
+      <SolidColorBrush x:Key="GlassInsetBrush" Color="#344B455D" />
+      <SolidColorBrush x:Key="GlassInsetStrokeBrush" Color="#507F7693" />
 
-      <SolidColorBrush x:Key="SurfaceBrush" Color="#202020" />
-      <SolidColorBrush x:Key="SurfaceSubtleBrush" Color="#262625" />
-      <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#232322" />
-      <SolidColorBrush x:Key="SurfaceStrokeBrush" Color="#31302E" />
-      <SolidColorBrush x:Key="DividerBrush" Color="#2B2A28" />
-      <SolidColorBrush x:Key="RowHoverBrush" Color="#282826" />
+      <SolidColorBrush x:Key="SurfaceBrush" Color="#262332" />
+      <SolidColorBrush x:Key="SurfaceSubtleBrush" Color="#33303F" />
+      <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="#F2302D3D" />
+      <SolidColorBrush x:Key="SurfaceStrokeBrush" Color="#514A60" />
+      <SolidColorBrush x:Key="DividerBrush" Color="#403B4E" />
+      <SolidColorBrush x:Key="RowHoverBrush" Color="#413B50" />
       <SolidColorBrush x:Key="WebViewSurfaceBrush" Color="#FFFFFF" />
 
-      <SolidColorBrush x:Key="TextPrimaryBrush" Color="#ECEAE6" />
-      <SolidColorBrush x:Key="TextSecondaryBrush" Color="#A8A59F" />
-      <SolidColorBrush x:Key="TextTertiaryBrush" Color="#7E7B75" />
-      <SolidColorBrush x:Key="TextAccentBrush" Color="#8EAAF5" />
+      <SolidColorBrush x:Key="TextPrimaryBrush" Color="#F6F0FB" />
+      <SolidColorBrush x:Key="TextSecondaryBrush" Color="#DDD4E5" />
+      <SolidColorBrush x:Key="TextTertiaryBrush" Color="#C3B9CF" />
+      <SolidColorBrush x:Key="TextAccentBrush" Color="#D7C6F4" />
 
-      <SolidColorBrush x:Key="ControlFillBrush" Color="#2A2A28" />
-      <SolidColorBrush x:Key="ControlStrokeBrush" Color="#3A3936" />
+      <SolidColorBrush x:Key="ControlFillBrush" Color="#393447" />
+      <SolidColorBrush x:Key="ControlStrokeBrush" Color="#594F68" />
       <SolidColorBrush x:Key="ControlHoverOverlayBrush" Color="#0DFFFFFF" />
       <SolidColorBrush x:Key="ControlPressedOverlayBrush" Color="#1F000000" />
       <SolidColorBrush x:Key="ControlSubtleHoverBrush" Color="#0FFFFFFF" />
       <SolidColorBrush x:Key="ControlSubtlePressedBrush" Color="#08FFFFFF" />
-      <SolidColorBrush x:Key="SegmentTrackBrush" Color="#2A2A28" />
-      <SolidColorBrush x:Key="SegmentThumbBrush" Color="#3A3936" />
+      <SolidColorBrush x:Key="SegmentTrackBrush" Color="#393447" />
+      <SolidColorBrush x:Key="SegmentThumbBrush" Color="#594F68" />
       <SolidColorBrush x:Key="SegmentThumbStrokeBrush" Color="#45443F" />
 
-      <SolidColorBrush x:Key="AccentFillBrush" Color="#3D69DE" />
+      <SolidColorBrush x:Key="AccentFillBrush" Color="#6A558F" />
       <SolidColorBrush x:Key="AccentRimBrush" Color="Transparent" />
-      <SolidColorBrush x:Key="AccentSoftBrush" Color="#25304A" />
+      <SolidColorBrush x:Key="AccentSoftBrush" Color="#3C344F" />
 
       <SolidColorBrush x:Key="SuccessSoftBrush" Color="#1F3328" />
       <SolidColorBrush x:Key="WarningSoftBrush" Color="#3A2F1A" />
@@ -149,6 +162,16 @@
 
     <!-- ==================== 高对比度 ==================== -->
     <ResourceDictionary x:Key="HighContrast">
+      <SolidColorBrush x:Key="AddressInsetBrush" Color="{ThemeResource SystemColorWindowColor}" />
+      <SolidColorBrush x:Key="PaperBandBrush" Color="Transparent" />
+      <SolidColorBrush x:Key="PaperWarmBrush" Color="Transparent" />
+      <SolidColorBrush x:Key="PaperLineBrush" Color="Transparent" />
+      <SolidColorBrush x:Key="PaperSunBrush" Color="Transparent" />
+      <SolidColorBrush x:Key="RailBaseBrush" Color="{ThemeResource SystemColorWindowColor}" />
+      <SolidColorBrush x:Key="BrandMarkBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+      <SolidColorBrush x:Key="BrandInkBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
+      <SolidColorBrush x:Key="OnAccentBrush" Color="{ThemeResource SystemColorHighlightTextColor}" />
+      <SolidColorBrush x:Key="NavSelectedTextBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
       <SolidColorBrush x:Key="FrameGradientBrush" Color="{ThemeResource SystemColorWindowColor}" />
       <SolidColorBrush x:Key="FrameGlowPrimaryBrush" Color="Transparent" />
       <SolidColorBrush x:Key="FrameGlowSecondaryBrush" Color="Transparent" />
@@ -157,7 +180,7 @@
       <SolidColorBrush x:Key="SidebarTextTertiaryBrush" Color="{ThemeResource SystemColorGrayTextColor}" />
       <SolidColorBrush x:Key="SidebarItemHoverBrush" Color="{ThemeResource SystemColorHighlightColor}" />
       <SolidColorBrush x:Key="SidebarItemPressedBrush" Color="{ThemeResource SystemColorHighlightColor}" />
-      <SolidColorBrush x:Key="SidebarItemSelectedBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+      <SolidColorBrush x:Key="SidebarItemSelectedBrush" Color="{ThemeResource SystemColorWindowColor}" />
       <SolidColorBrush x:Key="SidebarDividerBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
       <SolidColorBrush x:Key="GlassTintBrush" Color="{ThemeResource SystemColorWindowColor}" />
       <SolidColorBrush x:Key="GlassSolidBrush" Color="{ThemeResource SystemColorWindowColor}" />

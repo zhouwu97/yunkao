@@ -1,0 +1,15 @@
+YunKao desktop liquid glass
+Native Win2D adaptation of the circle-profile refraction and directional rim lighting studied in
+zhouwu97/FlutterLiquidglass, revision 2c281279bdde506d65a035442638a90c031bd593:
+https://github.com/zhouwu97/FlutterLiquidglass/blob/2c281279bdde506d65a035442638a90c031bd593/shaders/liquid_glass.frag
+
+The upstream shader credits Kyant0/AndroidLiquidGlass (Copyright 2025 Kyant, Apache-2.0)
+and DayDreamInAReverie/design-systems (MIT). The upstream project also credits SYLUlive (MIT).
+The desktop adaptation also uses the pressure, stretch, bend and damped spring equations from
+lib/widgets/liquid_glass/liquid_glass_dynamics.dart and the bounded release projection in
+lib/widgets/liquid_glass/bottom_nav_controller.dart at the revision above.
+The native renderer ports the deformed SDF, circle-profile refraction, seven-channel spectral
+reconstruction and directional surface lighting into a ComputeSharp Direct2D pixel shader.
+It samples separate artwork and tab-label textures and preserves continuous spring state.
+ComputeSharp 3.2.0 is Copyright (c) Sergio Pedri and contributors, MIT licensed.
+Applicable notices are included alongside this file.

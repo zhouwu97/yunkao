@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Windows.ApplicationModel.DataTransfer;
 using YunKao.Core.Models;
 using YunKao.Core.Services;
@@ -22,7 +23,26 @@ public sealed partial class ExportPage : Page
 
     private async void OnRefreshClick(object sender, RoutedEventArgs args) => await ViewModel.LoadAsync(reset: true);
     private async void OnMoreClick(object sender, RoutedEventArgs args) => await ViewModel.LoadAsync(reset: false);
-    private void OnGoToWorkspaceClick(object sender, RoutedEventArgs args) => App.MainWindow?.ShowPage(YunKao.Controls.NavigationTarget.Workspace);
+    private async void OnSearchChanged(object sender, TextChangedEventArgs args)
+        => await ViewModel.SearchAsync(((TextBox)sender).Text);
+
+    private void OnFindInvoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        SearchBox.Focus(FocusState.Keyboard);
+        SearchBox.SelectAll();
+        args.Handled = true;
+    }
+
+    private async void OnEmptyActionClick(object sender, RoutedEventArgs args)
+    {
+        if (ViewModel.ReadFailed) await ViewModel.LoadAsync(reset: true);
+        else if (!string.IsNullOrWhiteSpace(SearchBox.Text))
+        {
+            SearchBox.Text = "";
+            SearchBox.Focus(FocusState.Keyboard);
+        }
+        else App.MainWindow?.ShowPage(YunKao.Controls.NavigationTarget.Workspace);
+    }
     private Task LoadAsync(bool reset) => ViewModel.LoadAsync(reset);
 
     private void OnOpenClick(object sender, RoutedEventArgs args)

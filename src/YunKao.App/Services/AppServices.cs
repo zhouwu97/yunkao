@@ -52,7 +52,7 @@ public sealed class AppServices : IAsyncDisposable
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         AppSettings settings = Settings.Load();
-        MotionService.SetReduceMotion(settings.ReduceMotion || MotionService.ReduceMotion);
+        MotionService.SetReduceMotion(settings.ReduceMotion);
         await History.InitializeAsync(cancellationToken).ConfigureAwait(false);
         InterruptedSessions = await History.GetInterruptedSessionsAsync(cancellationToken).ConfigureAwait(false);
         Diagnostics.Info("应用服务已初始化");

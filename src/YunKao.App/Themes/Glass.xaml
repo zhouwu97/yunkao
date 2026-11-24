@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  外框上的卡片（任务卡、地址栏、折叠任务按钮）。纸感方向下为实体白卡 + 细线：
-  关闭模糊，着色层完全不透明，高光画刷为透明。控件仍保留材质能力，换回玻璃风格时只需改这里与令牌。
--->
+<!-- 共享液态玻璃：采样、磨砂、边缘折射、方向性高光与实体降级。 -->
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -15,31 +12,31 @@
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="CornerRadius" Value="{StaticResource GlassCornerRadius}" />
     <Setter Property="Padding" Value="14" />
-    <Setter Property="Blur" Value="False" />
-    <Setter Property="ShowSheen" Value="False" />
-    <Setter Property="TintScale" Value="10" />
+    <Setter Property="Blur" Value="True" />
+    <Setter Property="ShowSheen" Value="True" />
+    <Setter Property="BlurAmount" Value="1.5" />
+    <Setter Property="TintScale" Value="1.1" />
     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
     <Setter Property="VerticalContentAlignment" Value="Stretch" />
     <Setter Property="IsTabStop" Value="False" />
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="controls:GlassPanel">
-          <Grid>
-            <Border x:Name="PART_Backdrop" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
-            <Border x:Name="PART_Solid"
-                    Background="{TemplateBinding SolidBackground}"
-                    CornerRadius="{TemplateBinding CornerRadius}"
-                    Visibility="Collapsed"
-                    IsHitTestVisible="False" />
-            <Border x:Name="PART_Tint"
-                    Background="{TemplateBinding Background}"
-                    CornerRadius="{TemplateBinding CornerRadius}"
-                    IsHitTestVisible="False" />
-            <Border x:Name="PART_Sheen"
-                    Background="{ThemeResource GlassSheenBrush}"
-                    CornerRadius="{TemplateBinding CornerRadius}"
-                    IsHitTestVisible="False" />
+          <Grid Background="Transparent">
+            <controls:LiquidGlassSurface x:Name="PART_Surface"
+                    Tint="{TemplateBinding Background}"
+                    SolidBackground="{TemplateBinding SolidBackground}"
+                    BackdropSource="{TemplateBinding BackdropSource}"
+                    SurfaceCorners="{TemplateBinding CornerRadius}"
+                    Blur="{TemplateBinding Blur}"
+                    BlurAmount="{TemplateBinding BlurAmount}"
+                    RefractionAmount="{TemplateBinding RefractionAmount}"
+                    Saturation="{TemplateBinding Saturation}"
+                    Dispersion="{TemplateBinding Dispersion}"
+                    TintScale="{TemplateBinding TintScale}"
+                    ShowSheen="{TemplateBinding ShowSheen}" />
             <Border BorderBrush="{TemplateBinding BorderBrush}"
+                    Opacity="{Binding FallbackOpacity, ElementName=PART_Surface}"
                     BorderThickness="{TemplateBinding BorderThickness}"
                     CornerRadius="{TemplateBinding CornerRadius}"
                     IsHitTestVisible="False" />
@@ -55,4 +52,11 @@
   </Style>
 
   <Style TargetType="controls:GlassPanel" BasedOn="{StaticResource GlassPanelBaseStyle}" />
+
+  <Style x:Key="GlassGroupStyle" TargetType="controls:GlassPanel" BasedOn="{StaticResource GlassPanelBaseStyle}">
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="CornerRadius" Value="12" />
+    <Setter Property="TintScale" Value="1.25" />
+    <Setter Property="RefractionAmount" Value="18" />
+  </Style>
 </ResourceDictionary>

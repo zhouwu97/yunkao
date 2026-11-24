@@ -7,36 +7,53 @@
     xmlns:helpers="using:YunKao.Helpers"
     xmlns:vm="using:YunKao.ViewModels"
     Background="Transparent">
+  <Page.KeyboardAccelerators>
+    <KeyboardAccelerator Key="F" Modifiers="Control" Invoked="OnFindInvoked" />
+  </Page.KeyboardAccelerators>
   <Grid>
     <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
 
     <controls:PageHeader Title="历史记录"
-                         Description="已保存的题库任务。恢复后可以继续提取或直接导出。"
+                         Description="恢复已保存的题库，继续提取或导出。"
                          Status="{x:Bind ViewModel.StatusText, Mode=OneWay}">
       <controls:PageHeader.Actions>
-        <StackPanel Orientation="Horizontal" Spacing="8">
-          <Button Content="加载更多" Click="OnMoreClick" Visibility="{x:Bind ViewModel.CanLoadMore, Mode=OneWay}" Style="{StaticResource SubtleButtonStyle}" />
-          <Button Click="OnRefreshClick" IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}" Style="{StaticResource SecondaryButtonStyle}">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <FontIcon Glyph="&#xE72C;" FontSize="12" />
-              <TextBlock Text="刷新" />
-            </StackPanel>
-          </Button>
-        </StackPanel>
+        <Button AutomationProperties.Name="刷新记录" Click="OnRefreshClick" IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}" Style="{StaticResource SecondaryButtonStyle}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <FontIcon Glyph="&#xE72C;" FontSize="12" />
+            <TextBlock Text="刷新" />
+          </StackPanel>
+        </Button>
       </controls:PageHeader.Actions>
     </controls:PageHeader>
 
-    <Grid Grid.Row="1" Margin="32,0,32,28">
-      <Border Style="{StaticResource GroupStyle}"
-              VerticalAlignment="Top"
-              Visibility="{x:Bind helpers:Ui.Collapsed(ViewModel.IsEmpty), Mode=OneWay}">
+    <Grid Grid.Row="1" Margin="32,0,32,14" ColumnSpacing="12">
+      <Grid.ColumnDefinitions><ColumnDefinition Width="*" MaxWidth="480" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+      <Grid>
+        <TextBox x:Name="SearchBox" TextChanged="OnSearchChanged" Padding="36,7,10,7" CornerRadius="8"
+                 PlaceholderText="搜索课程名称或题库链接" AutomationProperties.Name="搜索课程名称或题库链接"
+                 ToolTipService.ToolTip="搜索课程名称或题库链接 (Ctrl+F)" />
+        <FontIcon Glyph="&#xE721;" FontSize="14" IsHitTestVisible="False" HorizontalAlignment="Left"
+                  Margin="12,0,0,0" Foreground="{ThemeResource TextSecondaryBrush}" />
+      </Grid>
+      <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.ResultLabel, Mode=OneWay}"
+                 VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite" Style="{StaticResource CaptionTextStyle}" />
+    </Grid>
+
+    <Grid Grid.Row="2" Margin="32,0,32,28">
+      <controls:GlassPanel Style="{StaticResource GlassGroupStyle}" VerticalAlignment="Top" Visibility="{x:Bind helpers:Ui.Collapsed(ViewModel.IsEmpty), Mode=OneWay}">
         <ListView ItemsSource="{x:Bind ViewModel.Items}"
                   SelectionMode="None"
                   Padding="0,4"
                   ItemContainerStyle="{StaticResource RowItemStyle}">
+          <ListView.Footer>
+            <Button Content="加载更多记录" Click="OnMoreClick" HorizontalAlignment="Center" Margin="0,8"
+                    Visibility="{x:Bind ViewModel.CanLoadMore, Mode=OneWay}" IsEnabled="{x:Bind ViewModel.IsIdle, Mode=OneWay}"
+                    Style="{StaticResource SecondaryButtonStyle}" />
+          </ListView.Footer>
           <ListView.ItemTemplate>
             <DataTemplate x:DataType="vm:SessionRow">
               <Grid ColumnSpacing="14">
@@ -45,11 +62,11 @@
                   <ColumnDefinition Width="*" />
                   <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <Border Width="38" Height="38" CornerRadius="11" Background="{ThemeResource SurfaceSubtleBrush}" BorderBrush="{ThemeResource SurfaceStrokeBrush}" BorderThickness="1" VerticalAlignment="Center">
-                  <FontIcon Glyph="&#xE81C;" FontSize="15" Foreground="{ThemeResource TextSecondaryBrush}" />
+                <Border Width="38" Height="38" CornerRadius="11" Background="{ThemeResource AccentSoftBrush}" VerticalAlignment="Center">
+                  <FontIcon Glyph="&#xE81C;" FontSize="15" Foreground="{ThemeResource TextAccentBrush}" />
                 </Border>
                 <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                  <TextBlock Text="{x:Bind Title}" TextTrimming="CharacterEllipsis" Style="{StaticResource CardTitleStyle}" />
+                  <TextBlock Text="{x:Bind Title}" ToolTipService.ToolTip="{x:Bind Title}" TextTrimming="CharacterEllipsis" Style="{StaticResource CardTitleStyle}" />
                   <TextBlock Style="{StaticResource CaptionTextStyle}" TextTrimming="CharacterEllipsis">
                     <Run Text="{x:Bind Meta}" /><Run Text="  ·  " /><Run Text="{x:Bind Counts}" />
                   </TextBlock>
@@ -80,15 +97,17 @@
             </DataTemplate>
           </ListView.ItemTemplate>
         </ListView>
-      </Border>
+      </controls:GlassPanel>
 
       <controls:EmptyState Glyph="&#xE81C;"
                            Title="{x:Bind ViewModel.EmptyTitle, Mode=OneWay}"
                            Text="{x:Bind ViewModel.EmptyText, Mode=OneWay}"
-                           ActionLabel="前往工作台"
-                           ActionClick="OnGoToWorkspaceClick"
-                           Margin="0,0,0,60"
+                           ActionLabel="{x:Bind ViewModel.EmptyAction, Mode=OneWay}"
+                           ActionClick="OnEmptyActionClick"
                            Visibility="{x:Bind ViewModel.IsEmpty, Mode=OneWay}" />
+      <ProgressBar IsIndeterminate="{x:Bind ViewModel.IsLoading, Mode=OneWay}"
+                   Visibility="{x:Bind ViewModel.IsLoading, Mode=OneWay}" VerticalAlignment="Top" Margin="8,1"
+                   AutomationProperties.Name="正在读取记录" />
     </Grid>
   </Grid>
 </Page>

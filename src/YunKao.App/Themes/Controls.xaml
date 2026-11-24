@@ -2,7 +2,7 @@
 <!--
   控件样式（全部基于原生控件，保留键盘焦点、Command 和禁用态）：
     PrimaryButtonStyle         墨蓝实色主按钮
-    SecondaryButtonStyle       内容区次按钮：实体填充 + 细描边
+    SecondaryButtonStyle       内容区次按钮：可形变液态玻璃
     DangerButtonStyle          警示操作
     SubtleButtonStyle          文字按钮
     IconButtonStyle            图标按钮
@@ -13,14 +13,12 @@
 -->
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:YunKao.Controls">
 
   <!-- 品牌按钮：实色填充 → 状态层 -->
   <ControlTemplate x:Key="AccentButtonTemplate" TargetType="Button">
     <Grid x:Name="RootGrid" CornerRadius="{TemplateBinding CornerRadius}" RenderTransformOrigin="0.5,0.5">
-      <Grid.RenderTransform>
-        <ScaleTransform x:Name="PressScale" />
-      </Grid.RenderTransform>
       <VisualStateManager.VisualStateGroups>
         <VisualStateGroup x:Name="CommonStates">
           <VisualState x:Name="Normal" />
@@ -34,10 +32,6 @@
               <Setter Target="StateOverlay.Background" Value="#26000000" />
               <Setter Target="StateOverlay.Opacity" Value="1" />
             </VisualState.Setters>
-            <Storyboard>
-              <DoubleAnimation Storyboard.TargetName="PressScale" Storyboard.TargetProperty="ScaleX" To="0.99" Duration="0:0:0.08" />
-              <DoubleAnimation Storyboard.TargetName="PressScale" Storyboard.TargetProperty="ScaleY" To="0.98" Duration="0:0:0.08" />
-            </Storyboard>
           </VisualState>
           <VisualState x:Name="Disabled">
             <VisualState.Setters>
@@ -67,9 +61,6 @@
           Background="{TemplateBinding Background}"
           CornerRadius="{TemplateBinding CornerRadius}"
           RenderTransformOrigin="0.5,0.5">
-      <Grid.RenderTransform>
-        <ScaleTransform x:Name="PressScale" />
-      </Grid.RenderTransform>
       <VisualStateManager.VisualStateGroups>
         <VisualStateGroup x:Name="CommonStates">
           <VisualState x:Name="Normal" />
@@ -83,10 +74,6 @@
               <Setter Target="StateOverlay.Background" Value="{ThemeResource ControlPressedOverlayBrush}" />
               <Setter Target="StateOverlay.Opacity" Value="1" />
             </VisualState.Setters>
-            <Storyboard>
-              <DoubleAnimation Storyboard.TargetName="PressScale" Storyboard.TargetProperty="ScaleX" To="0.99" Duration="0:0:0.08" />
-              <DoubleAnimation Storyboard.TargetName="PressScale" Storyboard.TargetProperty="ScaleY" To="0.98" Duration="0:0:0.08" />
-            </Storyboard>
           </VisualState>
           <VisualState x:Name="Disabled">
             <VisualState.Setters>
@@ -97,6 +84,45 @@
       </VisualStateManager.VisualStateGroups>
       <Border x:Name="StateOverlay" Background="{ThemeResource ControlHoverOverlayBrush}" CornerRadius="{TemplateBinding CornerRadius}" Opacity="0" IsHitTestVisible="False" />
       <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}" IsHitTestVisible="False" />
+      <ContentPresenter x:Name="ContentPresenter"
+                        Content="{TemplateBinding Content}"
+                        ContentTemplate="{TemplateBinding ContentTemplate}"
+                        Padding="{TemplateBinding Padding}"
+                        HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                        VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                        Foreground="{TemplateBinding Foreground}"
+                        FontWeight="{TemplateBinding FontWeight}"
+                        AutomationProperties.AccessibilityView="Raw" />
+    </Grid>
+  </ControlTemplate>
+
+  <!-- 原生按钮语义上的液态玻璃次操作。 -->
+  <ControlTemplate x:Key="GlassButtonTemplate" TargetType="Button">
+    <Grid x:Name="RootGrid"
+          Background="Transparent"
+          RenderTransformOrigin="0.5,0.5">
+      <VisualStateManager.VisualStateGroups>
+        <VisualStateGroup x:Name="CommonStates">
+          <VisualState x:Name="Normal" />
+          <VisualState x:Name="PointerOver">
+            <VisualState.Setters><Setter Target="ContentPresenter.Opacity" Value="0.9" /></VisualState.Setters>
+          </VisualState>
+          <VisualState x:Name="Pressed">
+            <VisualState.Setters><Setter Target="ContentPresenter.Opacity" Value="0.78" /></VisualState.Setters>
+          </VisualState>
+          <VisualState x:Name="Disabled">
+            <VisualState.Setters>
+              <Setter Target="RootGrid.Opacity" Value="0.42" />
+            </VisualState.Setters>
+          </VisualState>
+        </VisualStateGroup>
+      </VisualStateManager.VisualStateGroups>
+      <controls:LiquidGlassSurface x:Name="GlassSurface" Tint="{TemplateBinding Background}"
+                    SolidBackground="{ThemeResource ControlFillBrush}"
+                    SurfaceCorners="{TemplateBinding CornerRadius}"
+                    BlurAmount="2" RefractionAmount="12" TintScale="1.2" />
+      <Border BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="{TemplateBinding CornerRadius}"
+              Opacity="{Binding FallbackOpacity, ElementName=GlassSurface}" IsHitTestVisible="False" />
       <ContentPresenter x:Name="ContentPresenter"
                         Content="{TemplateBinding Content}"
                         ContentTemplate="{TemplateBinding ContentTemplate}"
@@ -161,12 +187,12 @@
     <Setter Property="Template" Value="{StaticResource AccentButtonTemplate}" />
     <Setter Property="Background" Value="{ThemeResource AccentFillBrush}" />
     <Setter Property="BorderBrush" Value="{ThemeResource AccentRimBrush}" />
-    <Setter Property="Foreground" Value="{StaticResource OnAccentBrush}" />
+    <Setter Property="Foreground" Value="{ThemeResource OnAccentBrush}" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
 
   <Style x:Key="SecondaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonBaseStyle}">
-    <Setter Property="Template" Value="{StaticResource StandardButtonTemplate}" />
+    <Setter Property="Template" Value="{StaticResource GlassButtonTemplate}" />
     <Setter Property="Background" Value="{ThemeResource ControlFillBrush}" />
     <Setter Property="BorderBrush" Value="{ThemeResource ControlStrokeBrush}" />
     <Setter Property="Foreground" Value="{ThemeResource TextPrimaryBrush}" />
@@ -190,6 +216,7 @@
   </Style>
 
   <Style x:Key="IconButtonStyle" TargetType="Button" BasedOn="{StaticResource SubtleButtonStyle}">
+    <Setter Property="Template" Value="{StaticResource GlassButtonTemplate}" />
     <Setter Property="Width" Value="34" />
     <Setter Property="Height" Value="34" />
     <Setter Property="MinHeight" Value="0" />
@@ -198,7 +225,7 @@
   </Style>
 
   <Style x:Key="SidebarButtonStyle" TargetType="Button" BasedOn="{StaticResource ButtonBaseStyle}">
-    <Setter Property="Template" Value="{StaticResource StandardButtonTemplate}" />
+    <Setter Property="Template" Value="{StaticResource GlassButtonTemplate}" />
     <Setter Property="Background" Value="{ThemeResource GlassInsetBrush}" />
     <Setter Property="BorderBrush" Value="{ThemeResource GlassInsetStrokeBrush}" />
     <Setter Property="Foreground" Value="{ThemeResource SidebarTextBrush}" />
@@ -221,22 +248,50 @@
     <Setter Property="FontSize" Value="13" />
   </Style>
 
+  <Style x:Key="SidebarGlassIconButtonStyle" TargetType="Button" BasedOn="{StaticResource SidebarIconButtonStyle}">
+    <Setter Property="Template" Value="{StaticResource GlassButtonTemplate}" />
+  </Style>
+
+  <!-- 导航只有移动玻璃透镜作为背景；原生按钮仍提供焦点、键盘与自动化。 -->
+  <ControlTemplate x:Key="SidebarNavItemTemplate" TargetType="Button">
+    <Grid x:Name="RootGrid" Background="Transparent">
+      <VisualStateManager.VisualStateGroups>
+        <VisualStateGroup x:Name="CommonStates">
+          <VisualState x:Name="Normal" />
+          <VisualState x:Name="PointerOver" />
+          <VisualState x:Name="Pressed" />
+          <VisualState x:Name="Disabled">
+            <VisualState.Setters>
+              <Setter Target="RootGrid.Opacity" Value="0.38" />
+            </VisualState.Setters>
+          </VisualState>
+        </VisualStateGroup>
+      </VisualStateManager.VisualStateGroups>
+      <ContentPresenter Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                        Padding="{TemplateBinding Padding}"
+                        HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                        VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+                        Foreground="{TemplateBinding Foreground}" FontWeight="{TemplateBinding FontWeight}"
+                        AutomationProperties.AccessibilityView="Raw" />
+    </Grid>
+  </ControlTemplate>
+
   <!-- 侧边导航项（展开：图标 + 名称；紧凑：仅图标） -->
   <Style x:Key="SidebarNavItemStyle" TargetType="Button" BasedOn="{StaticResource ButtonBaseStyle}">
-    <Setter Property="Template" Value="{StaticResource SidebarSubtleButtonTemplate}" />
+    <Setter Property="Template" Value="{StaticResource SidebarNavItemTemplate}" />
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="Foreground" Value="{ThemeResource SidebarTextSecondaryBrush}" />
     <Setter Property="HorizontalAlignment" Value="Stretch" />
     <Setter Property="HorizontalContentAlignment" Value="Left" />
-    <Setter Property="Height" Value="36" />
+    <Setter Property="Height" Value="40" />
     <Setter Property="MinHeight" Value="0" />
     <Setter Property="Padding" Value="10,0" />
     <Setter Property="CornerRadius" Value="8" />
     <Setter Property="FontSize" Value="14" />
   </Style>
   <Style x:Key="SidebarNavItemSelectedStyle" TargetType="Button" BasedOn="{StaticResource SidebarNavItemStyle}">
-    <Setter Property="Foreground" Value="{ThemeResource SidebarTextBrush}" />
+    <Setter Property="Foreground" Value="{ThemeResource NavSelectedTextBrush}" />
     <Setter Property="FontWeight" Value="SemiBold" />
   </Style>
 
@@ -284,12 +339,13 @@
                 <VisualState x:Name="Indeterminate" />
               </VisualStateGroup>
             </VisualStateManager.VisualStateGroups>
-            <Border x:Name="Thumb"
-                    Background="{ThemeResource SegmentThumbBrush}"
-                    BorderBrush="{ThemeResource SegmentThumbStrokeBrush}"
-                    BorderThickness="1"
-                    CornerRadius="{TemplateBinding CornerRadius}"
-                    Opacity="0" />
+            <Grid x:Name="Thumb" Opacity="0" IsHitTestVisible="False">
+              <controls:LiquidGlassSurface Tint="{ThemeResource SegmentThumbBrush}"
+                    SolidBackground="{ThemeResource SegmentThumbBrush}"
+                    SurfaceCorners="{TemplateBinding CornerRadius}" BlurAmount="2" RefractionAmount="12" TintScale="1.2" />
+              <Border BorderBrush="{ThemeResource SegmentThumbStrokeBrush}" BorderThickness="1"
+                      CornerRadius="{TemplateBinding CornerRadius}" />
+            </Grid>
             <ContentPresenter x:Name="ContentPresenter"
                               Content="{TemplateBinding Content}"
                               ContentTemplate="{TemplateBinding ContentTemplate}"

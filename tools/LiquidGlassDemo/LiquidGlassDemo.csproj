@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <UseWinUI>true</UseWinUI>
+    <WinUISDKReferences>false</WinUISDKReferences>
+    <EnableMsixTooling>true</EnableMsixTooling>
+    <EnableWinAppRunSupport>true</EnableWinAppRunSupport>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.7705" />
+    <PackageReference Include="Microsoft.Windows.SDK.BuildTools.WinApp" Version="0.6.1" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.3.1" />
+    <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.4.0" />
+    <PackageReference Include="ComputeSharp.D2D1.WinUI" Version="3.2.0" />
+    <ProjectReference Include="../../src/YunKao.Core/YunKao.Core.csproj" />
+    <Compile Include="../../src/YunKao.App/Controls/LiquidGlassShader.cs" Link="LiquidGlassShader.cs" />
+    <Compile Include="../../src/YunKao.App/Controls/LiquidGlassInteraction.cs" Link="Controls/LiquidGlassInteraction.cs" />
+    <Compile Include="../../src/YunKao.App/Controls/LiquidGlassSurface.cs" Link="Controls/LiquidGlassSurface.cs" />
+    <Compile Include="../../src/YunKao.App/Controls/LiquidGlassRenderer.cs" Link="Controls/LiquidGlassRenderer.cs" />
+    <Compile Include="../../src/YunKao.App/Controls/LiquidGlassScene.cs" Link="Controls/LiquidGlassScene.cs" />
+    <Compile Include="../../src/YunKao.App/Controls/LiquidGlassScope.cs" Link="Controls/LiquidGlassScope.cs" />
+    <Compile Include="../../src/YunKao.App/Controls/GlassPanel.cs" Link="Controls/GlassPanel.cs" />
+    <Compile Include="../../src/YunKao.App/Services/GlassSettings.cs" Link="Services/GlassSettings.cs" />
+    <Compile Include="../../src/YunKao.App/Services/MotionService.cs" Link="Services/MotionService.cs" />
+    <Compile Include="../../src/YunKao.App/Services/CompositionBackdropService.cs" Link="Services/CompositionBackdropService.cs" />
+    <Page Include="../../src/YunKao.App/Themes/Tokens.xaml" Link="Themes/Tokens.xaml" />
+    <Page Include="../../src/YunKao.App/Themes/Typography.xaml" Link="Themes/Typography.xaml" />
+    <Page Include="../../src/YunKao.App/Themes/Controls.xaml" Link="Themes/Controls.xaml" />
+    <Page Include="../../src/YunKao.App/Themes/Glass.xaml" Link="Themes/Glass.xaml" />
+    <Content Include="../../src/YunKao.App/Assets/Luna.png" Link="Assets/Luna.png" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../src/YunKao.App/Assets/GlassNotices/*.txt" Link="Assets/GlassNotices/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" ExcludeFromResourceIndex="true" />
+  </ItemGroup>
+  <ItemGroup><Manifest Include="$(ApplicationManifest)" /></ItemGroup>
+</Project>

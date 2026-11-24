@@ -41,7 +41,7 @@
               </MenuFlyout>
             </Button.Flyout>
           </Button>
-          <Button Click="OnCopyClick" Style="{StaticResource SecondaryButtonStyle}">
+          <Button AutomationProperties.Name="复制诊断" Click="OnCopyClick" Style="{StaticResource SecondaryButtonStyle}">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <FontIcon Glyph="&#xE8C8;" FontSize="12" />
               <TextBlock Text="复制诊断" />
@@ -70,7 +70,7 @@
           <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <TextBlock Text="运行摘要" Style="{StaticResource CardTitleStyle}" />
-        <Border Grid.Row="1" Style="{StaticResource GroupStyle}">
+        <controls:GlassPanel Grid.Row="1" Style="{StaticResource GlassGroupStyle}">
           <ListView ItemsSource="{x:Bind ViewModel.ReportItems}" SelectionMode="None" Padding="0,4" ItemContainerStyle="{StaticResource CompactRowStyle}">
             <ListView.ItemTemplate>
               <DataTemplate x:DataType="vm:ReportItem">
@@ -85,7 +85,7 @@
               </DataTemplate>
             </ListView.ItemTemplate>
           </ListView>
-        </Border>
+        </controls:GlassPanel>
       </Grid>
 
       <!-- 本次任务动态 -->
@@ -96,7 +96,7 @@
           <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <TextBlock Text="本次任务动态" Style="{StaticResource CardTitleStyle}" />
-        <Border Grid.Row="1" Background="{ThemeResource SurfaceSubtleBrush}" CornerRadius="12" Padding="14,12">
+        <controls:GlassPanel Grid.Row="1" CornerRadius="12" Padding="14,12">
           <Grid ColumnSpacing="12">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />
@@ -112,8 +112,8 @@
               <TextBlock Text="{x:Bind ViewModel.TaskState.AiDetail, Mode=OneWay}" TextWrapping="Wrap" Style="{StaticResource CaptionTextStyle}" />
             </StackPanel>
           </Grid>
-        </Border>
-        <Border Grid.Row="2" Style="{StaticResource GroupStyle}">
+        </controls:GlassPanel>
+        <controls:GlassPanel Grid.Row="2" Style="{StaticResource GlassGroupStyle}">
           <Grid>
             <ListView ItemsSource="{x:Bind ViewModel.TaskState.Activity}" SelectionMode="None" Padding="0,4" ItemContainerStyle="{StaticResource CompactRowStyle}">
               <ListView.ItemTemplate>
@@ -140,7 +140,7 @@
                        VerticalAlignment="Center"
                        Style="{StaticResource CaptionTextStyle}" />
           </Grid>
-        </Border>
+        </controls:GlassPanel>
       </Grid>
 
       <!-- 诊断事件 -->
@@ -153,7 +153,7 @@
           <TextBlock Text="诊断事件" Style="{StaticResource CardTitleStyle}" VerticalAlignment="Center" />
           <Button Content="加载更多" HorizontalAlignment="Right" Margin="0,-6" Click="OnMoreClick" Visibility="{x:Bind ViewModel.CanLoadMore, Mode=OneWay}" Style="{StaticResource SubtleButtonStyle}" />
         </Grid>
-        <Border Grid.Row="1" Style="{StaticResource GroupStyle}">
+        <controls:GlassPanel Grid.Row="1" Style="{StaticResource GlassGroupStyle}">
           <Grid>
             <ListView ItemsSource="{x:Bind ViewModel.Items}" SelectionMode="None" Padding="0,4" ItemContainerStyle="{StaticResource CompactRowStyle}">
               <ListView.ItemTemplate>
@@ -182,7 +182,7 @@
                        VerticalAlignment="Center"
                        Style="{StaticResource CaptionTextStyle}" />
           </Grid>
-        </Border>
+        </controls:GlassPanel>
       </Grid>
     </Grid>
     </ScrollViewer>

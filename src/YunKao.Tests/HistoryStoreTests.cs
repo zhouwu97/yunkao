@@ -6,6 +6,41 @@ namespace YunKao.Tests;
 public sealed class HistoryStoreTests
 {
     [Fact]
+    public async Task Search_pages_through_tied_timestamps_and_treats_wildcards_as_text()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"yunkao-search-{Guid.NewGuid():N}.db");
+        try
+        {
+            await using var store = new HistoryStore(path);
+            var time = DateTimeOffset.UtcNow;
+            foreach (string course in new[] { "练习_100%A", "其他", "练习_100%B" })
+            {
+                var session = new ExtractionSession();
+                session.Start(sourceUrl: "https://example.org/" + course);
+                var snapshot = session.Snapshot(course) with { StartedAt = time };
+                await store.SaveSessionSnapshotAsync(snapshot);
+                await store.SaveExportAsync(new ExportRecord(0, "MD", course + ".md", 1, time, "completed"));
+            }
+            var first = Assert.Single(await store.GetSessionsAsync(limit: 1, search: " _100% "));
+            var second = Assert.Single(await store.GetSessionsAsync(first.StartedAt, 1, search: "_100%", beforeId: first.Id));
+            Assert.Equal("练习_100%B", first.Course);
+            Assert.Equal("练习_100%A", second.Course);
+            Assert.Empty(await store.GetSessionsAsync(second.StartedAt, search: "_100%", beforeId: second.Id));
+            Assert.Equal(3, (await store.GetSessionsAsync(search: "EXAMPLE.ORG")).Count);
+
+            var latest = Assert.Single(await store.GetExportsAsync(limit: 1, search: "_100%"));
+            var earlier = Assert.Single(await store.GetExportsAsync(latest.CreatedAt, 1, search: "_100%", beforeId: latest.Id));
+            Assert.NotEqual(latest.FilePath, earlier.FilePath);
+            Assert.Equal(3, (await store.GetExportsAsync(search: "Markdown")).Count);
+            Assert.Empty(await store.GetExportsAsync(search: "找不到的文件"));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public async Task Persists_session_and_export_records_in_sqlite()
     {
         string root = Path.Combine(Path.GetTempPath(), "yunkao-history-" + Guid.NewGuid().ToString("N"));

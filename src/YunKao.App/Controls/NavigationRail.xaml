@@ -1,21 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  侧边导航：展开时为图标 + 名称的行，紧凑时只保留图标。
-  选中项下方是一块纸色底，切换时平滑滑动并轻微拉伸（减少动画时直接跳转）。
+  侧边导航：展开时为图标 + 名称的行，紧凑时显示图标和短名称。
+  选中标记随当前页面移动，并遵循减少动画设置。
 -->
 <UserControl
     x:Class="YunKao.Controls.NavigationRail"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-  <Grid>
-    <Grid.RowDefinitions>
-      <RowDefinition Height="Auto" />
-      <RowDefinition Height="*" />
-      <RowDefinition Height="Auto" />
-    </Grid.RowDefinitions>
-
+  <Grid x:Name="GestureSurface" Background="Transparent" ManipulationMode="None">
     <Grid x:Name="SelectionBlob"
-          Height="36"
+          Height="44"
           VerticalAlignment="Top"
           HorizontalAlignment="Stretch"
           IsHitTestVisible="False"
@@ -23,10 +17,12 @@
       <Grid.RenderTransform>
         <CompositeTransform x:Name="SelectionTransform" />
       </Grid.RenderTransform>
-      <Border CornerRadius="8" Background="{ThemeResource SidebarItemSelectedBrush}" />
+      <Border x:Name="LensFallback" CornerRadius="22" Background="{ThemeResource SidebarItemSelectedBrush}"
+              BorderThickness="1" BorderBrush="{ThemeResource GlassRimBrush}" />
+      <Grid x:Name="LensHost" Margin="-24" />
     </Grid>
 
-    <StackPanel x:Name="NavigationItems" Spacing="2" SizeChanged="OnLayoutChanged">
+    <StackPanel x:Name="NavigationItems" Spacing="5" SizeChanged="OnLayoutChanged">
       <Button x:Name="WorkspaceButton" Tag="Workspace" Click="OnItemClick" AutomationProperties.Name="工作台" ToolTipService.ToolTip="工作台" Style="{StaticResource SidebarNavItemStyle}">
         <StackPanel Orientation="Horizontal" Spacing="12">
           <FontIcon Glyph="&#xE774;" FontSize="15" />
@@ -51,13 +47,12 @@
           <TextBlock Text="诊断" VerticalAlignment="Center" />
         </StackPanel>
       </Button>
+      <Button x:Name="SettingsButton" Tag="Settings" Click="OnItemClick" AutomationProperties.Name="设置" ToolTipService.ToolTip="设置" Style="{StaticResource SidebarNavItemStyle}">
+        <StackPanel Orientation="Horizontal" Spacing="12">
+          <FontIcon Glyph="&#xE713;" FontSize="15" />
+          <TextBlock Text="设置" VerticalAlignment="Center" />
+        </StackPanel>
+      </Button>
     </StackPanel>
-
-    <Button x:Name="SettingsButton" Grid.Row="2" Tag="Settings" Click="OnItemClick" AutomationProperties.Name="设置" ToolTipService.ToolTip="设置" Style="{StaticResource SidebarNavItemStyle}">
-      <StackPanel Orientation="Horizontal" Spacing="12">
-        <FontIcon Glyph="&#xE713;" FontSize="15" />
-        <TextBlock Text="设置" VerticalAlignment="Center" />
-      </StackPanel>
-    </Button>
   </Grid>
 </UserControl>

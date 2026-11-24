@@ -1,19 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  外壳布局（Studio）：
-    纸色外框（窗口材质 + 暖白纸面）
-    ├─ 左：侧边栏，直接放在外框上：浏览器控制 / 任务卡 / 页面导航
-    └─ 右：白色内容卡片（细线描边，无阴影）：常驻网页，或覆盖其上的历史、导出、诊断、设置页面
--->
 <Window
     x:Class="YunKao.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:YunKao.Controls"
     Title="融智云考">
-  <Grid x:Name="RootSurface">
+  <Grid x:Name="RootSurface" KeyboardAcceleratorPlacementMode="Hidden">
     <Grid.RowDefinitions>
-      <RowDefinition Height="44" />
+      <RowDefinition Height="58" />
       <RowDefinition Height="*" />
     </Grid.RowDefinitions>
     <Grid.ColumnDefinitions>
@@ -21,69 +15,91 @@
       <ColumnDefinition Width="*" />
     </Grid.ColumnDefinitions>
 
-    <!-- 外框 -->
     <Border x:Name="FrameTint" Grid.RowSpan="2" Grid.ColumnSpan="2" Background="{ThemeResource FrameGradientBrush}" IsHitTestVisible="False" />
-    <Grid x:Name="FrameGlow" Grid.RowSpan="2" Grid.ColumnSpan="2" IsHitTestVisible="False">
-      <Rectangle Fill="{ThemeResource FrameGlowPrimaryBrush}" />
-      <Rectangle Fill="{ThemeResource FrameGlowSecondaryBrush}" />
+    <Grid x:Name="PaperArtwork" Background="{ThemeResource FrameGradientBrush}" Grid.RowSpan="2" Grid.ColumnSpan="2" IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw">
+      <Viewbox Stretch="Fill">
+        <Canvas Width="1280" Height="800">
+          <Path Fill="{ThemeResource PaperBandBrush}" Data="M 570,800 L 1030,0 L 1280,0 L 1280,800 Z" />
+          <Path Fill="{ThemeResource PaperWarmBrush}" Data="M 915,800 L 1280,115 L 1280,800 Z" />
+          <Path Fill="{ThemeResource PaperSunBrush}" Opacity=".36" Data="M 250,680 C 567,653 795,380 994,277 C 1118,208 1195,198 1280,210 L 1280,237 C 1008,204 833,478 598,614 C 445,704 315,719 250,724 Z" />
+          <Path Stroke="{ThemeResource PaperLineBrush}" StrokeThickness="1" Data="M 205,687 C 651,682 829,254 1280,185 M 219,700 C 658,686 863,263 1280,194" />
+          <Path Stroke="{ThemeResource PaperLineBrush}" StrokeThickness="1.3" Data="M 527,800 L 995,0 M 1246,0 L 794,800" />
+        </Canvas>
+      </Viewbox>
+      <Canvas HorizontalAlignment="Right" VerticalAlignment="Bottom" Width="275" Height="455">
+        <Ellipse Canvas.Left="12" Canvas.Top="18" Width="344" Height="344" Fill="{ThemeResource PaperSunBrush}" />
+        <Ellipse Canvas.Left="0" Canvas.Top="6" Width="368" Height="368" Stroke="{ThemeResource PaperLineBrush}" />
+        <Ellipse Canvas.Left="-15" Canvas.Top="-9" Width="398" Height="398" Stroke="{ThemeResource PaperLineBrush}" StrokeDashArray="2,7" />
+      </Canvas>
+      <Grid x:Name="PagePortrait" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+            Width="245" Height="350" Visibility="Collapsed" IsHitTestVisible="False">
+        <Canvas><Image x:Name="PagePortraitArt" Source="ms-appx:///Assets/Luna.png" Width="245" ImageOpened="OnPortraitAvailable" /></Canvas>
+      </Grid>
     </Grid>
 
-    <!-- 标题栏（可拖动）：品牌 -->
-    <Grid x:Name="AppTitleBar" Grid.ColumnSpan="2" Background="Transparent" Padding="18,0,140,0">
-      <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-        <Grid Width="22" Height="22">
-          <Border CornerRadius="6" Background="{ThemeResource SidebarTextBrush}" />
-          <TextBlock Text="云" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource FrameGradientBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-        </Grid>
-        <TextBlock x:Name="BrandText" Text="融智云考" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{ThemeResource SidebarTextBrush}" />
+    <Grid x:Name="RailScene" Grid.RowSpan="2" Margin="8,8,0,8" CornerRadius="19" RequestedTheme="Dark"
+          Background="{ThemeResource RailBaseBrush}" IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw">
+      <Viewbox x:Name="RailArtwork" Stretch="Fill">
+        <Canvas Width="250" Height="730">
+          <Canvas.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+              <GradientStop Color="#20253F" Offset="0"/><GradientStop Color="#38365F" Offset=".46"/>
+              <GradientStop Color="#63567B" Offset=".72"/><GradientStop Color="#34374F" Offset="1"/>
+            </LinearGradientBrush>
+          </Canvas.Background>
+          <Path Fill="#213B4782" Data="M 0,178 L 106,0 L 189,0 L 0,321 Z" />
+          <Path Fill="#267E92C6" Data="M 0,466 L 250,70 L 250,198 L 0,596 Z" />
+          <Path Stroke="#438C93CB" StrokeThickness="1.1" Data="M 0,402 L 250,5 M 0,451 L 250,54" />
+          <Ellipse Width="294" Height="294" Canvas.Left="38" Canvas.Top="321" Fill="#349C8CB5" />
+          <Ellipse Width="314" Height="314" Canvas.Left="28" Canvas.Top="311" Stroke="#60D8B5BA" StrokeThickness="1.1" />
+          <Ellipse Width="326" Height="326" Canvas.Left="22" Canvas.Top="305" Stroke="#49E5B7BC" StrokeDashArray="2,7" />
+        </Canvas>
+      </Viewbox>
+      <Canvas x:Name="RailPortraitCanvas" Width="165" Height="0" HorizontalAlignment="Left" VerticalAlignment="Top">
+        <Image x:Name="RailPortraitArt" Source="ms-appx:///Assets/Luna.png" Stretch="Uniform"
+               Width="{Binding Width, ElementName=RailPortraitCanvas}" ImageOpened="OnRailPortraitAvailable" />
+      </Canvas>
+    </Grid>
+
+    <Grid x:Name="AppTitleBar" Grid.ColumnSpan="2" Background="Transparent" Padding="24,8,140,0">
+      <StackPanel x:Name="Brand" Orientation="Horizontal" Spacing="11" VerticalAlignment="Center" RequestedTheme="Dark">
+        <Border Width="33" Height="33" CornerRadius="11" Background="{ThemeResource BrandMarkBrush}">
+          <Path Width="21" Height="19" Stretch="Uniform" Fill="{ThemeResource BrandInkBrush}"
+                Data="M 1,4 L 8,6 Q 10,7 10,9 L 10,18 Q 8,16 6,16 L 1,14 Z M 12,7 Q 14,5 17,4 L 22,2 L 22,13 L 17,15 Q 14,16 12,18 Z" />
+        </Border>
+        <TextBlock x:Name="BrandText" Text="融智云考" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{ThemeResource SidebarTextBrush}" />
       </StackPanel>
     </Grid>
 
-    <!-- 侧边栏 -->
-    <ScrollViewer x:Name="SidebarScroller" Grid.Row="1" HorizontalScrollMode="Disabled"
-                  HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-    <Grid x:Name="Sidebar" Padding="14,6,10,14"
-          MinHeight="{Binding ViewportHeight, ElementName=SidebarScroller}">
-      <Grid.RowDefinitions>
-        <RowDefinition Height="Auto" />
-        <RowDefinition Height="Auto" />
-        <RowDefinition Height="Auto" />
-        <RowDefinition Height="*" />
-        <RowDefinition Height="Auto" />
-      </Grid.RowDefinitions>
-
-      <controls:BrowserBar x:Name="BrowserBar" />
-      <controls:TaskCard x:Name="TaskCard" Grid.Row="1" Margin="0,14,0,0" />
-      <TextBlock x:Name="PagesLabel" Grid.Row="2" Text="页面" Margin="12,20,0,6" Style="{StaticResource SidebarLabelStyle}" />
-      <controls:NavigationRail x:Name="NavigationRail" Grid.Row="3" MinHeight="220" />
-      <Button x:Name="CollapseButton"
-              Grid.Row="4"
-              Margin="0,6,0,0"
-              HorizontalAlignment="Left"
-              Click="OnCollapseClick"
-              AutomationProperties.Name="收起侧栏"
-              ToolTipService.ToolTip="收起侧栏"
-              Style="{StaticResource SidebarIconButtonStyle}">
-        <FontIcon x:Name="CollapseGlyph" Glyph="&#xE76B;" FontSize="12" />
-      </Button>
-    </Grid>
+    <ScrollViewer x:Name="SidebarScroller" Grid.Row="1" Margin="8,0,0,8" RequestedTheme="Dark"
+                  HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+      <Grid x:Name="Sidebar" Padding="14,14,14,12" MinHeight="{Binding ViewportHeight, ElementName=SidebarScroller}">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" /><RowDefinition Height="*" MinHeight="20" />
+          <RowDefinition Height="Auto" /><RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <controls:NavigationRail x:Name="NavigationRail" />
+        <Grid x:Name="RailPortrait" Grid.Row="1" Margin="0,8,0,0" SizeChanged="OnRailPortraitSizeChanged"
+              IsHitTestVisible="False" AutomationProperties.AccessibilityView="Raw" />
+        <controls:TaskCard x:Name="TaskCard" Grid.Row="2" />
+        <Button x:Name="CollapseButton" Grid.Row="3" HorizontalAlignment="Left" Margin="0,8,0,0" Click="OnCollapseClick"
+                AutomationProperties.Name="收起侧栏" ToolTipService.ToolTip="收起侧栏" Style="{StaticResource SidebarIconButtonStyle}">
+          <FontIcon x:Name="CollapseGlyph" Glyph="&#xE76B;" FontSize="13" />
+        </Button>
+      </Grid>
     </ScrollViewer>
 
-    <!-- 内容卡片 -->
-    <Grid Grid.Row="1" Grid.Column="1" Margin="0,0,12,12">
-      <Border x:Name="ContentCard"
-              Background="{ThemeResource SurfaceBrush}"
-              BorderBrush="{ThemeResource SurfaceStrokeBrush}"
-              BorderThickness="1"
-              CornerRadius="{StaticResource ContentCornerRadius}" />
-      <Grid Margin="1">
-        <controls:BrowserShell x:Name="Browser" />
-        <Frame x:Name="RootFrame"
-               Visibility="Collapsed"
-               Background="{ThemeResource SurfaceBrush}"
-               CornerRadius="9"
-               HorizontalContentAlignment="Stretch"
-               VerticalContentAlignment="Stretch" />
+    <Grid Grid.Row="1" Grid.Column="1" Margin="12,0,12,12">
+      <Grid x:Name="WorkspaceContent" RowSpacing="10">
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+        <controls:BrowserBar x:Name="BrowserBar" />
+        <Grid Grid.Row="1" CornerRadius="{StaticResource ContentCornerRadius}"
+              Background="Transparent">
+          <controls:BrowserShell x:Name="Browser" Margin="1" />
+        </Grid>
+      </Grid>
+      <Frame x:Name="RootFrame" Visibility="Collapsed" Background="Transparent" IsNavigationStackEnabled="False"
+             HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
         <InfoBar x:Name="ShellBanner"
                  IsOpen="False"
                  IsClosable="True"
@@ -95,7 +111,6 @@
             <Button x:Name="ShellBannerAction" Click="OnShellBannerActionClick" Style="{StaticResource SecondaryButtonStyle}" />
           </InfoBar.ActionButton>
         </InfoBar>
-      </Grid>
     </Grid>
   </Grid>
 </Window>

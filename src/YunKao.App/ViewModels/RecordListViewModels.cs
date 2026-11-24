@@ -22,7 +22,9 @@ public abstract class PagedListViewModel<TRow> : ObservableObject
         get => _isLoading;
         protected set
         {
-            if (SetProperty(ref _isLoading, value)) OnPropertyChanged(nameof(IsIdle));
+            if (!SetProperty(ref _isLoading, value)) return;
+            OnPropertyChanged(nameof(IsIdle));
+            OnPropertyChanged(nameof(IsEmpty));
         }
     }
 
@@ -31,7 +33,7 @@ public abstract class PagedListViewModel<TRow> : ObservableObject
     public string StatusText { get => _statusText; set => SetProperty(ref _statusText, value); }
     public string EmptyTitle { get => _emptyTitle; protected set => SetProperty(ref _emptyTitle, value); }
     public string EmptyText { get => _emptyText; protected set => SetProperty(ref _emptyText, value); }
-    public bool IsEmpty => _hasLoaded && Items.Count == 0;
+    public bool IsEmpty => _hasLoaded && IsIdle && Items.Count == 0;
 
     protected void FinishLoad()
     {
@@ -40,55 +42,102 @@ public abstract class PagedListViewModel<TRow> : ObservableObject
     }
 }
 
+public abstract class SearchableRecordsViewModel<TRow> : PagedListViewModel<TRow> where TRow : class
+{
+    protected const int PageSize = 50;
+    private CancellationTokenSource? _pending;
+    private string _query = "";
+    private bool _readFailed;
+    private string _resultLabel = "";
+
+    protected abstract string DefaultEmptyTitle { get; }
+    protected abstract string DefaultEmptyText { get; }
+    protected abstract Task<IReadOnlyList<TRow>> ReadAsync(TRow? last, string query, CancellationToken token);
+    public string ResultLabel { get => _resultLabel; private set => SetProperty(ref _resultLabel, value); }
+    public string EmptyAction => _readFailed ? "重新读取" : _query.Length > 0 ? "清除搜索" : "前往工作台";
+    public bool ReadFailed => _readFailed;
+
+    public Task SearchAsync(string text)
+    {
+        string query = text.Trim();
+        if (query == _query) return Task.CompletedTask;
+        _query = query;
+        CanLoadMore = false;
+        Items.Clear();
+        ResultLabel = "";
+        return LoadAsync(reset: true, debounce: query.Length > 0);
+    }
+
+    public async Task LoadAsync(bool reset, bool debounce = false)
+    {
+        if (!reset && (IsLoading || !CanLoadMore)) return;
+        _pending?.Cancel();
+        using var request = new CancellationTokenSource();
+        _pending = request;
+        IsLoading = true;
+        StatusText = "";
+        string query = _query;
+        TRow? last = reset ? null : Items.LastOrDefault();
+        try
+        {
+            if (debounce) await Task.Delay(180, request.Token);
+            // SQLite reads and file existence checks may block, particularly for network drives.
+            var rows = await Task.Run(() => ReadAsync(last, query, request.Token), request.Token);
+            request.Token.ThrowIfCancellationRequested();
+            if (reset) Items.Clear();
+            foreach (var row in rows.Take(PageSize)) Items.Add(row);
+            CanLoadMore = rows.Count > PageSize;
+            _readFailed = false;
+            ResultLabel = Items.Count == 0 ? "" : $"{(CanLoadMore ? "已显示" : "共")} {Items.Count} 条{(query.Length > 0 ? "匹配记录" : "记录")}";
+            EmptyTitle = query.Length > 0 ? "没有找到匹配的记录" : DefaultEmptyTitle;
+            EmptyText = query.Length > 0 ? "换个关键词，或清除搜索查看全部记录。" : DefaultEmptyText;
+        }
+        catch (OperationCanceledException) when (request.IsCancellationRequested) { }
+        catch (Exception exception)
+        {
+            if (request.IsCancellationRequested) return;
+            _readFailed = true;
+            EmptyTitle = "暂时无法读取记录";
+            EmptyText = exception.Message;
+            StatusText = "读取失败，请刷新重试。";
+            App.Services.Diagnostics.Error("读取记录列表失败", exception);
+        }
+        finally
+        {
+            if (ReferenceEquals(_pending, request))
+            {
+                _pending = null;
+                IsLoading = false;
+                FinishLoad();
+                OnPropertyChanged(nameof(EmptyAction));
+            }
+        }
+    }
+}
+
 public sealed class SessionRow(ExtractionSessionRecord record)
 {
     public ExtractionSessionRecord Record { get; } = record;
     public string Title { get; } = string.IsNullOrWhiteSpace(record.Course) ? "练习题库" : record.Course;
     public string Meta { get; } = $"{record.StartedAt.LocalDateTime:yyyy-MM-dd HH:mm} · {RecordStatusText.ForSession(record.Status)}";
-    public string Counts { get; } = $"{record.QuestionCount} 题 · 重复 {record.DuplicateCount} · 异常 {record.ErrorCount} · AI {record.AiCount} 题";
+    public string Counts { get; } = $"{record.QuestionCount} 题"
+        + (record.DuplicateCount > 0 ? $" · 重复 {record.DuplicateCount}" : "")
+        + (record.ErrorCount > 0 ? $" · 异常 {record.ErrorCount}" : "")
+        + (record.AiCount > 0 ? $" · AI {record.AiCount} 题" : "");
     public string Url { get; } = record.SourceUrl ?? "";
     public bool HasUrl => !string.IsNullOrWhiteSpace(Url);
     public bool CanRestore => Record.QuestionCount > 0;
 }
 
-public sealed class HistoryViewModel : PagedListViewModel<SessionRow>
+public sealed class HistoryViewModel : SearchableRecordsViewModel<SessionRow>
 {
-    private const int PageSize = 50;
-    private DateTimeOffset? _cursor;
+    protected override string DefaultEmptyTitle => "还没有提取记录";
+    protected override string DefaultEmptyText => "在工作台打开练习并开始提取。保存后的题库可以在这里恢复，继续提取或导出。";
 
-    public async Task LoadAsync(bool reset)
+    protected override async Task<IReadOnlyList<SessionRow>> ReadAsync(SessionRow? last, string query, CancellationToken token)
     {
-        if (IsLoading) return;
-        IsLoading = true;
-        StatusText = "正在读取记录…";
-        try
-        {
-            if (reset)
-            {
-                _cursor = null;
-                Items.Clear();
-                EmptyTitle = "还没有提取记录";
-                EmptyText = "在工作台打开练习页，开始提取。保存的题目会出现在这里，之后可以恢复或导出。";
-            }
-            IReadOnlyList<ExtractionSessionRecord> rows = await App.Services.History.GetSessionsAsync(_cursor, PageSize);
-            foreach (ExtractionSessionRecord row in rows) Items.Add(new SessionRow(row));
-            if (rows.Count > 0) _cursor = rows[^1].StartedAt;
-            CanLoadMore = rows.Count == PageSize;
-            StatusText = Items.Count > 0 ? $"已显示 {Items.Count} 条记录" : "";
-        }
-        catch (Exception exception)
-        {
-            EmptyTitle = "暂时无法读取记录";
-            EmptyText = "历史记录读取失败：" + exception.Message;
-            StatusText = "读取失败，请点击刷新重试。";
-            CanLoadMore = false;
-            App.Services.Diagnostics.Error("历史记录读取失败", exception);
-        }
-        finally
-        {
-            IsLoading = false;
-            FinishLoad();
-        }
+        var rows = await App.Services.History.GetSessionsAsync(last?.Record.StartedAt, PageSize + 1, token, query, last?.Record.Id);
+        return rows.Select(row => new SessionRow(row)).ToArray();
     }
 }
 
@@ -105,48 +154,22 @@ public sealed class ExportRow(ExportRecord record)
         + $"{(Record.IncludeAnswers ? "答案版" : "练习版")} · {RecordStatusText.ForExport(Record.Status)}"
         + (FileExists ? "" : " · 文件已移动或删除");
     public bool CanReExport => !string.IsNullOrWhiteSpace(Record.SessionId);
+    public bool ShowReExport => !FileExists && CanReExport;
 }
 
-public sealed class ExportsViewModel : PagedListViewModel<ExportRow>
+public sealed class ExportsViewModel : SearchableRecordsViewModel<ExportRow>
 {
-    private const int PageSize = 50;
-    private DateTimeOffset? _cursor;
+    protected override string DefaultEmptyTitle => "还没有导出文件";
+    protected override string DefaultEmptyText => "在工作台导出第一份题库后，就可以在这里打开文件或找到它所在的文件夹。";
 
-    public async Task LoadAsync(bool reset)
+    protected override async Task<IReadOnlyList<ExportRow>> ReadAsync(ExportRow? last, string query, CancellationToken token)
     {
-        if (IsLoading) return;
-        IsLoading = true;
-        StatusText = "正在读取记录…";
-        try
+        var rows = await App.Services.History.GetExportsAsync(last?.Record.CreatedAt, PageSize + 1, token, query, last?.Record.Id);
+        return rows.Select(row =>
         {
-            if (reset)
-            {
-                _cursor = null;
-                Items.Clear();
-                EmptyTitle = "还没有导出文件";
-                EmptyText = "提取题目后，在左侧任务卡选择导出格式。生成的文件会记录在这里，方便再次打开。";
-            }
-            IReadOnlyList<ExportRecord> rows = await App.Services.History.GetExportsAsync(_cursor, PageSize);
-            // 文件存在性检查放到后台，避免网络盘阻塞界面。
-            ExportRow[] mapped = await Task.Run(() => rows.Select(row => new ExportRow(row)).ToArray());
-            foreach (ExportRow row in mapped) Items.Add(row);
-            if (rows.Count > 0) _cursor = rows[^1].CreatedAt;
-            CanLoadMore = rows.Count == PageSize;
-            StatusText = Items.Count > 0 ? $"已显示 {Items.Count} 条记录" : "";
-        }
-        catch (Exception exception)
-        {
-            EmptyTitle = "暂时无法读取记录";
-            EmptyText = "导出记录读取失败：" + exception.Message;
-            StatusText = "读取失败，请点击刷新重试。";
-            CanLoadMore = false;
-            App.Services.Diagnostics.Error("导出记录读取失败", exception);
-        }
-        finally
-        {
-            IsLoading = false;
-            FinishLoad();
-        }
+            token.ThrowIfCancellationRequested();
+            return new ExportRow(row);
+        }).ToArray();
     }
 }
 

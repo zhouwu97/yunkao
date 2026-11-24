@@ -218,14 +218,18 @@ public sealed class HistoryStore : IAsyncDisposable
     public Task<IReadOnlyList<ExtractionSessionRecord>> GetSessionsAsync(
         DateTimeOffset? before = null,
         int limit = 50,
-        CancellationToken cancellationToken = default)
-        => ReadSessionsAsync(before, limit, cancellationToken);
+        CancellationToken cancellationToken = default,
+        string search = "",
+        long? beforeId = null)
+        => ReadSessionsAsync(before, limit, cancellationToken, search.Trim(), beforeId);
 
     public Task<IReadOnlyList<ExportRecord>> GetExportsAsync(
         DateTimeOffset? before = null,
         int limit = 50,
-        CancellationToken cancellationToken = default)
-        => ReadExportsAsync(before, limit, cancellationToken);
+        CancellationToken cancellationToken = default,
+        string search = "",
+        long? beforeId = null)
+        => ReadExportsAsync(before, limit, cancellationToken, search.Trim(), beforeId);
 
     public Task<IReadOnlyList<DiagnosticRecord>> GetDiagnosticsAsync(
         DateTimeOffset? before = null,
@@ -328,7 +332,7 @@ public sealed class HistoryStore : IAsyncDisposable
     }
 
     private async Task<IReadOnlyList<ExtractionSessionRecord>> ReadSessionsAsync(
-        DateTimeOffset? before, int limit, CancellationToken cancellationToken)
+        DateTimeOffset? before, int limit, CancellationToken cancellationToken, string search, long? beforeId)
     {
         await InitializeAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
@@ -337,11 +341,15 @@ public sealed class HistoryStore : IAsyncDisposable
             SELECT id, session_id, started_at, completed_at, status, question_count, ai_count, course,
                    source_url, duplicate_count, error_count
             FROM extraction_sessions
-            WHERE ($before IS NULL OR started_at < $before)
-            ORDER BY started_at DESC
+            WHERE ($before IS NULL OR started_at < $before OR (started_at = $before AND id < $before_id))
+              AND ($search = '' OR instr(lower(CASE WHEN trim(course) = '' THEN '练习题库' ELSE course END), lower($search)) > 0
+                                OR instr(lower(source_url), lower($search)) > 0)
+            ORDER BY started_at DESC, id DESC
             LIMIT $limit;
             """;
         command.Parameters.AddWithValue("$before", before?.ToString("O") ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("$before_id", beforeId ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("$search", search);
         command.Parameters.AddWithValue("$limit", ClampLimit(limit, 50));
         var rows = new List<ExtractionSessionRecord>();
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
@@ -357,7 +365,7 @@ public sealed class HistoryStore : IAsyncDisposable
     }
 
     private async Task<IReadOnlyList<ExportRecord>> ReadExportsAsync(
-        DateTimeOffset? before, int limit, CancellationToken cancellationToken)
+        DateTimeOffset? before, int limit, CancellationToken cancellationToken, string search, long? beforeId)
     {
         await InitializeAsync(cancellationToken).ConfigureAwait(false);
         await using var connection = await OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
@@ -365,11 +373,16 @@ public sealed class HistoryStore : IAsyncDisposable
         command.CommandText = """
             SELECT id, format, file_path, question_count, created_at, status, session_id, include_answers
             FROM exports
-            WHERE ($before IS NULL OR created_at < $before)
-            ORDER BY created_at DESC
+            WHERE ($before IS NULL OR created_at < $before OR (created_at = $before AND id < $before_id))
+              AND ($search = '' OR instr(lower(file_path), lower($search)) > 0
+                                OR instr(lower(format), lower($search)) > 0
+                                OR (lower(format) = 'md' AND instr('markdown', lower($search)) > 0))
+            ORDER BY created_at DESC, id DESC
             LIMIT $limit;
             """;
         command.Parameters.AddWithValue("$before", before?.ToString("O") ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("$before_id", beforeId ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("$search", search);
         command.Parameters.AddWithValue("$limit", ClampLimit(limit, 50));
         var rows = new List<ExportRecord>();
         await using SqliteDataReader reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);

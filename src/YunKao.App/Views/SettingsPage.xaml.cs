@@ -62,6 +62,24 @@ public sealed partial class SettingsPage : Page
             InitializeResponsiveRows(VisualTreeHelper.GetChild(parent, i));
     }
 
+    private void OnJumpToGroup(object sender, RoutedEventArgs args)
+    {
+        var section = ((sender as MenuFlyoutItem)?.Tag as string) switch
+        {
+            "Account" => AccountGroup,
+            "Export" => ExportGroup,
+            "Ai" => AiGroup,
+            "Data" => DataGroup,
+            _ => AppearanceGroup,
+        };
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (Microsoft.UI.Xaml.Input.FocusManager.FindFirstFocusableElement(section) is Control first)
+                first.Focus(FocusState.Programmatic);
+            section.StartBringIntoView(new BringIntoViewOptions { VerticalAlignmentRatio = 0, AnimationDesired = !MotionService.ReduceMotion });
+        });
+    }
+
     private void OnSettingsSizeChanged(object sender, SizeChangedEventArgs args) => UpdateResponsiveRows();
 
     private void UpdateResponsiveRows()

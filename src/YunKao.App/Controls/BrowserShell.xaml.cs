@@ -5,6 +5,7 @@ using Microsoft.UI.Composition;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Hosting;
+using Microsoft.UI.Xaml.Input;
 using Windows.System;
 using YunKao.Core.Services;
 using YunKao.Services;
@@ -39,6 +40,7 @@ public sealed partial class BrowserShell : UserControl, IBrowserActions
                 ++_navigationRevision;
                 _fitWidthResizeCts?.Cancel();
                 NavigationErrorOverlay.Visibility = Visibility.Collapsed;
+                UpdateErrorSurface();
             }
         };
         _service.StatusChanged += OnStatusChanged;
@@ -46,6 +48,32 @@ public sealed partial class BrowserShell : UserControl, IBrowserActions
         _service.BridgeMessageReceived += (_, args) => BridgeMessageReceived?.Invoke(this, args);
         _service.AddressRequested += (_, _) => DispatcherQueue.TryEnqueue(ViewModel.RequestAddressEdit);
         ViewModel.Attach(this);
+    }
+
+    public bool IsShowingError => NavigationErrorOverlay.Visibility == Visibility.Visible || WebViewErrorOverlay.Visibility == Visibility.Visible;
+    internal event EventHandler? ErrorVisibilityChanged;
+
+    internal void ConnectGlass(LiquidGlassScene scene)
+    {
+        ErrorGlass.Connect(scene, NavigationErrorOverlay);
+        RuntimeGlass.Connect(scene, WebViewErrorOverlay);
+    }
+
+    private void OnViewportSizeChanged(object sender, SizeChangedEventArgs args)
+    {
+        double width = args.NewSize.Width;
+        double inset = width < 580 ? 12 : Math.Clamp(width * .065, 26, 92);
+        NavigationErrorOverlay.Margin = WebViewErrorOverlay.Margin = new Thickness(inset, 12, inset, 12);
+        NavigationErrorOverlay.MaxWidth = WebViewErrorOverlay.MaxWidth = Math.Clamp(width * .52, 275, 420);
+        ErrorGlass.RefreshPosition();
+        RuntimeGlass.RefreshPosition();
+    }
+
+    private void UpdateErrorSurface()
+    {
+        bool error = IsShowingError;
+        WebContent.Visibility = error ? Visibility.Collapsed : Visibility.Visible;
+        ErrorVisibilityChanged?.Invoke(this, EventArgs.Empty);
     }
 
     public WebViewService Service => _service;
@@ -67,25 +95,28 @@ public sealed partial class BrowserShell : UserControl, IBrowserActions
         try
         {
             WebViewErrorOverlay.Visibility = Visibility.Collapsed;
+            UpdateErrorSurface();
             await _service.InitializeAsync(WebView);
             Workspace.WebViewInitialized = true;
             Workspace.BrowserVersion = _service.BrowserVersion;
             SetStatus("WebView2 已就绪");
             _service.GoHome();
-            // 启动后把焦点交给网页，避免侧边栏第一个按钮出现键盘焦点框。
-            WebView.Focus(FocusState.Programmatic);
+            if (XamlRoot is { } root && FocusManager.GetFocusedElement(root) is null)
+                WebView.Focus(FocusState.Programmatic);
         }
         catch (WebViewInitializationException exception)
         {
             SetStatus(exception.Message + "，请安装 Evergreen Runtime。");
             ErrorMessageText.Text = "融智云考需要 Microsoft Edge WebView2 Runtime。当前系统尚未安装或版本过低，请点击下方按钮下载安装。";
             WebViewErrorOverlay.Visibility = Visibility.Visible;
+            UpdateErrorSurface();
         }
         catch (Exception exception)
         {
             SetStatus("浏览器启动失败：" + exception.Message);
             ErrorMessageText.Text = "浏览器启动失败：" + exception.Message;
             WebViewErrorOverlay.Visibility = Visibility.Visible;
+            UpdateErrorSurface();
         }
     }
 
@@ -173,6 +204,8 @@ public sealed partial class BrowserShell : UserControl, IBrowserActions
         {
             NavigationErrorText.Text = args.Message;
             NavigationErrorOverlay.Visibility = Visibility.Visible;
+            UpdateErrorSurface();
+            _fitWidthResizeCts?.Cancel();
         }
         if (args.Message == "导航完成")
         {
@@ -243,7 +276,7 @@ public sealed partial class BrowserShell : UserControl, IBrowserActions
 
     private async Task ApplyFitWidthAsync(CancellationToken cancellationToken = default, bool fromResize = false)
     {
-        if (!_service.IsInitialized || !WebViewService.IsAllowedHost(_service.CurrentUri)) return;
+        if (IsShowingError || _service.IsLoading || !_service.IsInitialized || !WebViewService.IsAllowedHost(_service.CurrentUri)) return;
 
         bool gateEntered = false;
         long revision = _navigationRevision;
@@ -297,9 +330,9 @@ public sealed partial class BrowserShell : UserControl, IBrowserActions
             double.TryParse(dimensions[3], NumberStyles.Float, CultureInfo.InvariantCulture, out double contentHeight);
             BrowserZoomResult result = BrowserZoomCalculator.Calculate(viewportWidth, scrollWidth, pageState, viewportHeight, contentHeight);
             cancellationToken.ThrowIfCancellationRequested();
-            if (!_fitWidth || revision != _navigationRevision) return;
+            if (IsShowingError || !_fitWidth || revision != _navigationRevision) return;
             await _service.ExecuteScriptAsync($"document.documentElement.style.zoom = '{result.Percent}%';", cancellationToken);
-            if (!_fitWidth || revision != _navigationRevision) return;
+            if (IsShowingError || !_fitWidth || revision != _navigationRevision) return;
 
             Workspace.WebViewActualWidth = WebView.ActualWidth;
             Workspace.PageScrollWidth = result.ScrollWidth;
@@ -332,7 +365,7 @@ public sealed partial class BrowserShell : UserControl, IBrowserActions
         if (_clipGeometry is null)
         {
             _clipGeometry = visual.Compositor.CreateRoundedRectangleGeometry();
-            _clipGeometry.CornerRadius = new Vector2(9, 9);
+            _clipGeometry.CornerRadius = new Vector2(13, 13);
             visual.Clip = visual.Compositor.CreateGeometricClip(_clipGeometry);
         }
         _clipGeometry.Size = new Vector2((float)WebView.ActualWidth, (float)WebView.ActualHeight);

@@ -108,12 +108,15 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
 
     public async Task StartAsync()
     {
-        await _startGate.WaitAsync().ConfigureAwait(true);
+        if (_disposed || !_startGate.Wait(0)) return;
         try
         {
-            if (_session.Status == ExtractionStatus.Running || _browserRecovering) return;
+            if (_session.Status is ExtractionStatus.Running or ExtractionStatus.Completing || _browserRecovering) return;
 
+            _task.SetStarting(true);
+            long requestedGeneration = CurrentSessionGeneration;
             BrowserPageState pageState = await _browser.Service.GetPageStateAsync(_lifetimeCancellation.Token).ConfigureAwait(true);
+            if (requestedGeneration != CurrentSessionGeneration || _browserRecovering || _disposed) return;
             ApplyPageState(pageState);
             if (!pageState.IsPracticeReady)
             {
@@ -191,6 +194,7 @@ public sealed class ExtractionCoordinator : IAsyncDisposable, ITaskActions
         finally
         {
             _startGate.Release();
+            _task.SetStarting(false);
         }
     }
 

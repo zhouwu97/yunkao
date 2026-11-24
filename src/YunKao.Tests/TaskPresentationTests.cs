@@ -129,9 +129,9 @@ public sealed class TaskPresentationTests
     }
 
     [Theory]
-    [InlineData("acrylic", "clear", 0.82)]
-    [InlineData("mica", "standard", 0.60)]
-    [InlineData("acrylic", "transparent", 0.40)]
+    [InlineData("acrylic", "clear", 0.10)]
+    [InlineData("mica", "standard", 0.06)]
+    [InlineData("acrylic", "transparent", 0.02)]
     [InlineData("solid", "transparent", 1.0)]
     public void GlassTintOpacityFollowsMaterialAndClarity(string material, string clarity, double expected)
         => Assert.Equal(expected, AppearancePolicy.GetGlassTintOpacity(material, clarity), 3);

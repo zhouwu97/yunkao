@@ -1,5 +1,6 @@
 using Windows.UI.ViewManagement;
 using YunKao.Core.Services;
+using System.Runtime.InteropServices;
 
 namespace YunKao.Services;
 
@@ -11,7 +12,7 @@ public static class GlassSettings
 {
     private static readonly UISettings SystemSettings = CreateSettings();
 
-    public static double TintOpacity { get; private set; } = 0.60;
+    public static double TintOpacity { get; private set; } = 0.06;
     public static bool IsSolidRequested { get; private set; }
     public static bool IsSolid => IsSolidRequested || !SystemTransparencyEnabled || IsHighContrast;
     public static bool BlurEnabled => !IsSolid;
@@ -27,7 +28,7 @@ public static class GlassSettings
     /// <summary>系统设置（透明效果、高对比度）变化后由窗口调用。</summary>
     public static void Refresh() => Changed?.Invoke(null, EventArgs.Empty);
 
-    private static bool SystemTransparencyEnabled
+    public static bool SystemTransparencyEnabled
     {
         get
         {
@@ -40,10 +41,23 @@ public static class GlassSettings
     {
         get
         {
-            try { return new AccessibilitySettings().HighContrast; }
-            catch { return false; }
+            var info = new HighContrastInfo { Size = (uint)Marshal.SizeOf<HighContrastInfo>() };
+            return SystemParametersInfo(0x0042 /* SPI_GETHIGHCONTRAST */, info.Size, ref info, 0)
+                && (info.Flags & 1 /* HCF_HIGHCONTRASTON */) != 0;
         }
     }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct HighContrastInfo
+    {
+        public uint Size;
+        public uint Flags;
+        public IntPtr DefaultScheme;
+    }
+
+    [DllImport("user32.dll", EntryPoint = "SystemParametersInfoW")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SystemParametersInfo(uint action, uint size, ref HighContrastInfo info, uint flags);
 
     private static UISettings CreateSettings()
     {

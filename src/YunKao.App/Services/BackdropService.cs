@@ -1,7 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
-using Windows.UI.ViewManagement;
 using YunKao.Core.Services;
 
 namespace YunKao.Services;
@@ -22,7 +21,7 @@ public static class BackdropService
 
     public static BackdropMaterial Apply(Window window, Panel? root, BackdropMaterial preferred = BackdropMaterial.DesktopAcrylic)
     {
-        if (IsHighContrastEnabled())
+        if (GlassSettings.IsHighContrast || !GlassSettings.SystemTransparencyEnabled)
         {
             window.SystemBackdrop = null;
             AppliedMaterial = BackdropMaterial.Solid;
@@ -93,18 +92,6 @@ public static class BackdropService
             window.SystemBackdrop = new DesktopAcrylicBackdrop();
             AppliedMaterial = BackdropMaterial.DesktopAcrylic;
             return true;
-        }
-        catch (Exception)
-        {
-            return false;
-        }
-    }
-
-    private static bool IsHighContrastEnabled()
-    {
-        try
-        {
-            return new AccessibilitySettings().HighContrast;
         }
         catch (Exception)
         {

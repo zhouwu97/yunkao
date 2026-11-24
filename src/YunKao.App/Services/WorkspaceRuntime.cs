@@ -10,6 +10,7 @@ public sealed class WorkspaceRuntime
     public ExtractionSession Session { get; } = new();
     public Uri? CurrentUrl { get; set; }
     public string CurrentCourse { get; set; } = "";
+    public string NavigationMaterial { get; set; } = "基础材质";
     public bool AuthExpired { get; set; }
     public bool PermissionDenied { get; set; }
     public bool WebViewInitialized { get; set; }

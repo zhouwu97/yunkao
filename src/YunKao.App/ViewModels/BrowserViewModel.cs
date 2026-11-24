@@ -18,7 +18,7 @@ public interface IBrowserActions
 }
 
 /// <summary>
-/// 浏览器状态（应用级）。WebView 常驻在窗口内容区，地址栏与导航按钮位于侧边栏，二者通过此对象同步。
+/// 浏览器状态（应用级）。WebView 常驻在窗口内容区，地址栏与导航按钮位于工作台顶部，二者通过此对象同步。
 /// </summary>
 public sealed class BrowserViewModel : ObservableObject
 {
@@ -66,7 +66,7 @@ public sealed class BrowserViewModel : ObservableObject
 
     public void Attach(IBrowserActions actions) => _actions = actions;
 
-    public string? Navigate(string input) => _actions?.Navigate(input) ?? "浏览器尚未就绪";
+    public string? Navigate(string input) => _actions is null ? "浏览器尚未就绪" : _actions.Navigate(input);
 
     public void RequestAddressEdit() => AddressEditRequested?.Invoke(this, EventArgs.Empty);
 

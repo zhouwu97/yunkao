@@ -5,7 +5,7 @@ from pathlib import Path
 
 APP_NAME = "融智云考助手"
 _VERSION_FILE = Path(__file__).resolve().parents[1] / "VERSION"
-APP_VERSION = _VERSION_FILE.read_text(encoding="utf-8").strip() if _VERSION_FILE.exists() else "2.0.1"
+APP_VERSION = _VERSION_FILE.read_text(encoding="utf-8").strip() if _VERSION_FILE.exists() else "2.1.0"
 APP_RELEASE = f"v{APP_VERSION}"
 APP_VERSION_PARTS = tuple(int(part) for part in APP_VERSION.split("."))
 APP_VERSION_TUPLE = (*APP_VERSION_PARTS, 0)

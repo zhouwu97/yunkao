@@ -23,9 +23,9 @@ namespace YunKao;
 /// </summary>
 public sealed partial class MainWindow : Window
 {
-    private const double CompactWidth = 1100;
-    private const double ExpandedSidebarWidth = 248;
-    private const double CompactSidebarWidth = 78;
+    private const double CompactWidth = 980;
+    private const double ExpandedSidebarWidth = 250;
+    private const double CompactSidebarWidth = 86;
 
     private static readonly Dictionary<NavigationTarget, Type> Pages = new()
     {
@@ -36,6 +36,8 @@ public sealed partial class MainWindow : Window
     };
 
     private readonly UISettings _uiSettings = new();
+    private readonly LiquidGlassScene _paperScene;
+    private readonly LiquidGlassScene _railScene;
     private AppWindow? _appWindow;
     private Action? _bannerAction;
     private bool _bannerReturnToWorkspace;
@@ -49,6 +51,27 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         App.Services.Task.Dispatcher = DispatcherQueue;
 
+        _paperScene = new LiquidGlassScene(PaperArtwork);
+        _railScene = new LiquidGlassScene(RailScene);
+        LiquidGlassScope.SetScene(RootSurface, _paperScene);
+        LiquidGlassScope.SetScene(Sidebar, _railScene);
+        NavigationRail.SetScene(_railScene);
+        BrowserBar.ConnectGlass(_paperScene);
+        Browser.ConnectGlass(_paperScene);
+        Browser.ErrorVisibilityChanged += (_, _) => ArrangeIllustration();
+        ButtonMotion.Attach(RootSurface);
+        SidebarScroller.ViewChanged += (_, _) => { NavigationRail.RefreshLens(); SizeRailPortrait(); };
+        GlassSettings.Changed += OnGlassSettingsChanged;
+        Closed += (_, _) =>
+        {
+            GlassSettings.Changed -= OnGlassSettingsChanged;
+            _paperScene.Dispose();
+            _railScene.Dispose();
+            _uiSettings.ColorValuesChanged -= OnSystemAppearanceChanged;
+            _uiSettings.AdvancedEffectsEnabledChanged -= OnSystemAppearanceChanged;
+            if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 19041))
+                _uiSettings.AnimationsEnabledChanged -= OnSystemAppearanceChanged;
+        };
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
         ConfigureWindow();
@@ -68,7 +91,10 @@ public sealed partial class MainWindow : Window
         RootSurface.SizeChanged += OnRootSizeChanged;
         RootSurface.ActualThemeChanged += (_, _) => UpdateCaptionButtons();
         App.Services.Notifications.Requested += OnNotificationRequested;
-        _uiSettings.AdvancedEffectsEnabledChanged += (_, _) => DispatcherQueue.TryEnqueue(GlassSettings.Refresh);
+        _uiSettings.AdvancedEffectsEnabledChanged += OnSystemAppearanceChanged;
+        if (OperatingSystem.IsWindowsVersionAtLeast(10, 0, 19041))
+            _uiSettings.AnimationsEnabledChanged += OnSystemAppearanceChanged;
+        _uiSettings.ColorValuesChanged += OnSystemAppearanceChanged;
         RegisterShortcuts();
         NavigationRail.SetActive(NavigationTarget.Workspace);
     }
@@ -78,20 +104,27 @@ public sealed partial class MainWindow : Window
     /// <summary>切换内容卡片：工作台显示常驻网页，其余页面覆盖在网页之上。</summary>
     public void ShowPage(NavigationTarget target)
     {
+        bool returningFromWorkspace = _current == NavigationTarget.Workspace;
         _current = target;
+        ArrangeIllustration();
         NavigationRail.SetActive(target);
         if (target == NavigationTarget.Workspace)
         {
             RootFrame.Visibility = Visibility.Collapsed;
-            Browser.Visibility = Visibility.Visible;
+            WorkspaceContent.Visibility = Visibility.Visible;
             return;
         }
 
         Type page = Pages[target];
-        Browser.Visibility = Visibility.Collapsed;
+        WorkspaceContent.Visibility = Visibility.Collapsed;
         RootFrame.Visibility = Visibility.Visible;
         if (RootFrame.CurrentSourcePageType != page) RootFrame.Navigate(page);
-        else if (RootFrame.Content is FrameworkElement element) MotionService.AnimatePage(element);
+        else if (returningFromWorkspace)
+        {
+            if (RootFrame.Content is HistoryPage history) _ = history.ViewModel.LoadAsync(reset: true);
+            if (RootFrame.Content is ExportPage exports) _ = exports.ViewModel.LoadAsync(reset: true);
+            if (RootFrame.Content is FrameworkElement element) MotionService.AnimatePage(element);
+        }
     }
 
     private void OnRootFrameNavigated(object sender, Microsoft.UI.Xaml.Navigation.NavigationEventArgs args)
@@ -137,6 +170,7 @@ public sealed partial class MainWindow : Window
     private void OnRootSizeChanged(object sender, SizeChangedEventArgs args)
     {
         ApplySidebarMode(args.NewSize.Width);
+        ArrangeIllustration();
         UpdateTitleBarInsets();
     }
 
@@ -153,12 +187,12 @@ public sealed partial class MainWindow : Window
         _sidebarApplied = true;
         _compact = compact;
         SidebarColumn.Width = new GridLength(compact ? CompactSidebarWidth : ExpandedSidebarWidth);
-        Sidebar.Padding = compact ? new Thickness(10, 6, 6, 14) : new Thickness(14, 6, 10, 14);
-        BrowserBar.SetCompact(compact);
+        Sidebar.Padding = compact ? new Thickness(7, 12, 7, 12) : new Thickness(14, 14, 14, 12);
+        BrandText.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
         TaskCard.SetCompact(compact);
         NavigationRail.SetCompact(compact);
-        PagesLabel.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-        TaskCard.Margin = compact ? new Thickness(0, 10, 0, 6) : new Thickness(0, 14, 0, 0);
+        ArrangeIllustration();
+
         CollapseButton.HorizontalAlignment = compact ? HorizontalAlignment.Center : HorizontalAlignment.Left;
         CollapseGlyph.Glyph = compact ? "" : "";
         string tip = compact ? "展开侧栏" : "收起侧栏";
@@ -185,14 +219,74 @@ public sealed partial class MainWindow : Window
 
         bool solid = applied == BackdropMaterial.Solid;
         RootSurface.Background = new SolidColorBrush(Colors.Transparent);
-        // 纸面默认几乎不透明；选"通透"时才让桌面材质轻微透出。
+
         FrameTint.Opacity = solid ? 1 : AppearancePolicy.ResolveClarity(clarity) switch
         {
-            AppearanceClarity.Clear => 1.0,
-            AppearanceClarity.Transparent => 0.82,
-            _ => 0.96,
+            AppearanceClarity.Clear => 0.98,
+            AppearanceClarity.Transparent => 0.76,
+            _ => 0.91,
         };
         GlassSettings.Update(material, clarity, solid);
+    }
+
+    private void OnGlassSettingsChanged(object? sender, EventArgs args)
+    {
+        ArrangeIllustration();
+        NavigationRail.RefreshLens();
+    }
+
+    private void OnSystemAppearanceChanged(UISettings sender, object args)
+        => DispatcherQueue.TryEnqueue(() =>
+        {
+            ApplyAppearance(App.Services.Workspace.RequestedAppearanceMaterial, App.Services.Workspace.AppearanceClarity);
+            MotionService.RefreshSystemSettings();
+            UpdateCaptionButtons();
+        });
+
+    private void ArrangeIllustration()
+    {
+        bool illustrated = !GlassSettings.IsHighContrast;
+        bool errorPortrait = _current == NavigationTarget.Workspace && Browser.IsShowingError;
+        bool pagePortrait = illustrated && errorPortrait;
+        double artWidth = errorPortrait ? Math.Clamp((RootSurface.ActualWidth - SidebarColumn.Width.Value) * .47, 180, 470)
+            : Math.Clamp((RootSurface.ActualWidth - SidebarColumn.Width.Value) * .26, 230, 340);
+        PagePortrait.Width = PagePortraitArt.Width = artWidth;
+        PagePortrait.Height = Math.Min(artWidth * 1.43, Math.Max(160, RootSurface.ActualHeight - 108));
+        PagePortrait.Visibility = pagePortrait ? Visibility.Visible : Visibility.Collapsed;
+        RailPortraitCanvas.Visibility = illustrated && !pagePortrait ? Visibility.Visible : Visibility.Collapsed;
+        SizeRailPortrait();
+        RootFrame.Margin = new Thickness(0);
+        PaperArtwork.Visibility = RailArtwork.Visibility = illustrated ? Visibility.Visible : Visibility.Collapsed;
+        _paperScene.Invalidate();
+    }
+
+    private void OnPortraitAvailable(object sender, RoutedEventArgs args) => _paperScene?.Invalidate();
+    private void OnRailPortraitAvailable(object sender, RoutedEventArgs args) => _railScene?.Invalidate();
+
+    private void OnRailPortraitSizeChanged(object sender, SizeChangedEventArgs args) => SizeRailPortrait();
+
+    private void SizeRailPortrait()
+    {
+        // Keep the character in one place across pages and window sizes. Fit the space between
+        // navigation and task controls instead of sending it to the far corner of a wide window.
+        if (RailPortraitArt is null || RailPortrait is null) return;
+        double overlap = _compact ? 12 : 64;
+        RailPortraitCanvas.Width = Math.Min(_compact ? 62 : 210, Math.Max(1, (RailPortrait.ActualHeight + overlap) / 1.5));
+        Canvas.SetTop(RailPortraitArt, overlap - RailPortraitCanvas.Width * 1.5);
+        // The half-length source ends behind the task card. Keep its pale clothes out of
+        // the text area while the glass edge still samples the visible artwork above it.
+        RailPortraitArt.Clip = new RectangleGeometry
+        {
+            Rect = new Windows.Foundation.Rect(0, 0, RailPortraitCanvas.Width,
+                Math.Max(1, RailPortraitCanvas.Width * 1.5 - overlap + 1)),
+        };
+        if (RailPortrait.XamlRoot is not null)
+        {
+            var origin = RailPortrait.TransformToVisual(RailScene).TransformPoint(new Windows.Foundation.Point());
+            RailPortraitCanvas.Margin = new Thickness(origin.X + (RailPortrait.ActualWidth - RailPortraitCanvas.Width) / 2,
+                origin.Y + RailPortrait.ActualHeight, 0, 0);
+            _railScene?.Invalidate();
+        }
     }
 
     public void ApplyTheme(string themeName)
@@ -293,6 +387,6 @@ public sealed partial class MainWindow : Window
         if (scale <= 0) return;
         double right = _appWindow.TitleBar.RightInset / scale;
         double left = _appWindow.TitleBar.LeftInset / scale;
-        AppTitleBar.Padding = new Thickness(18 + left, 0, Math.Max(12, right + 8), 0);
+        AppTitleBar.Padding = new Thickness((_compact ? 31 : 24) + left, 8, Math.Max(12, right + 8), 0);
     }
 }

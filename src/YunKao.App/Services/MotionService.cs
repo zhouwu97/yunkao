@@ -22,8 +22,22 @@ public static class MotionService
     }
 
     public static bool ReduceMotion { get; private set; } = DetectReducedMotion();
+    private static bool _reduceMotionRequested;
+    public static event EventHandler? Changed;
 
-    public static void SetReduceMotion(bool reduceMotion) => ReduceMotion = reduceMotion || DetectReducedMotion();
+    public static void SetReduceMotion(bool reduceMotion)
+    {
+        _reduceMotionRequested = reduceMotion;
+        RefreshSystemSettings();
+    }
+
+    public static void RefreshSystemSettings()
+    {
+        bool reduced = _reduceMotionRequested || DetectReducedMotion();
+        if (ReduceMotion == reduced) return;
+        ReduceMotion = reduced;
+        Changed?.Invoke(null, EventArgs.Empty);
+    }
 
     public static void AnimateScale(FrameworkElement element, double target, double durationMs = 120)
         => AnimateScaleXY(element, target, target, durationMs);
