@@ -19,6 +19,7 @@ $required = @(
     "Microsoft.Graphics.Canvas.dll",
     "Assets\Luna.png",
     "Assets\AppIcon.ico",
+    "Assets\AppIcon.png",
     "Assets\GlassNotices\NOTICE.txt",
     "Assets\GlassNotices\ComputeSharp-MIT.txt",
     "README.txt",

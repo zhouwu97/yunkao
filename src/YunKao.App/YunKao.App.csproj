@@ -39,6 +39,7 @@
     <Content Include="Assets\Luna.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\GlassNotices\*.txt" CopyToOutputDirectory="PreserveNewest" ExcludeFromResourceIndex="true" />
     <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="Assets\AppIcon.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="Assets\SplashScreen.scale-200.png" />
     <Content Include="Assets\LockScreenLogo.scale-200.png" />
     <Content Include="Assets\Square150x150Logo.scale-200.png" />

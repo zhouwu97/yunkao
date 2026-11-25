@@ -79,9 +79,9 @@
 
     <Grid x:Name="AppTitleBar" Grid.ColumnSpan="2" Background="Transparent" Padding="24,8,140,0">
       <StackPanel x:Name="Brand" Orientation="Horizontal" Spacing="11" VerticalAlignment="Center" RequestedTheme="Dark">
-        <Border Width="33" Height="33" CornerRadius="11" Background="{ThemeResource BrandMarkBrush}">
-          <Path Width="21" Height="19" Stretch="Uniform" Fill="{ThemeResource BrandInkBrush}"
-                Data="M 1,4 L 8,6 Q 10,7 10,9 L 10,18 Q 8,16 6,16 L 1,14 Z M 12,7 Q 14,5 17,4 L 22,2 L 22,13 L 17,15 Q 14,16 12,18 Z" />
+        <Border Width="33" Height="33" CornerRadius="11" Background="White">
+          <Image x:Name="BrandIcon" Source="ms-appx:///Assets/AppIcon.png" Stretch="Uniform"
+                 AutomationProperties.Name="融智云考图标" />
         </Border>
         <TextBlock x:Name="BrandText" Text="融智云考" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{ThemeResource SidebarTextBrush}" />
       </StackPanel>
