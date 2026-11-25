@@ -50,18 +50,21 @@ public sealed class ExportPathGeneratorTests
         Directory.CreateDirectory(tempDir);
         try
         {
-            string path1 = ExportPathGenerator.CreateUniquePath(tempDir, "测试题库", "pdf");
+            var timestamp = new DateTime(2026, 11, 25, 10, 0, 0);
+            string path1 = ExportPathGenerator.CreateUniquePath(tempDir, "测试题库", "pdf", timestamp);
             File.WriteAllText(path1, "dummy");
 
-            string path2 = ExportPathGenerator.CreateUniquePath(tempDir, "测试题库", "pdf");
+            string path2 = ExportPathGenerator.CreateUniquePath(tempDir, "测试题库", "pdf", timestamp);
             File.WriteAllText(path2, "dummy");
 
-            string path3 = ExportPathGenerator.CreateUniquePath(tempDir, "测试题库", "pdf");
+            string path3 = ExportPathGenerator.CreateUniquePath(tempDir, "测试题库", "pdf", timestamp);
 
             Assert.NotEqual(path1, path2);
             Assert.NotEqual(path2, path3);
             Assert.EndsWith("_2.pdf", path2);
             Assert.EndsWith("_3.pdf", path3);
+            string nextSecond = ExportPathGenerator.CreateUniquePath(tempDir, "测试题库", "pdf", timestamp.AddSeconds(1));
+            Assert.Equal("测试题库_20261125_100001.pdf", Path.GetFileName(nextSecond));
         }
         finally
         {

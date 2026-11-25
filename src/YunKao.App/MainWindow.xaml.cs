@@ -372,7 +372,7 @@ public sealed partial class MainWindow : Window
                 initialSize = new SizeInt32(width, height);
             }
             _appWindow.Resize(initialSize);
-            _appWindow.SetIcon("Assets/AppIcon.ico");
+            _appWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
         }
         catch (Exception)
         {

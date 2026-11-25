@@ -9,7 +9,7 @@
   <Identity
     Name="E0F7968A-BC5F-4BB2-8D9C-4D79CE7CC5C6"
     Publisher="CN=YunKao"
-    Version="2.1.0.0" />
+    Version="2.1.1.0" />
 
   <mp:PhoneIdentity PhoneProductId="E0F7968A-BC5F-4BB2-8D9C-4D79CE7CC5C6" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
 

@@ -21,10 +21,61 @@ public sealed class LiquidToggleMotionTests
     }
     [Theory]
     [InlineData(30)] [InlineData(60)] [InlineData(120)] [InlineData(144)]
-    public void PreviewAndStretchStayWithinTheTrack(int fps)
+    public void ExpandedLensAndTravelStayBoundedAtDifferentFrameRates(int fps)
     {
         var m=new LiquidToggleMotion(); m.SetState(false,true); m.Press(0); m.Pull(2000);
-        for(int i=0;i<fps;i++) {m.Advance(1d/fps);Assert.InRange(m.Progress,0,1);Assert.InRange(m.ScaleX,1,1.18);}
+        for(int i=0;i<fps;i++)
+        {
+            m.Advance(1d/fps);
+            Assert.InRange(m.Progress,0,1);
+            Assert.InRange(30*m.ScaleX,30,58);
+            Assert.InRange(24*m.ScaleY,23,34);
+        }
         m.Release(); Settle(m); Assert.Equal(1,m.Progress); Assert.Equal(1,m.ScaleX);
+    }
+
+    [Fact]
+    public void HeldLensGrowsBeyondTheRailAndReturnsToTheOrdinaryThumb()
+    {
+        var m=new LiquidToggleMotion(); m.SetState(false,true); m.Press(0); Settle(m);
+        Assert.Equal(52,30*m.ScaleX,6); Assert.Equal(32,24*m.ScaleY,6);
+        var held=(m.ScaleX,m.ScaleY); m.Release(); Assert.Equal(held,(m.ScaleX,m.ScaleY));
+        Settle(m); Assert.Equal(1,m.ScaleX); Assert.Equal(1,m.ScaleY); Assert.Equal(0,m.Pressure);
+    }
+
+    [Fact]
+    public void RailColorWaitsForTheVisibleThumbToCrossTheMiddleInBothDirections()
+    {
+        var m=new LiquidToggleMotion(); m.SetState(false,true); m.Press(0); m.Pull(9); Settle(m);
+        Assert.Equal(0,m.TrackProgress);
+        m.Pull(20);
+        while(m.Position<10)
+        {
+            Assert.Equal(0,m.TrackProgress); m.Advance(1d/240);
+        }
+        Settle(m); Assert.Equal(1,m.TrackProgress);
+        m.Pull(11); Settle(m); Assert.Equal(1,m.TrackProgress);
+        m.Pull(0);
+        while(m.Position>=10)
+        {
+            Assert.Equal(1,m.TrackProgress); m.Advance(1d/240);
+        }
+        Settle(m); Assert.Equal(0,m.TrackProgress);
+    }
+
+    [Fact]
+    public void TapWaitsForTheVisibleThumbBeforeColoringTheRail()
+    {
+        var m=new LiquidToggleMotion(); m.SetState(false,true); m.Press(0); m.Release();
+        m.Advance(1d/120); Assert.Equal(0,m.TrackProgress);
+        Settle(m); Assert.Equal(1,m.TrackProgress);
+    }
+
+    [Fact]
+    public void RegrabPreservesTheCurrentPositionAndLensSize()
+    {
+        var m=new LiquidToggleMotion(); m.SetState(false,true); m.Press(0); m.Advance(.05);
+        m.Release(); m.Advance(.03); var pose=(m.ScaleX,m.ScaleY,m.Position);
+        m.Press(0); Assert.Equal(pose,(m.ScaleX,m.ScaleY,m.Position));
     }
 }

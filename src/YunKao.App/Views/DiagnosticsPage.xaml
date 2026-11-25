@@ -52,8 +52,9 @@
     </controls:PageHeader>
 
     <Grid x:Name="LayoutViewport" Grid.Row="1" Margin="32,0,32,28" SizeChanged="OnLayoutSizeChanged">
-    <ScrollViewer HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-    <Grid x:Name="DiagnosticsLayout" ColumnSpacing="20" RowSpacing="20">
+    <!-- Preserve the content bounds while leaving room for the Demo's 12 DIP tether and rim. -->
+    <ScrollViewer Margin="-16" HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+    <Grid x:Name="DiagnosticsLayout" Margin="16" ColumnSpacing="20" RowSpacing="20">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="3*" />
         <ColumnDefinition Width="2*" />
@@ -96,7 +97,7 @@
           <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <TextBlock Text="本次任务动态" Style="{StaticResource CardTitleStyle}" />
-        <controls:GlassPanel Grid.Row="1" CornerRadius="12" Padding="14,12">
+        <controls:GlassPanel Grid.Row="1" Padding="14,12">
           <Grid ColumnSpacing="12">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="Auto" />

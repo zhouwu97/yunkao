@@ -6,6 +6,22 @@
     xmlns:controls="using:YunKao.Controls"
     Title="融智云考">
   <Grid x:Name="RootSurface" KeyboardAcceleratorPlacementMode="Hidden">
+    <Grid.Resources>
+      <ResourceDictionary>
+        <ResourceDictionary.ThemeDictionaries>
+          <ResourceDictionary x:Key="Default">
+            <!-- Define the surface in the parent scope so it is available during InfoBar construction. -->
+            <AcrylicBrush x:Key="ShellBannerBackground" TintColor="#343247" TintOpacity="0.94"
+                          TintLuminosityOpacity="0.96" FallbackColor="#343247" />
+            <SolidColorBrush x:Key="ShellBannerBorderBrush" Color="#656176" />
+          </ResourceDictionary>
+          <ResourceDictionary x:Key="HighContrast">
+            <SolidColorBrush x:Key="ShellBannerBackground" Color="{ThemeResource SystemColorWindowColor}" />
+            <SolidColorBrush x:Key="ShellBannerBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+          </ResourceDictionary>
+        </ResourceDictionary.ThemeDictionaries>
+      </ResourceDictionary>
+    </Grid.Resources>
     <Grid.RowDefinitions>
       <RowDefinition Height="58" />
       <RowDefinition Height="*" />
@@ -106,9 +122,53 @@
                  Margin="16"
                  MaxWidth="720"
                  VerticalAlignment="Top"
-                 CornerRadius="12">
+                 HorizontalAlignment="Stretch"
+                 RequestedTheme="Dark"
+                 Background="{ThemeResource ShellBannerBackground}"
+                 BorderBrush="{ThemeResource ShellBannerBorderBrush}"
+                 BorderThickness="1"
+                 CornerRadius="16">
+          <InfoBar.Resources>
+            <ResourceDictionary>
+              <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Default">
+                  <SolidColorBrush x:Key="InfoBarTitleForeground" Color="#FFFFFF" />
+                  <SolidColorBrush x:Key="InfoBarMessageForeground" Color="#E2DFEC" />
+                  <SolidColorBrush x:Key="InfoBarInformationalSeverityIconBackground" Color="#A99BDF" />
+                  <SolidColorBrush x:Key="InfoBarInformationalSeverityIconForeground" Color="#292638" />
+                  <!-- The acrylic is drawn by the inner grid; don't put an opaque severity layer beneath it. -->
+                  <SolidColorBrush x:Key="InfoBarInformationalSeverityBackgroundBrush" Color="Transparent" />
+                  <SolidColorBrush x:Key="InfoBarSuccessSeverityBackgroundBrush" Color="Transparent" />
+                  <SolidColorBrush x:Key="InfoBarWarningSeverityBackgroundBrush" Color="Transparent" />
+                  <SolidColorBrush x:Key="InfoBarErrorSeverityBackgroundBrush" Color="Transparent" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="HighContrast" />
+              </ResourceDictionary.ThemeDictionaries>
+              <x:Double x:Key="InfoBarTitleFontSize">16</x:Double>
+            </ResourceDictionary>
+          </InfoBar.Resources>
           <InfoBar.ActionButton>
-            <Button x:Name="ShellBannerAction" Click="OnShellBannerActionClick" Style="{StaticResource SecondaryButtonStyle}" />
+            <Button x:Name="ShellBannerAction" Click="OnShellBannerActionClick"
+                    CornerRadius="8" Padding="16,6" FontWeight="SemiBold">
+              <Button.Resources>
+                <ResourceDictionary>
+                  <ResourceDictionary.ThemeDictionaries>
+                    <ResourceDictionary x:Key="Default">
+                      <SolidColorBrush x:Key="ButtonBackground" Color="#EEE8FF" />
+                      <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#FFFFFF" />
+                      <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#D6CCE9" />
+                      <SolidColorBrush x:Key="ButtonForeground" Color="#39314F" />
+                      <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="#39314F" />
+                      <SolidColorBrush x:Key="ButtonForegroundPressed" Color="#39314F" />
+                    </ResourceDictionary>
+                    <ResourceDictionary x:Key="HighContrast">
+                      <SolidColorBrush x:Key="ButtonBackground" Color="{ThemeResource SystemColorButtonFaceColor}" />
+                      <SolidColorBrush x:Key="ButtonForeground" Color="{ThemeResource SystemColorButtonTextColor}" />
+                    </ResourceDictionary>
+                  </ResourceDictionary.ThemeDictionaries>
+                </ResourceDictionary>
+              </Button.Resources>
+            </Button>
           </InfoBar.ActionButton>
         </InfoBar>
     </Grid>

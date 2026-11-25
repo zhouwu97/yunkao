@@ -164,6 +164,86 @@ Check("all four sides retain a bright rounded rim",weakestRim>4,weakestRim);
 await brightPressed.SaveAsync(Path.Combine(output,"bright-pressed-rim.png"),CanvasBitmapFileFormat.Png);
 await clearLens.SaveAsync(Path.Combine(output, "clear-navigation.png"), CanvasBitmapFileFormat.Png);
 await externalBend.SaveAsync(Path.Combine(output, "tether-bend.png"), CanvasBitmapFileFormat.Png);
+// A settings panel may extend well beyond the captured viewport while scrolling.
+// Its visible bevel must sample the nearest scene pixel rather than transparent black.
+async Task<byte[]> RenderOutsideCapture(bool clamp)
+{
+    using var small=new CanvasRenderTarget(device,120,80,96);
+    using(var draw=small.CreateDrawingSession())draw.Clear(Color.FromArgb(255,236,226,242));
+    using var crop=new CropEffect{Source=small,SourceRectangle=new Windows.Foundation.Rect(0,0,120,80)};
+    using var border=new BorderEffect{Source=crop,ExtendX=CanvasEdgeBehavior.Clamp,ExtendY=CanvasEdgeBehavior.Clamp};
+    using var positioned=new Transform2DEffect{Source=clamp?border:small,TransformMatrix=Matrix3x2.CreateTranslation(20,-40)};
+    using var effect=new PixelShaderEffect<LiquidGlassShader>
+    {
+        ConstantBuffer=new(new Float2(180,280),new Float2(120,150),new Float4(28,28,28,28),
+            new Float2(70,80),new Float4(1,0,0,1),new Float2(0,0),new Float4(1,1,1,0),
+            0,28,.35f,0,1,.85f,0,0,2),
+        TransformMapper=D2D1DrawTransformMapper<LiquidGlassShader>.Inflate(96)
+    };
+    effect.Sources[0]=positioned;effect.Sources[1]=ink;
+    using var target=new CanvasRenderTarget(device,240,300,96);
+    using(var draw=target.CreateDrawingSession()){draw.Clear(Color.FromArgb(0,0,0,0));draw.DrawImage(effect,Vector2.Zero,new Windows.Foundation.Rect(0,0,240,300));}
+    if(clamp)await target.SaveAsync(Path.Combine(output,"scrolled-panel-clamped.png"),CanvasBitmapFileFormat.Png);
+    return target.GetPixelBytes();
+}
+byte[] unclamped=await RenderOutsideCapture(false),clamped=await RenderOutsideCapture(true);
+int atBottom=(278*240+120)*4;
+Check("scrolled panel samples remain light beyond the capture",clamped[atBottom+2]>225,clamped[atBottom+2]);
+Check("capture edge regression detects transparent black",unclamped[atBottom+2]<30,unclamped[atBottom+2]);
+
+// Exercise the same rail-composition graph as the native switch. The final
+// transform simulates the native thumb expansion; no raster mock is substituted.
+CanvasRenderTarget RenderSwitch(float compare = 0, bool on = true)
+{
+    const float sx = 52f / 30, sy = 32f / 24, cx = 160, cy = 90;
+    using var background = new ColorSourceEffect { Color = Color.FromArgb(255, 28, 28, 30) };
+    using var track = new PixelShaderEffect<SwitchTrackShader>
+    {
+        ConstantBuffer = new(new Float4(sx, 0, 0, sy), new Float2(28 - sx * cx, 22 - sy * cy),
+            new Float2(56, 44), on ? new Float4(42 / 255f, 211 / 255f, 77 / 255f, 1)
+                : new Float4(91 / 255f, 88 / 255f, 106 / 255f, 1), 1),
+        TransformMapper = D2D1DrawTransformMapper<SwitchTrackShader>.Inflate(96),
+    };
+    track.Sources[0] = background;
+    using var effect = new PixelShaderEffect<LiquidGlassShader>
+    {
+        ConstantBuffer = new(new Float2(30, 24), new Float2(cx, cy), new Float4(12, 12, 12, 12),
+            new Float2(cx - 6, cy - 10), new Float4(1 / sx, 0, 0, 1 / sy), new Float2(0, 0),
+            new Float4(1, 1, 1, .012f), 1, 10, .5f, .4f, 1, .85f, 0, compare, 2,
+            new Float2(.5f, .5f), 0, 1),
+        TransformMapper = D2D1DrawTransformMapper<LiquidGlassShader>.Inflate(96),
+    };
+    effect.Sources[0] = track;
+    effect.Sources[1] = ink;
+    using var expanded = new Transform2DEffect
+    {
+        Source = effect,
+        TransformMatrix = Matrix3x2.CreateScale(sx, sy, new Vector2(cx, cy)),
+    };
+    var target = new CanvasRenderTarget(device, 320, 180, 96);
+    using (var draw = target.CreateDrawingSession())
+    {
+        draw.Clear(Color.FromArgb(0, 0, 0, 0));
+        draw.DrawImage(expanded, Vector2.Zero, new Windows.Foundation.Rect(0, 0, 320, 180));
+    }
+    return target;
+}
+using var switchLens = RenderSwitch();
+using var switchFlat = RenderSwitch(compare: 1);
+using var switchOff = RenderSwitch(on: false);
+byte[] switchPixels = switchLens.GetPixelBytes(), switchIdentity = switchFlat.GetPixelBytes();
+int switchWidth = Enumerable.Range(100, 120).Count(x => switchPixels[(90 * 320 + x) * 4 + 3] > 127);
+int switchHeight = Enumerable.Range(50, 80).Count(y => switchPixels[(y * 320 + 160) * 4 + 3] > 127);
+Check("pressed switch keeps the approved wide capsule", Math.Abs(switchWidth - 52) <= 1 && Math.Abs(switchHeight - 32) <= 1, switchWidth);
+double switchShoulder = Difference(switchPixels, switchIdentity, 153, 75, 167, 79);
+Check("switch shoulder refracts the rail into clear surrounding glass", switchShoulder > 20, switchShoulder);
+int switchCenter = (90 * 320 + 160) * 4;
+Check("switch transmits the rail color without a white interior wash", switchPixels[switchCenter + 1] > 195 && switchPixels[switchCenter + 2] < 65, switchPixels[switchCenter + 1]);
+double switchColor = Difference(switchPixels, switchOff.GetPixelBytes(), 155, 86, 165, 94);
+Check("switch optics sample the live changing rail", switchColor > 35, switchColor);
+double switchAlpha = Difference(switchPixels, switchIdentity, 100, 50, 220, 130, 3);
+Check("optical strength preserves the frozen switch outline", switchAlpha == 0, switchAlpha);
+await switchLens.SaveAsync(Path.Combine(output, "switch-pressed.png"), CanvasBitmapFileFormat.Png);
 await scene.SaveAsync(Path.Combine(output, "scene.png"), CanvasBitmapFileFormat.Png);
 await glass.SaveAsync(Path.Combine(output, "refracted.png"), CanvasBitmapFileFormat.Png);
 await control.SaveAsync(Path.Combine(output, "blur-only.png"), CanvasBitmapFileFormat.Png);

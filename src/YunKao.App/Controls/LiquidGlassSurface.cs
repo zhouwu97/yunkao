@@ -204,11 +204,15 @@ public sealed partial class LiquidGlassSurface : Grid
             CornerRadius c = SurfaceCorners;
             Color tint = Tint is SolidColorBrush brush ? brush.Color
                 : ActualTheme == ElementTheme.Dark ? Color.FromArgb(255, 42, 39, 61) : Color.FromArgb(255, 255, 255, 255);
+            // Large panels use the reference Demo's clear transmission. The window's
+            // stronger Mica/acrylic wash must not turn the optical surface milky.
+            double tintOpacity = _interaction?.Input is GlassPanel
+                ? Math.Min(GlassSettings.TintOpacity, .06) : GlassSettings.TintOpacity;
             _renderer.SetMaterial(new(
                 new GlassCorners((float)c.TopLeft, (float)c.TopRight, (float)c.BottomRight, (float)c.BottomLeft),
                 Blur ? Clamp(BlurAmount, 0, 64, 1.5f) : 0,
                 Clamp(RefractionAmount, 0, 80, 24), Clamp(Saturation, 0, 2, 1.12f), tint,
-                Clamp(GlassSettings.TintOpacity * TintScale, 0, 1, .6f), ShowSheen,
+                Clamp(tintOpacity * TintScale, 0, 1, .04f), ShowSheen,
                 Padding: DeformationPadding, Dispersion: Clamp(Dispersion, 0, 1, .35f)));
             _interaction?.Paint();
         }

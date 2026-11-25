@@ -5,7 +5,7 @@ namespace YunKao.Core.Services;
 /// </summary>
 public static class ExportPathGenerator
 {
-    public static string CreateUniquePath(string directory, string? prefix, string format)
+    public static string CreateUniquePath(string directory, string? prefix, string format, DateTime? timestamp = null)
     {
         string targetDir = string.IsNullOrWhiteSpace(directory)
             ? Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
@@ -19,7 +19,7 @@ public static class ExportPathGenerator
             || character is '/' or '\\' ? '_' : character).ToArray()).Trim(' ', '.');
         if (cleanPrefix.Length == 0) cleanPrefix = "云考题库导出";
         if (cleanPrefix.Length > 80) cleanPrefix = cleanPrefix[..80];
-        string baseName = $"{cleanPrefix}_{DateTime.Now:yyyyMMdd_HHmmss}";
+        string baseName = $"{cleanPrefix}_{timestamp ?? DateTime.Now:yyyyMMdd_HHmmss}";
 
         string candidate = Path.Combine(targetDir, $"{baseName}.{ext}");
         if (!File.Exists(candidate)) return candidate;

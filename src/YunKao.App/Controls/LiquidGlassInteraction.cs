@@ -95,7 +95,9 @@ internal sealed class LiquidGlassInteraction : IDisposable
         _motion.Press(world.Position.X, world.Position.Y, _geometry.ActualWidth, _geometry.ActualHeight, Pressure(world));
         TrackRoot(root);
         // Buttons keep native click/capture until a real drag is detected. Touch retains native pan ownership.
-        if (Input is not ButtonBase && !args.Handled && world.PointerDeviceType == PointerDeviceType.Mouse
+        // A nonselecting ListView can mark the down event handled before the panel
+        // sees it. Child editing/selection owners were already excluded above.
+        if (Input is not ButtonBase && world.PointerDeviceType == PointerDeviceType.Mouse
             && Input.CapturePointer(args.Pointer)) _captureOwner = Input;
         UpdateLight(args.GetCurrentPoint(_geometry));
         Wake();

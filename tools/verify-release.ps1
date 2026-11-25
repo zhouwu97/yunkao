@@ -18,6 +18,7 @@ $required = @(
     "ComputeSharp.D2D1.WinUI.dll",
     "Microsoft.Graphics.Canvas.dll",
     "Assets\Luna.png",
+    "Assets\AppIcon.ico",
     "Assets\GlassNotices\NOTICE.txt",
     "Assets\GlassNotices\ComputeSharp-MIT.txt",
     "README.txt",

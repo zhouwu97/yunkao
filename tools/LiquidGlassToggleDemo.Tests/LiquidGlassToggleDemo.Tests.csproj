@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <Using Include="Xunit" />
+    <Compile Include="../../src/YunKao.Core/Presentation/LiquidToggleMotion.cs" Link="LiquidToggleMotion.cs" />
+    <Compile Include="../../src/YunKao.Tests/LiquidToggleMotionTests.cs" Link="LiquidToggleMotionTests.cs" />
+  </ItemGroup>
+</Project>

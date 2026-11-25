@@ -15,5 +15,6 @@
     <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.4.0" />
     <PackageReference Include="ComputeSharp.D2D1.WinUI" Version="3.2.0" />
     <Compile Include="../../src/YunKao.App/Controls/LiquidGlassShader.cs" Link="LiquidGlassShader.cs" />
+    <Compile Include="../../src/YunKao.App/Controls/SwitchTrackShader.cs" Link="SwitchTrackShader.cs" />
   </ItemGroup>
 </Project>

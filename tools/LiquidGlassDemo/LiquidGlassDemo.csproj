@@ -24,6 +24,7 @@
     <PackageReference Include="ComputeSharp.D2D1.WinUI" Version="3.2.0" />
     <ProjectReference Include="../../src/YunKao.Core/YunKao.Core.csproj" />
     <Compile Include="../../src/YunKao.App/Controls/LiquidGlassShader.cs" Link="LiquidGlassShader.cs" />
+    <Compile Include="../../src/YunKao.App/Controls/SwitchTrackShader.cs" Link="SwitchTrackShader.cs" />
     <Compile Include="../../src/YunKao.App/Controls/LiquidGlassInteraction.cs" Link="Controls/LiquidGlassInteraction.cs" />
     <Compile Include="../../src/YunKao.App/Controls/LiquidGlassSurface.cs" Link="Controls/LiquidGlassSurface.cs" />
     <Compile Include="../../src/YunKao.App/Controls/LiquidGlassRenderer.cs" Link="Controls/LiquidGlassRenderer.cs" />
@@ -39,6 +40,7 @@
     <Page Include="../../src/YunKao.App/Themes/Typography.xaml" Link="Themes/Typography.xaml" />
     <Page Include="../../src/YunKao.App/Themes/Controls.xaml" Link="Themes/Controls.xaml" />
     <Page Include="../../src/YunKao.App/Themes/Glass.xaml" Link="Themes/Glass.xaml" />
+    <Page Include="../../src/YunKao.App/Themes/GlassToggle.xaml" Link="Themes/GlassToggle.xaml" />
     <Content Include="../../src/YunKao.App/Assets/Luna.png" Link="Assets/Luna.png" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../../src/YunKao.App/Assets/GlassNotices/*.txt" Link="Assets/GlassNotices/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" ExcludeFromResourceIndex="true" />
   </ItemGroup>
